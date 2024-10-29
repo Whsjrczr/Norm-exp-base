@@ -1,0 +1,5 @@
+==> args: Namespace(arch='MLP', width=100, depth=4, epochs=10, start_epoch=-1, output='./results', test=False, seed=-1, gpu=None, dataset='cifar10', dataset_root='/home/PycharmProjects/data/cifar10/', batch_size=[64, 1000], workers=1, im_size=(32, 32), dataset_classes=None, lr_method='fix', lr=0.001, lr_step=30, lr_gamma=0.1, lr_steps=[], optimizer='adam', optimizer_config={}, weight_decay=1e-05, log_suffix='', print_f=100, resume='', load='', load_no_strict=True, norm='No', norm_cfg={}, vis=False, vis_port=6006, vis_env=None)
+==> the results path: ./results
+==> seed: 1730199753
+==> PyTorch version: 2.5.1, cudnn version: 90100
+==> git version: 

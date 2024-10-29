@@ -1,0 +1,5 @@
+# python setting
+.conda/
+
+# vscode setting
+.dataset/
