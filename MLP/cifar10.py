@@ -11,10 +11,12 @@ import torchvision.transforms as transforms
 from torchvision.utils import save_image
 import sys
 
-sys.path.append('../')
+from Taiyi.taiyi.monitor import Monitor
+import wandb
 
+sys.path.append('../')
 import extension as ext
-from model import *
+from model.selection_tool import get_model
 
 
 
@@ -31,33 +33,17 @@ class MNIST:
 
         self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, self.cfg.resume is not None)
         ext.trainer.setting(self.cfg)
-        if self.cfg.arch == 'MLP':
-            self.model = MLP(width=self.cfg.width, depth=self.cfg.depth)
-        elif self.cfg.arch == 'MLPReLU':
-            self.model = MLPReLU(width=self.cfg.width, depth=self.cfg.depth)
-        elif self.cfg.arch =='LinearModel':
-            self.model = LinearModel(width=self.cfg.width, depth=self.cfg.depth)
-        elif self.cfg.arch =='Linear':
-            self.model = Linear(width=self.cfg.width, depth=self.cfg.depth)
-        elif self.cfg.arch =='resnet18':
-            self.model = resnet18(num_classes=10)
-        elif self.cfg.arch =='resnet34':
-            self.model = Linear(num_classes=10)
-        elif self.cfg.arch =='resnet50':
-            self.model = Linear(num_classes=10)
-        else:
-            self.model = AutoEncoder()
+
+        self.model, transform = get_model(self.cfg.arch, self.cfg.width, self.cfg.depth, self.cfg.dataset)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
+
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
         self.scheduler = ext.scheduler.setting(self.optimizer, self.cfg)
 
-        self.saver = ext.checkpoint.Checkpoint(self.model, self.cfg, self.optimizer, self.scheduler, self.result_path,
-                                               not self.cfg.test)
+        self.saver = ext.checkpoint.Checkpoint(self.model, self.cfg, self.optimizer, self.scheduler, self.result_path, not self.cfg.test)
         self.saver.load(self.cfg.load)
 
         # dataset loader
-        # transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,)),transforms.Grayscale()])
         self.train_loader = ext.dataset.get_dataset_loader(self.cfg, transform, train=True, use_cuda=False)
         self.val_loader = ext.dataset.get_dataset_loader(self.cfg, transform, train=False, use_cuda=False)
 
@@ -79,6 +65,8 @@ class MNIST:
         self.vis = ext.visualization.setting(self.cfg, self.model_name,
                                              {'train loss': 'loss', 'test loss': 'loss', 'train accuracy': 'accuracy',
                                               'test accuracy': 'accuracy'})
+        
+        # self.monitor = Monitor()
         return
 
     def add_arguments(self):
@@ -120,11 +108,12 @@ class MNIST:
             if self.cfg.lr_method == 'auto':
                 self.scheduler.step(val_loss)
         # finish train
-        now_date = time.strftime("%y-%m-%d_%H:%M:%S", time.localtime(time.time()))
+        now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))
-        new_log_filename = '{}_{}_{:5.2f}%.txt'.format(self.model_name, now_date, self.best_acc)
+        new_log_filename = r'{}_{}_{:5.2f}%%.txt'.format(self.model_name, now_date, self.best_acc)
         self.logger('\n==> Network training completed. Copy log file to {}'.format(new_log_filename))
-        shutil.copy(self.logger.filename, os.path.join(self.result_path, new_log_filename))
+        new_log_path = os.path.join(self.result_path, new_log_filename)
+        shutil.copy(self.logger.filename, new_log_path)
         # print("trainend.")
         return
 

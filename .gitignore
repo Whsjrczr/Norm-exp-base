@@ -1,5 +1,22 @@
 # python setting
 .conda/
 
-# vscode setting
-.dataset/
+# dataset
+dataset/
+
+# Taiyi tool
+Taiyi/
+
+# pycache
+MLP/model/__pycache__/
+extension/__pycache__/
+
+# result
+MLP/results/
+
+# wandb related
+wandb/
+MLP/test_wandb/
+
+# test
+MLP/exp/a.txt

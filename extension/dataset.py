@@ -9,7 +9,7 @@ from torchvision.datasets.folder import has_file_allowed_extension, default_load
 import random
 import numpy as np
 
-dataset_list = ['mnist', 'fashion-mnist', 'cifar10', 'ImageNet', 'folder']
+dataset_list = ['mnist', 'fashion-mnist', 'mnist_RandomLabel', 'fashion-mnist_RandomLabel', 'cifar10', 'cifar10_RandomLabel', 'ImageNet', 'folder']
 
 
 def add_arguments(parser: argparse.ArgumentParser):
