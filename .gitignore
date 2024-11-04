@@ -10,6 +10,10 @@ Taiyi/
 # pycache
 MLP/model/__pycache__/
 extension/__pycache__/
+extension/.ipynb_checkpoints/
+extension/modules/__pycache__/
+extension/modules/.ipynb_checkpoints/
+extension/my_modules/__pycache__/
 
 # result
 MLP/results/
