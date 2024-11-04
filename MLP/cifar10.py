@@ -13,6 +13,7 @@ import sys
 
 from Taiyi.taiyi.monitor import Monitor
 import wandb
+from Taiyi.visualize import Visualization
 
 sys.path.append('../')
 import extension as ext
@@ -26,7 +27,8 @@ class MNIST:
         self.model_name = self.cfg.dataset + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(self.cfg.width)+ '_' + ext.normalization.setting(self.cfg)
         self.model_name = self.model_name + '_lr' + str(self.cfg.lr) + '_bs' + str(
             self.cfg.batch_size[0]) + '_seed' + str(self.cfg.seed)
-        print(self.cfg.norm_cfg)
+        # print(self.cfg.norm_cfg)
+        # print(self.cfg.dataset)
         self.result_path = os.path.join(self.cfg.output, self.model_name, self.cfg.log_suffix)
         os.makedirs(self.result_path, exist_ok=True)
         self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, bool(self.cfg.resume))
@@ -66,7 +68,34 @@ class MNIST:
                                              {'train loss': 'loss', 'test loss': 'loss', 'train accuracy': 'accuracy',
                                               'test accuracy': 'accuracy'})
         
-        # self.monitor = Monitor()
+        taiyi_config = {
+            # nn.BatchNorm2d: [['MeanTID', 'linear(5,0)'],'InputSndNorm']
+            nn.LayerNorm: [['InputMean', 'linear(5,0)']]
+        }
+        self.monitor = Monitor(self.model, taiyi_config)
+
+        wandb.init(
+            project="Norm-Exp",
+            name=self.model_name,
+            config={
+                "model": self.cfg.arch,
+                "depth": self.cfg.depth,
+                "width": self.cfg.width,
+                "normalization": ext.normalization.setting(self.cfg),
+
+                "learning_rate": self.cfg.lr,
+                "batch_size": self.cfg.batch_size[0],
+                "seed": self.cfg.seed,
+                "optimizer": self.cfg.optimizer,
+
+                "dataset": self.cfg.dataset,
+                "epochs": self.cfg.epochs,
+
+            }
+        )
+
+
+        self.vis_wandb = Visualization(self.monitor, wandb)
         return
 
     def add_arguments(self):
@@ -99,6 +128,7 @@ class MNIST:
             self.validate()
             return
         # train model
+        self.step=0
         for epoch in range(self.cfg.start_epoch + 1, self.cfg.epochs):
             if self.cfg.lr_method != 'auto':
                 self.scheduler.step()
@@ -110,8 +140,13 @@ class MNIST:
         # finish train
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))
+
+        self.vis_wandb.close()
+        self.monitor.get_output()
+        self.logger("==> Wandb successfully get output.")
+
         new_log_filename = r'{}_{}_{:5.2f}%%.txt'.format(self.model_name, now_date, self.best_acc)
-        self.logger('\n==> Network training completed. Copy log file to {}'.format(new_log_filename))
+        self.logger('==> Network training completed. Copy log file to {}'.format(new_log_filename))
         new_log_path = os.path.join(self.result_path, new_log_filename)
         shutil.copy(self.logger.filename, new_log_path)
         # print("trainend.")
@@ -138,6 +173,10 @@ class MNIST:
             losses.backward()
             self.optimizer.step()
 
+            self.monitor.track(self.step)
+            self.vis_wandb.show(self.step)
+            self.step+=1
+
             # measure accuracy and record loss
             train_loss += losses.item() * targets.size(0)
             if self.cfg.arch == 'AE':
@@ -153,6 +192,7 @@ class MNIST:
         accuracy = 100. * correct / total
         self.vis.add_value('train loss', train_loss)
         self.vis.add_value('train accuracy', accuracy)
+
         self.logger(
             'Train on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(epoch, train_loss,
                 accuracy, correct, total, progress_bar.time_used()))

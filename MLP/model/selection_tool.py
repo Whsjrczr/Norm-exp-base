@@ -2,11 +2,11 @@ from model import *
 import torchvision.transforms as transforms
 
 def get_model(model_name, model_width, model_depth, dataset):
-    if dataset == 'mnist' or 'fashion-mnist' or 'mnist_RandomLabel' or 'fashion-mnist_RandomLabel':
+    if dataset == 'mnist' or dataset =='fashion-mnist' or dataset =='mnist_RandomLabel' or dataset =='fashion-mnist_RandomLabel':
         input_size = 28 * 28
         output_size = 10
         transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-    elif dataset == 'cifar10' or 'cifar10_RandomLabel':
+    elif dataset == 'cifar10' or dataset =='cifar10_RandomLabel':
         input_size = 32 * 32
         output_size = 10
         transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,)),transforms.Grayscale()])

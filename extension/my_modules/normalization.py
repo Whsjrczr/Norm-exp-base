@@ -1,6 +1,5 @@
 import argparse
 import torch.nn as nn
-from .normalization_scalingonly import SOLayerNorm, SOGroupNorm
 
 
 from ..utils import str2dict
@@ -31,15 +30,6 @@ def _Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilatio
     """return first input"""
     return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias)
 
-
-def _SOLayerNorm(normalized_shape, eps=1e-5, affine=True, *args, **kwargs):
-    return SOLayerNorm(normalized_shape, eps=eps, elementwise_affine=affine)
-
-
-def _SOGroupNorm(num_features, num_groups=32, eps=1e-5, affine=True, *args, **kwargs):
-    return SOGroupNorm(num_groups, num_features, eps=eps, affine=affine)
-
-
 '''def _IdentityModule(x, *args, **kwargs):
     """return first input"""
     return IdentityModule()'''
@@ -54,7 +44,7 @@ class _config:
     norm = 'BN'
     norm_cfg = {}
     norm_methods = {'BN': _BatchNorm, 'GN': _GroupNorm, 'LN': _LayerNorm, 'IN': _InstanceNorm,
-                    'None': None, 'SOGN': _SOGroupNorm, 'SOLN': _SOLayerNorm}  # 'No': _LayerNorm, 
+                    'None': None}  # 'No': _LayerNorm, 
 
 
 def add_arguments(parser: argparse.ArgumentParser):
