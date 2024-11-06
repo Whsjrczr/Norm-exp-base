@@ -9,7 +9,7 @@ from torchvision.datasets.folder import has_file_allowed_extension, default_load
 import random
 import numpy as np
 
-dataset_list = ['mnist', 'fashion-mnist', 'mnist_RandomLabel', 'fashion-mnist_RandomLabel', 'cifar10', 'cifar10_RandomLabel', 'ImageNet', 'folder']
+dataset_list = ['mnist', 'fashion-mnist', 'mnist_RandomLabel', 'fashion-mnist_RandomLabel', 'cifar10', 'cifar10_nogrey','cifar10_RandomLabel', 'ImageNet', 'folder']
 
 
 def add_arguments(parser: argparse.ArgumentParser):
@@ -100,7 +100,15 @@ def get_dataset_loader(args: argparse.Namespace, transforms=None, target_transfo
     assert os.path.exists(root), 'Please assign the correct dataset root path with --dataset-root <PATH>'
     print("Successfully find the dataset root path")
     if args.dataset != 'folder':
-        root = os.path.join(root, args.dataset)
+        if args.dataset == 'mnist_RandomLabel':
+            root = os.path.join(root, 'mnist')
+        elif args.dataset == 'fashion-mnist_RandomLabel':
+            root = os.path.join(root, 'fashion-mnist')
+        elif args.dataset in ('cifar10_nogrey', 'cifar10_RandomLabel'):
+            root = os.path.join(root, 'cifar10')  
+        else:
+            root = os.path.join(root, args.dataset)
+    
 
     if isinstance(transforms, list):
         transforms = torchvision.transforms.Compose(transforms)
@@ -143,7 +151,7 @@ def get_dataset_loader(args: argparse.Namespace, transforms=None, target_transfo
             np.save(os.path.join(root,label_filename), random_labels.numpy())
         mnist_dataset.targets = random_labels
         dataset = mnist_dataset
-    elif args.dataset == 'cifar10':
+    elif args.dataset == 'cifar10' or args.dataset == 'cifar10_nogrey':
         if len(args.im_size) == 0:
             args.im_size = (3, 32, 32)
         args.dataset_classes = 10

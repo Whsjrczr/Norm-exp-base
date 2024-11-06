@@ -11,10 +11,6 @@ import torchvision.transforms as transforms
 from torchvision.utils import save_image
 import sys
 
-from Taiyi.taiyi.monitor import Monitor
-import wandb
-from Taiyi.visualize import Visualization
-
 sys.path.append('../')
 import extension as ext
 from model.selection_tool import get_model
@@ -64,38 +60,14 @@ class MNIST:
             self.best_acc = saved['best_acc']
         self.criterion = nn.MSELoss() if self.cfg.arch == 'AE' else nn.CrossEntropyLoss()
 
-        taiyi_config = {
-            # nn.BatchNorm2d: [['MeanTID', 'linear(5,0)'],'InputSndNorm']
-            'Norm': [['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']]
-        }
-        self.monitor = Monitor(self.model, taiyi_config)
-
-        wandb.init(
-            project="Norm-Exp",
-            name=self.model_name,
-            notes=str(self.cfg) + ' ---- ' + str(taiyi_config),
-            config={
-                "model": self.cfg.arch,
-                "depth": self.cfg.depth,
-                "width": self.cfg.width,
-                "normalization": ext.normalization.setting(self.cfg),
-
-                "learning_rate": self.cfg.lr,
-                "batch_size": self.cfg.batch_size[0],
-                "seed": self.cfg.seed,
-                "optimizer": self.cfg.optimizer,
-
-                "dataset": self.cfg.dataset,
-                "epochs": self.cfg.epochs,
-
-            }
-        )
-        self.vis_wandb = Visualization(self.monitor, wandb)
+        self.vis = ext.visualization.setting(self.cfg, self.model_name,
+                                             {'train loss': 'loss', 'test loss': 'loss', 'train accuracy': 'accuracy',
+                                              'test accuracy': 'accuracy'})
         return
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
-        model_names = ['MLP', 'LinearModel', 'Linear', 'resnet18', 'resnet34', 'resnet50','MLPReLU', 'PreNormMLP']
+        model_names = ['MLP', 'LinearModel', 'Linear', 'resnet18', 'resnet34', 'resnet50','MLPReLU']
         parser.add_argument('-a', '--arch', metavar='ARCH', default=model_names[0], choices=model_names,
                             help='model architecture: ' + ' | '.join(model_names))
         parser.add_argument('-width', '--width', type=int, default=100)
@@ -111,6 +83,7 @@ class MNIST:
         ext.logger.add_arguments(parser)
         ext.checkpoint.add_arguments(parser)
         ext.normalization.add_arguments(parser)
+        ext.visualization.add_arguments(parser)
         args = parser.parse_args()
         if args.resume:
             args = parser.parse_args(namespace=ext.checkpoint.Checkpoint.load_config(args.resume))
@@ -134,11 +107,6 @@ class MNIST:
         # finish train
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))
-
-        self.vis_wandb.close()
-        self.monitor.get_output()
-        self.logger("==> Wandb successfully get output.")
-
         new_log_filename = r'{}_{}_{:5.2f}%%.txt'.format(self.model_name, now_date, self.best_acc)
         self.logger('==> Network training completed. Copy log file to {}'.format(new_log_filename))
         new_log_path = os.path.join(self.result_path, new_log_filename)
@@ -166,9 +134,6 @@ class MNIST:
             self.optimizer.zero_grad()
             losses.backward()
             self.optimizer.step()
-
-            self.monitor.track(self.step)
-            self.vis_wandb.show(self.step)
             self.step+=1
 
             # measure accuracy and record loss
@@ -184,7 +149,8 @@ class MNIST:
                     10)
         train_loss /= total
         accuracy = 100. * correct / total
-        wandb.log({"train_acc":accuracy, "train_loss":train_loss, "epochs":epoch})
+        self.vis.add_value('train loss', train_loss)
+        self.vis.add_value('train accuracy', accuracy)
         self.logger(
             'Train on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(epoch, train_loss,
                 accuracy, correct, total, progress_bar.time_used()))
@@ -211,7 +177,8 @@ class MNIST:
                 progress_bar.step('Loss: {:.5g} | Accuracy: {:.2f}%'.format(test_loss / total, 100. * correct / total))
         test_loss /= total
         accuracy = correct * 100. / total
-        wandb.log({"test_acc":accuracy,"test_loss":test_loss, "epochs":epoch})
+        self.vis.add_value('test loss', test_loss)
+        self.vis.add_value('test accuracy', accuracy)
         self.logger('Test on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(epoch, test_loss,
             accuracy, correct, total, progress_bar.time_used()))
         if not self.cfg.test and accuracy > self.best_acc:

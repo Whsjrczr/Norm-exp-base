@@ -18,6 +18,21 @@ class MLP(nn.Module):
     def forward(self, input):
         return self.net(input)
     
+
+class PreNormMLP(nn.Module):
+    def __init__(self, depth=4, width=100, input_size=28*28, output_size=10, **kwargs):
+        super(PreNormMLP, self).__init__()
+        layers = [ext.View(input_size), nn.Linear(input_size, width), nn.ReLU(True), ext.Norm(width)]
+        for index in range(depth-1):
+            layers.append(nn.Linear(width, width))
+            layers.append(nn.ReLU(True))
+            layers.append(ext.Norm(width))
+        layers.append(nn.Linear(width, output_size))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, input):
+        return self.net(input)
+    
     
 class MLPReLU(nn.Module):
     def __init__(self, depth=4, width=100, input_size=28 * 28, output_size=10, **kwargs):

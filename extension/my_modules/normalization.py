@@ -1,6 +1,10 @@
 import argparse
 import torch.nn as nn
 
+from .ln_modules import *
+from .bn1d_modules import *
+from .bn2d_modules import *
+from .gn_modules import *
 
 from ..utils import str2dict
 
@@ -9,15 +13,36 @@ from ..utils import str2dict
 def _GroupNorm(num_features, num_groups=32, eps=1e-5, affine=True, *args, **kwargs):
     return nn.GroupNorm(num_groups, num_features, eps=eps, affine=affine)
 
+def _GroupNormCentering(num_features, num_groups=32, eps=1e-5, affine=True, *args, **kwargs):
+    return GroupNormCentering(num_groups, num_features, eps=eps, affine=affine)
+
+def _GroupNormScaling(num_features, num_groups=32, eps=1e-5, affine=True, *args, **kwargs):
+    return GroupNormScaling(num_groups, num_features, eps=eps, affine=affine)
+
 
 def _LayerNorm(normalized_shape, eps=1e-5, affine=True, *args, **kwargs):
     return nn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=affine)
 
+def _LayerNormCentering(normalized_shape, eps=1e-5, affine=True, *args, **kwargs):
+    return LayerNormCentering(normalized_shape, elementwise_affine=affine)
+
+def _LayerNormScaling(normalized_shape, eps=1e-5, affine=True, *args, **kwargs):
+    return LayerNormScaling(normalized_shape, eps=eps, elementwise_affine=affine)
+
+def _RMSNorm(normalized_shape, eps=1e-5, affine=True, *args, **kwargs):
+    return RMSNorm(normalized_shape, eps=eps, elementwise_affine=affine)
 
 def _BatchNorm(num_features, dim=4, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
     return (nn.BatchNorm2d if dim == 4 else nn.BatchNorm1d)(num_features, eps=eps, momentum=momentum, affine=affine,
                                                             track_running_stats=track_running_stats)
 
+def _BatchNormCentering(num_features, dim=4, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    return (BatchNorm2dCentering if dim == 4 else BatchNorm1dCentering)(num_features, eps=eps, momentum=momentum, affine=affine,
+                                                            track_running_stats=track_running_stats)
+
+def _BatchNormScaling(num_features, dim=4, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    return (BatchNorm2dScaling if dim == 4 else BatchNorm1dScaling)(num_features, eps=eps, momentum=momentum, affine=affine,
+                                                            track_running_stats=track_running_stats)
 
 def _InstanceNorm(num_features, dim=4, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False, *args,
                   **kwargs):
@@ -34,6 +59,9 @@ def _Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilatio
     """return first input"""
     return IdentityModule()'''
 
+def _IdentityModule(x, *args, **kwargs):
+    return nn.Identity(x, *args, **kwargs)
+
 
 def _Identity_fn(x, *args, **kwargs):
     """return first input"""
@@ -43,8 +71,10 @@ def _Identity_fn(x, *args, **kwargs):
 class _config:
     norm = 'BN'
     norm_cfg = {}
-    norm_methods = {'BN': _BatchNorm, 'GN': _GroupNorm, 'LN': _LayerNorm, 'IN': _InstanceNorm,
-                    'None': None}  # 'No': _LayerNorm, 
+    norm_methods = {'BN': _BatchNorm, 'GN': _GroupNorm, 'LN': _LayerNorm, 'IN': _InstanceNorm, 
+                    'LNc': _LayerNormCentering, 'LNs': _LayerNormScaling, 'RMS': _RMSNorm, 
+                    'BNc': _BatchNormCentering, 'BNs': _BatchNormScaling,
+                    'GNc': _GroupNormCentering, 'GNs': _GroupNormScaling, 'No': _IdentityModule}  # 'No': _LayerNorm, 
 
 
 def add_arguments(parser: argparse.ArgumentParser):
