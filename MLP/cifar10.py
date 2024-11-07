@@ -24,15 +24,14 @@ from model.selection_tool import get_model
 class MNIST:
     def __init__(self):
         self.cfg = self.add_arguments()
-        self.model_name = self.cfg.dataset + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(self.cfg.width)+ '_' + ext.normalization.setting(self.cfg)
+        self.model_name = self.cfg.dataset + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(self.cfg.width)+ '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg)
         self.model_name = self.model_name + '_lr' + str(self.cfg.lr) + '_bs' + str(
             self.cfg.batch_size[0]) + '_seed' + str(self.cfg.seed)
         # print(self.cfg.norm_cfg)
         # print(self.cfg.dataset)
         self.result_path = os.path.join(self.cfg.output, self.model_name, self.cfg.log_suffix)
         os.makedirs(self.result_path, exist_ok=True)
-        self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, bool(self.cfg.resume))
-
+        # self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, bool(self.cfg.resume))
         self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, self.cfg.resume is not None)
         ext.trainer.setting(self.cfg)
 
@@ -79,6 +78,7 @@ class MNIST:
                 "depth": self.cfg.depth,
                 "width": self.cfg.width,
                 "normalization": ext.normalization.setting(self.cfg),
+                "activation": self.cfg.activation,
 
                 "learning_rate": self.cfg.lr,
                 "batch_size": self.cfg.batch_size[0],
@@ -111,6 +111,7 @@ class MNIST:
         ext.logger.add_arguments(parser)
         ext.checkpoint.add_arguments(parser)
         ext.normalization.add_arguments(parser)
+        ext.activation.add_arguments(parser)
         args = parser.parse_args()
         if args.resume:
             args = parser.parse_args(namespace=ext.checkpoint.Checkpoint.load_config(args.resume))

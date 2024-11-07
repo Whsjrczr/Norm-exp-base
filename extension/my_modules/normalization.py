@@ -106,15 +106,15 @@ def getNormConfigFlag():
     return flag
 
 def setting(cfg: argparse.Namespace):
-    print(_config.__dict__)
+    # print(_config.__dict__)
     for key, value in vars(cfg).items():
         #print(key)
         #print(value)
         if key in _config.__dict__:
             setattr(_config, key, value)
-    #print(_config.__dict__)
+    # print(_config.__dict__)
     flagName = getNormConfigFlag()
-    print(flagName)
+    # print(flagName)
     return flagName
 
 
@@ -122,5 +122,6 @@ def Norm(*args, **kwargs):
     kwargs.update(_config.norm_cfg)
     if _config.norm == 'None':
         return None
+    print(args)
     return _config.norm_methods[_config.norm](*args, **kwargs)
 

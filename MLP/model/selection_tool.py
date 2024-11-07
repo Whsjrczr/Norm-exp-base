@@ -19,12 +19,6 @@ def get_model(model_name, model_width, model_depth, dataset):
         model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
     elif model_name == 'PreNormMLP':
         model_out = PreNormMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
-    elif model_name == 'MLPReLU':
-        model_out = MLPReLU(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
-    elif model_name =='LinearModel':
-        model_out = LinearModel(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
-    elif model_name =='Linear':
-        model_out = Linear(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
     elif model_name =='resnet18':
         model_out = resnet18(num_classes=output_size)
     elif model_name =='resnet34':
