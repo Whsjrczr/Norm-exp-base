@@ -2,6 +2,7 @@ import argparse
 import torch
 import torch.nn as nn
 from .utils import str2dict
+from .my_modules.pgn_modules import PointwiseGroupNorm
 
 def _ReLU(num_features, inplace=False, *args, **kwargs):
     return nn.ReLU(inplace=inplace)
@@ -18,11 +19,13 @@ def _GroupNorm(num_feature, num_groups=32, eps=1e-5, affine=True, *args, **kwarg
 def _IdentityModule(x, *args, **kwargs):
     return nn.Identity(x, *args, **kwargs)
 
+def _PointwiseGroupNorm(num_feature, num_groups=32, eps=1e-5, affine=True, *args, **kwargs):
+    return PointwiseGroupNorm(num_groups, num_feature, eps=eps, affine=affine)
 
 class _config:
     activation = 'relu'
     activation_cfg = {}
-    _methods = {'relu': _ReLU, 'sigmoid': _sigmoid, 'tanh': _tanh,'GN': _GroupNorm, 'no': torch.nn.Identity}
+    _methods = {'relu': _ReLU, 'sigmoid': _sigmoid, 'tanh': _tanh,'gn': _GroupNorm,'pgn': _PointwiseGroupNorm,'no': torch.nn.Identity}
 
 def add_arguments(parser: argparse.ArgumentParser):
     group = parser.add_argument_group('Activation Option:')
