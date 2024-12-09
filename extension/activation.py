@@ -55,7 +55,7 @@ def add_grouped_weight_decay(model, weight_decay=1e-4):
 def getActivationConfigFlag():
     flag = ''
     flag += _config.activation
-    if str.find(_config.activation, 'GN')>-1:
+    if str.find(_config.activation, 'gn')>-1:
         if _config.activation_cfg.get('num_groups') != None:
             flag += '_NG' + str(_config.activation_cfg.get('num_groups'))
     if str.find(_config.activation, 'relu')>-1:

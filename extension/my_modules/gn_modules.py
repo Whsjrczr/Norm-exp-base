@@ -61,8 +61,16 @@ class GroupNormCentering(nn.Module):
         output = output.view(*size)
         
         if self.affine:
-            output = output * self.weight + self.bias
+            dims_to_affine = [1 for i in range (2, len(size))]
+            weight = self.weight.view(1, self.num_channels,*dims_to_affine)
+            bias = self.bias.view(1, self.num_channels,*dims_to_affine)
+            output = output * weight + bias
         return output
+    
+    def extra_repr(self) -> str:
+        return "{num_groups}, {num_channels}, eps={eps}, " "affine={affine}".format(
+            **self.__dict__
+        )
     
 
 class GroupNormScaling(nn.Module):
@@ -112,13 +120,20 @@ class GroupNormScaling(nn.Module):
         dims_to_var = [i for i in range (2, length)]
 
         var = input.var(dim=dims_to_var, keepdim=True, unbiased=False)
-
         output = input / torch.sqrt(var + self.eps)
         output = output.view(*size)
         
         if self.affine:
-            output = output * self.weight + self.bias
+            dims_to_affine = [1 for i in range (2, len(size))]
+            weight = self.weight.view(1, self.num_channels,*dims_to_affine)
+            bias = self.bias.view(1, self.num_channels,*dims_to_affine)
+            output = output * weight + bias
         return output
+    
+    def extra_repr(self) -> str:
+        return "{num_groups}, {num_channels}, eps={eps}, " "affine={affine}".format(
+            **self.__dict__
+        )
     
 
 class GroupNormScalingRMS(nn.Module):
@@ -173,9 +188,16 @@ class GroupNormScalingRMS(nn.Module):
         output = output.view(*size)
         
         if self.affine:
-            output = output * self.weight + self.bias
+            dims_to_affine = [1 for i in range (2, len(size))]
+            weight = self.weight.view(1, self.num_channels,*dims_to_affine)
+            bias = self.bias.view(1, self.num_channels,*dims_to_affine)
+            output = output * weight + bias
         return output
     
+    def extra_repr(self) -> str:
+        return "{num_groups}, {num_channels}, eps={eps}, " "affine={affine}".format(
+            **self.__dict__
+        )
 
 if __name__ == '__main__':
 
@@ -188,20 +210,27 @@ if __name__ == '__main__':
 
     print()
 
-    gc = GroupNormCentering(2,32,affine=False)
-    gs = GroupNormScaling(2,32,affine=False)
+    gc = GroupNormCentering(2,32,affine=True)
+    gs = GroupNormScaling(2,32,affine=True)
     gn = nn.GroupNorm(2, 32, affine=False)
-    grms = GroupNormScalingRMS(2,32,affine=False)
+    grms = GroupNormScalingRMS(2,32,affine=True)
 
     ln = nn.LayerNorm([32, 4], elementwise_affine=False)
 
-    print("orgin")
-    print(x)
-    print("gn")
-    y = gn(x)
-    print(y)
-    print("gn1")
-    z = grms(gc(x))
-    print(z)
-    print(y-z)
+    # print("orgin")
+    # print(x)
+    # print("gn")
+    # y = gn(x)
+    # print(y)
+    # print("gn1")
+    # z = grms(gc(x))
+    # print(z)
+    # print(y-z)
 
+    print(gc)
+    print(gs)
+    print(grms)
+
+    print(gc(x))
+    print(gs(x))
+    print(grms(x))

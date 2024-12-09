@@ -90,8 +90,16 @@ class BatchNorm2dCentering(nn.Module):
             mean = self.running_mean
         output = input - mean
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = self.weight.view(1, self.num_features, 1, 1)
+            bias = self.bias.view(1, self.num_features, 1, 1)
+            output = weight * output + bias
         return output
+    
+    def extra_repr(self):
+        return (
+            "{num_features}, momentum={momentum}, affine={affine}, "
+            "track_running_stats={track_running_stats}".format(**self.__dict__)
+        )
     
 class BatchNorm2dScaling(nn.Module):
     _version = 2
@@ -179,9 +187,19 @@ class BatchNorm2dScaling(nn.Module):
             var = self.running_var
         output = input / torch.sqrt(var + self.eps)
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = self.weight.view(1, self.num_features, 1, 1)
+            bias = self.bias.view(1, self.num_features, 1, 1)
+            output = weight * output + bias
         return output
     
+    def extra_repr(self):
+        return (
+            "{num_features}, eps={eps}, momentum={momentum}, affine={affine}, "
+            "track_running_stats={track_running_stats}".format(**self.__dict__)
+        )
+
+    
+nn.BatchNorm1d
 
 class BatchNorm2dScalingRMS(nn.Module):
     _version = 2
@@ -271,8 +289,15 @@ class BatchNorm2dScalingRMS(nn.Module):
             norm = self.running_norm
         output = input / (norm / (frac ** (1/2)) + self.eps)
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = self.weight.view(1, self.num_features, 1, 1)
+            bias = self.bias.view(1, self.num_features, 1, 1)
+            output = weight * output + bias
         return output
+    def extra_repr(self):
+        return (
+            "{num_features}, eps={eps}, momentum={momentum}, affine={affine}, "
+            "track_running_stats={track_running_stats}".format(**self.__dict__)
+        )
 
 
     
@@ -280,17 +305,24 @@ if __name__ == '__main__':
 
     x = torch.randn(3, 4, 5, 2)
 
-    bc = BatchNorm2dCentering(4, affine=False)
-    bs = BatchNorm2dScaling(4, affine=False)
+    bc = BatchNorm2dCentering(4, affine=True)
+    bs = BatchNorm2dScaling(4, affine=True)
     bn = nn.BatchNorm2d(4, affine=False)
-    brms = BatchNorm2dScalingRMS(4, affine=False)
+    brms = BatchNorm2dScalingRMS(4, affine=True)
+    print(bc)
+    print(bs)
+    print(brms)
 
-    print("orgin")
-    print(x)
-    print("bn")
-    y = bn(x)
-    print(y)
-    print("bc+bs")
-    z = brms(bc(x))
-    print(z)
-    print(y-z)
+    # print("orgin")
+    # print(x)
+    # print("bn")
+    # y = bn(x)
+    # print(y)
+    # print("bc+bs")
+    # z = brms(bc(x))
+    # print(z)
+    # print(y-z)
+
+    print(bc(x))
+    print(bs(x))
+    print(brms(x))

@@ -86,8 +86,10 @@ class BatchNorm1dCentering(nn.Module):
         assert input.dim() in (2, 3)
         if input.dim() == 2:
             cal_dim = 0
+            shape = [1, self.num_features]
         elif input.dim() == 3:
             cal_dim = [0,2]
+            shape = [1, self.num_features, 1]
 
         if bn_training:
             mean = torch.mean(input, dim=cal_dim, keepdim=True)
@@ -96,8 +98,17 @@ class BatchNorm1dCentering(nn.Module):
             mean = self.running_mean
         output = input - mean
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = self.weight.view(*shape)
+            bias = self.bias.view(*shape)
+            output = output * weight + bias
         return output
+        
+    def extra_repr(self):
+        return (
+            "{num_features}, momentum={momentum}, affine={affine}, "
+            "track_running_stats={track_running_stats}".format(**self.__dict__)
+        )
+
     
 class BatchNorm1dScaling(nn.Module):
     _version = 2
@@ -181,8 +192,10 @@ class BatchNorm1dScaling(nn.Module):
         assert input.dim() in (2, 3)
         if input.dim() == 2:
             cal_dim = 0
+            shape = [1, self.num_features]
         elif input.dim() == 3:
             cal_dim = [0,2]
+            shape = [1, self.num_features, 1]
 
         if bn_training:
             var = torch.var(input, dim=cal_dim, unbiased=False, keepdim=True)
@@ -191,8 +204,17 @@ class BatchNorm1dScaling(nn.Module):
             var = self.running_var
         output = input / torch.sqrt(var + self.eps)
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = self.weight.view(*shape)
+            bias = self.bias.view(*shape)
+            output = output * weight + bias
         return output
+    
+    def extra_repr(self):
+        return (
+            "{num_features}, eps={eps}, momentum={momentum}, affine={affine}, "
+            "track_running_stats={track_running_stats}".format(**self.__dict__)
+        )
+
     
 
 class BatchNorm1dScalingRMS(nn.Module):
@@ -274,13 +296,15 @@ class BatchNorm1dScalingRMS(nn.Module):
         else:
             bn_training = (self.running_norm is None)
 
-        assert input.dim() in (2, 3)
+        assert input.dim() in (2, 3)            
         if input.dim() == 2:
             cal_dim = 0
             frac = input.shape[0]
+            shape = [1, self.num_features]
         elif input.dim() == 3:
             cal_dim = [0,2]
             frac = input.shape[0]*input.shape[2]
+            shape = [1, self.num_features, 1]
 
         if bn_training:
             norm = torch.norm(input,p=2, dim=cal_dim, keepdim=True)
@@ -289,25 +313,41 @@ class BatchNorm1dScalingRMS(nn.Module):
             norm = self.running_norm
         output = input / (norm / (frac ** (1/2)) + self.eps)
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = self.weight.view(*shape)
+            bias = self.bias.view(*shape)
+            output = output * weight + bias
         return output
+
+    def extra_repr(self):
+        return (
+            "{num_features}, eps={eps}, momentum={momentum}, affine={affine}, "
+            "track_running_stats={track_running_stats}".format(**self.__dict__)
+        )
 
 
 if __name__ == '__main__':
 
     x = torch.randn(3, 4, 5)
 
-    bc = BatchNorm1dCentering(4, affine=False)
-    bs = BatchNorm1dScaling(4, affine=False)
-    brms = BatchNorm1dScalingRMS(4, affine=False)
+    bc = BatchNorm1dCentering(4, affine=True)
+    bs = BatchNorm1dScaling(4, affine=True)
+    brms = BatchNorm1dScalingRMS(4, affine=True)
     bn = nn.BatchNorm1d(4, affine=False)
+    print(bc)
+    print(bs)
+    print(brms)
 
-    print("orgin")
-    print(x)
-    print("bn")
-    y = bn(x)
-    print(y)
-    print("bc+bs")
-    z = brms(bc(x))
-    print(z)
-    print(y-z)
+
+    # print("orgin")
+    # print(x)
+    # print("bn")
+    # y = bn(x)
+    # print(y)
+    # print("bc+bs")
+    # z = brms(bc(x))
+    # print(z)
+    # print(y-z)
+
+    print(bc(x))
+    print(bs(x))
+    print(brms(x))

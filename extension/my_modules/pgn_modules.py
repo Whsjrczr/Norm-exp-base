@@ -56,10 +56,17 @@ class PointwiseGroupNorm(nn.Module):
         mean = input.mean(dim=2, keepdim=True)
         output = (input - mean) / torch.sqrt(var + self.eps)
         output = output.view(*size)
+        print(mean.shape)
         
         if self.affine:
             output = output * self.weight + self.bias
         return output
+    
+    def extra_repr(self) -> str:
+        return "{num_groups}, {num_channels}, eps={eps}, " "affine={affine}".format(
+            **self.__dict__
+        )
+    
 
 
 
@@ -114,6 +121,12 @@ class PointwiseGroupNormCentering(nn.Module):
             output = output * self.weight + self.bias
         return output
     
+    def extra_repr(self) -> str:
+        return "{num_groups}, {num_channels}, eps={eps}, " "affine={affine}".format(
+            **self.__dict__
+        )
+    
+    
 
 class PointwiseGroupNormScaling(nn.Module):
     __constants__ = ["num_groups", "num_channels", "eps", "affine"]
@@ -167,6 +180,11 @@ class PointwiseGroupNormScaling(nn.Module):
             output = output * self.weight + self.bias
         return output
 
+    def extra_repr(self) -> str:
+        return "{num_groups}, {num_channels}, eps={eps}, " "affine={affine}".format(
+            **self.__dict__
+        )
+    
 
 
 class PointwiseGroupNormScalingRMS(nn.Module):
@@ -220,6 +238,12 @@ class PointwiseGroupNormScalingRMS(nn.Module):
         if self.affine:
             output = output * self.weight + self.bias
         return output
+
+    def extra_repr(self) -> str:
+        return "{num_groups}, {num_channels}, eps={eps}, " "affine={affine}".format(
+            **self.__dict__
+        )
+    
     
 
 if __name__ == '__main__':

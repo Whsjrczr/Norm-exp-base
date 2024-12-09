@@ -64,6 +64,13 @@ class LayerNormCentering(nn.Module):
         if self.elementwise_affine:
             centered_tensor = centered_tensor * self.weight + self.bias
         return centered_tensor
+
+    def extra_repr(self) -> str:
+        return (
+            "{normalized_shape}, "
+            "elementwise_affine={elementwise_affine}".format(**self.__dict__)
+        )
+    
     
 class LayerNormScaling(nn.Module):
     __constants__ = ["normalized_shape", "eps", "elementwise_affine"]
@@ -117,6 +124,13 @@ class LayerNormScaling(nn.Module):
         if self.elementwise_affine:
             centered_tensor = centered_tensor * self.weight + self.bias
         return centered_tensor
+    
+    def extra_repr(self) -> str:
+        return (
+            "{normalized_shape}, eps={eps}, "
+            "elementwise_affine={elementwise_affine}".format(**self.__dict__)
+        )
+    
     
 
 class LayerNormScalingRMS(nn.Module):
@@ -172,6 +186,12 @@ class LayerNormScalingRMS(nn.Module):
         if self.elementwise_affine:
             centered_tensor = centered_tensor * self.weight + self.bias
         return centered_tensor
+
+    def extra_repr(self) -> str:
+        return (
+            "{normalized_shape}, eps={eps}, "
+            "elementwise_affine={elementwise_affine}".format(**self.__dict__)
+        )
     
 
 
@@ -179,12 +199,18 @@ if __name__ == '__main__':
 
     x = torch.randn(1, 4, 3, 6)
 
-    lc = LayerNormCentering([4,3,6], elementwise_affine=False)
-    rms = LayerNormScalingRMS([4,3,6], elementwise_affine=False)
-    ls = LayerNormScaling([4,3,6], elementwise_affine=False)
-    ln = nn.LayerNorm([3,6], elementwise_affine=False)
+    lc = LayerNormCentering(6, elementwise_affine=True)
+    rms = LayerNormScalingRMS(6, elementwise_affine=True)
+    ls = LayerNormScaling(6, elementwise_affine=True)
+    ln = nn.LayerNorm([3,6], elementwise_affine=True)
 
-    print(lc.__class__.__name__)
+    print(lc)
+    print(rms)
+    print(ls)
+
+    print(lc(x))
+    print(rms(x))
+    print(ls(x))
 
     # print("orgin")
     # print(x)
