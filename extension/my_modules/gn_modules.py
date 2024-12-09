@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch import Size, Tensor
 import torch.nn as nn
@@ -119,6 +121,62 @@ class GroupNormScaling(nn.Module):
         return output
     
 
+class GroupNormScalingRMS(nn.Module):
+    __constants__ = ["num_groups", "num_channels", "eps", "affine"]
+    num_groups: int
+    num_channels: int
+    eps: float
+    affine: bool
+
+    def __init__(
+        self,
+        num_groups: int,
+        num_channels: int,
+        eps: float = 1e-5,
+        affine: bool = True,
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        if num_channels % num_groups != 0:
+            raise ValueError("num_channels must be divisible by num_groups")
+
+        self.num_groups = num_groups
+        self.num_channels = num_channels
+        self.eps = eps
+        self.affine = affine
+        if self.affine:
+            self.weight = Parameter(torch.empty(num_channels, **factory_kwargs))
+            self.bias = Parameter(torch.empty(num_channels, **factory_kwargs))
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.ones_(self.weight)
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        size = input.shape
+        input = input.view(size[0], self.num_groups, self.num_channels // self.num_groups, *size[2:])
+        length = len(input.shape)
+        dims_to_norm = [i for i in range (2, length)]
+
+        norm = input.norm(p=2, dim=dims_to_norm, keepdim=True)
+        frac = math.prod(input.shape[2:])
+
+        output = input / (norm / ( frac ** (1/2)) + self.eps)
+        output = output.view(*size)
+        
+        if self.affine:
+            output = output * self.weight + self.bias
+        return output
+    
+
 if __name__ == '__main__':
 
     x = torch.randn(16, 32, 4)
@@ -133,6 +191,7 @@ if __name__ == '__main__':
     gc = GroupNormCentering(2,32,affine=False)
     gs = GroupNormScaling(2,32,affine=False)
     gn = nn.GroupNorm(2, 32, affine=False)
+    grms = GroupNormScalingRMS(2,32,affine=False)
 
     ln = nn.LayerNorm([32, 4], elementwise_affine=False)
 
@@ -142,7 +201,7 @@ if __name__ == '__main__':
     y = gn(x)
     print(y)
     print("gn1")
-    z = gs(gc(x))
+    z = grms(gc(x))
     print(z)
     print(y-z)
 

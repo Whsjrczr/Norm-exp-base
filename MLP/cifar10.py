@@ -65,7 +65,7 @@ class MNIST:
 
         taiyi_config = {
             # nn.BatchNorm2d: [['MeanTID', 'linear(5,0)'],'InputSndNorm']
-            'Norm': [['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']]
+            'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']]
         }
         self.monitor = Monitor(self.model, taiyi_config)
 

@@ -122,6 +122,5 @@ def Norm(*args, **kwargs):
     kwargs.update(_config.norm_cfg)
     if _config.norm == 'None':
         return None
-    print(args)
     return _config.norm_methods[_config.norm](*args, **kwargs)
 

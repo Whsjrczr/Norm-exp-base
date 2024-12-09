@@ -70,7 +70,7 @@ class LayerNormScaling(nn.Module):
     normalized_shape: Tuple[int, ...]
     eps: float
     elementwise_affine: bool
-
+    
     def __init__(self, 
         normalized_shape: _shape_t,
         eps: float = 1e-5,
@@ -119,7 +119,7 @@ class LayerNormScaling(nn.Module):
         return centered_tensor
     
 
-class RMSNorm(nn.Module):
+class LayerNormScalingRMS(nn.Module):
     __constants__ = ["normalized_shape", "eps", "elementwise_affine"]
     normalized_shape: Tuple[int, ...]
     eps: float
@@ -180,24 +180,26 @@ if __name__ == '__main__':
     x = torch.randn(1, 4, 3, 6)
 
     lc = LayerNormCentering([4,3,6], elementwise_affine=False)
-    rms = RMSNorm([4,3,6], elementwise_affine=False)
+    rms = LayerNormScalingRMS([4,3,6], elementwise_affine=False)
     ls = LayerNormScaling([4,3,6], elementwise_affine=False)
-    ln = nn.LayerNorm([4,3,6], elementwise_affine=False)
+    ln = nn.LayerNorm([3,6], elementwise_affine=False)
 
-    print("orgin")
-    print(x)
-    print("ln")
-    y = ln(x)
-    print(y)
-    print("lc+ls")
-    z = ls(lc(x))
-    # print(z)
-    print(y-z)
-    print("lc+rms")
-    a = rms(lc(x))
-    # print(a)
-    print(y-a)
+    print(lc.__class__.__name__)
 
-    print()
-    print(z-a)
+    # print("orgin")
+    # print(x)
+    # print("ln")
+    # y = ln(x)
+    # print(y)
+    # print("lc+ls")
+    # z = ls(lc(x))
+    # # print(z)
+    # print(y-z)
+    # print("lc+rms")
+    # a = rms(lc(x))
+    # # print(a)
+    # print(y-a)
+
+    # print()
+    # print(z-a)
 

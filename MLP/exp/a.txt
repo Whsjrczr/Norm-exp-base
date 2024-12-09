@@ -1,1 +1,0 @@
-& e:/norm-exp/.conda/python.exe e:/norm-exp/MLP/cifar10.py -a=MLP --batch-size=64 --depth=4 --width=512 --epochs=2 -oo=sgd -oc=momentum=0 -wd=0 --lr=0.001 --lr-method=step --lr-step=5 --lr-gamma=0.9 --dataset=mnist --dataset-root=dataset/ --norm=LN --norm-cfg=T=5,num_channels=0,num_groups=2,dim=2 --activation=relu --seed=1 --log-suffix=base
