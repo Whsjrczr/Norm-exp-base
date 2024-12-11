@@ -95,7 +95,7 @@ class BatchNorm1dCentering(nn.Module):
             mean = torch.mean(input, dim=cal_dim, keepdim=True)
             self.running_mean = (exponential_average_factor * self.running_mean + (1 - exponential_average_factor) * mean)
         else:
-            mean = self.running_mean
+            mean = self.running_mean.view(*shape)
         output = input - mean
         if self.affine:
             weight = self.weight.view(*shape)
@@ -201,7 +201,7 @@ class BatchNorm1dScaling(nn.Module):
             var = torch.var(input, dim=cal_dim, unbiased=False, keepdim=True)
             self.running_var = (exponential_average_factor * self.running_var + (1 - exponential_average_factor) * var)
         else:
-            var = self.running_var
+            var = self.running_var.view(*shape)
         output = input / torch.sqrt(var + self.eps)
         if self.affine:
             weight = self.weight.view(*shape)
@@ -310,7 +310,7 @@ class BatchNorm1dScalingRMS(nn.Module):
             norm = torch.norm(input,p=2, dim=cal_dim, keepdim=True)
             self.running_norm = (exponential_average_factor * self.running_norm + (1 - exponential_average_factor) * norm)
         else:
-            norm = self.running_norm
+            norm = self.running_norm.view(*shape)
         output = input / (norm / (frac ** (1/2)) + self.eps)
         if self.affine:
             weight = self.weight.view(*shape)
@@ -329,10 +329,10 @@ if __name__ == '__main__':
 
     x = torch.randn(3, 4, 5)
 
-    bc = BatchNorm1dCentering(4, affine=True)
-    bs = BatchNorm1dScaling(4, affine=True)
-    brms = BatchNorm1dScalingRMS(4, affine=True)
-    bn = nn.BatchNorm1d(4, affine=False)
+    bc = BatchNorm1dCentering(4, affine=True).eval()
+    bs = BatchNorm1dScaling(4, affine=True).eval()
+    brms = BatchNorm1dScalingRMS(4, affine=True).eval()
+    bn = nn.BatchNorm1d(4, affine=False).eval()
     print(bc)
     print(bs)
     print(brms)

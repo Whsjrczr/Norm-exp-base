@@ -87,7 +87,7 @@ class BatchNorm2dCentering(nn.Module):
             mean = torch.mean(input, dim=(0,2,3), keepdim=True)
             self.running_mean =(exponential_average_factor * self.running_mean + (1 - exponential_average_factor) * mean)
         else:
-            mean = self.running_mean
+            mean = self.running_mean.view(1, self.num_features, 1, 1)
         output = input - mean
         if self.affine:
             weight = self.weight.view(1, self.num_features, 1, 1)
@@ -184,7 +184,7 @@ class BatchNorm2dScaling(nn.Module):
             var = torch.var(input, dim=(0,2,3), unbiased=False, keepdim=True)
             self.running_var =(exponential_average_factor * self.running_var + (1 - exponential_average_factor) * var)
         else:
-            var = self.running_var
+            var = self.running_var.view(1, self.num_features, 1, 1)
         output = input / torch.sqrt(var + self.eps)
         if self.affine:
             weight = self.weight.view(1, self.num_features, 1, 1)
@@ -197,9 +197,6 @@ class BatchNorm2dScaling(nn.Module):
             "{num_features}, eps={eps}, momentum={momentum}, affine={affine}, "
             "track_running_stats={track_running_stats}".format(**self.__dict__)
         )
-
-    
-nn.BatchNorm1d
 
 class BatchNorm2dScalingRMS(nn.Module):
     _version = 2
@@ -286,7 +283,7 @@ class BatchNorm2dScalingRMS(nn.Module):
             norm = torch.norm(input, p=2, dim=(0,2,3), keepdim=True)
             self.running_norm =(exponential_average_factor * self.running_norm + (1 - exponential_average_factor) * norm)
         else:
-            norm = self.running_norm
+            norm = self.running_norm.view(1, self.num_features, 1, 1)
         output = input / (norm / (frac ** (1/2)) + self.eps)
         if self.affine:
             weight = self.weight.view(1, self.num_features, 1, 1)
@@ -305,24 +302,24 @@ if __name__ == '__main__':
 
     x = torch.randn(3, 4, 5, 2)
 
-    bc = BatchNorm2dCentering(4, affine=True)
-    bs = BatchNorm2dScaling(4, affine=True)
-    bn = nn.BatchNorm2d(4, affine=False)
-    brms = BatchNorm2dScalingRMS(4, affine=True)
-    print(bc)
-    print(bs)
-    print(brms)
+    bc = BatchNorm2dCentering(4, affine=False).eval()
+    bs = BatchNorm2dScaling(4, affine=False).eval()
+    bn = nn.BatchNorm2d(4, affine=False).eval()
+    brms = BatchNorm2dScalingRMS(4, affine=False).eval()
+    # print(bc)
+    # print(bs)
+    # print(brms)
 
-    # print("orgin")
-    # print(x)
-    # print("bn")
-    # y = bn(x)
-    # print(y)
-    # print("bc+bs")
-    # z = brms(bc(x))
-    # print(z)
-    # print(y-z)
+    print("orgin")
+    print(x)
+    print("bn")
+    y = bn(x)
+    print(y)
+    print("bc+bs")
+    z = bs(bc(x))
+    print(z)
+    print(y-z)
 
-    print(bc(x))
-    print(bs(x))
-    print(brms(x))
+    # print(bc(x))
+    # print(bs(x))
+    # print(brms(x))
