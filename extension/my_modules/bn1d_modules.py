@@ -93,7 +93,7 @@ class BatchNorm1dCentering(nn.Module):
 
         if bn_training:
             mean = torch.mean(input, dim=cal_dim, keepdim=True)
-            self.running_mean = (exponential_average_factor * self.running_mean + (1 - exponential_average_factor) * mean)
+            self.running_mean =((1 - exponential_average_factor) * self.running_mean + exponential_average_factor * mean)
         else:
             mean = self.running_mean.view(*shape)
         output = input - mean
@@ -199,7 +199,7 @@ class BatchNorm1dScaling(nn.Module):
 
         if bn_training:
             var = torch.var(input, dim=cal_dim, unbiased=False, keepdim=True)
-            self.running_var = (exponential_average_factor * self.running_var + (1 - exponential_average_factor) * var)
+            self.running_var =((1 - exponential_average_factor) * self.running_var + exponential_average_factor * var)
         else:
             var = self.running_var.view(*shape)
         output = input / torch.sqrt(var + self.eps)
@@ -308,7 +308,7 @@ class BatchNorm1dScalingRMS(nn.Module):
 
         if bn_training:
             norm = torch.norm(input,p=2, dim=cal_dim, keepdim=True)
-            self.running_norm = (exponential_average_factor * self.running_norm + (1 - exponential_average_factor) * norm)
+            self.running_norm =((1 - exponential_average_factor) * self.running_norm + exponential_average_factor * norm)
         else:
             norm = self.running_norm.view(*shape)
         output = input / (norm / (frac ** (1/2)) + self.eps)
@@ -333,21 +333,22 @@ if __name__ == '__main__':
     bs = BatchNorm1dScaling(4, affine=True).eval()
     brms = BatchNorm1dScalingRMS(4, affine=True).eval()
     bn = nn.BatchNorm1d(4, affine=False).eval()
-    print(bc)
-    print(bs)
-    print(brms)
+    print(bc.training)
+    # print(bc)
+    # print(bs)
+    # print(brms)
 
 
-    # print("orgin")
-    # print(x)
-    # print("bn")
-    # y = bn(x)
-    # print(y)
-    # print("bc+bs")
-    # z = brms(bc(x))
-    # print(z)
-    # print(y-z)
+    # # print("orgin")
+    # # print(x)
+    # # print("bn")
+    # # y = bn(x)
+    # # print(y)
+    # # print("bc+bs")
+    # # z = brms(bc(x))
+    # # print(z)
+    # # print(y-z)
 
-    print(bc(x))
-    print(bs(x))
-    print(brms(x))
+    # print(bc(x))
+    # print(bs(x))
+    # print(brms(x))

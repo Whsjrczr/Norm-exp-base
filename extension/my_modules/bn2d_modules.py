@@ -85,7 +85,7 @@ class BatchNorm2dCentering(nn.Module):
 
         if bn_training:
             mean = torch.mean(input, dim=(0,2,3), keepdim=True)
-            self.running_mean =(exponential_average_factor * self.running_mean + (1 - exponential_average_factor) * mean)
+            self.running_mean =((1 - exponential_average_factor) * self.running_mean + exponential_average_factor * mean)
         else:
             mean = self.running_mean.view(1, self.num_features, 1, 1)
         output = input - mean
@@ -182,7 +182,7 @@ class BatchNorm2dScaling(nn.Module):
 
         if bn_training:
             var = torch.var(input, dim=(0,2,3), unbiased=False, keepdim=True)
-            self.running_var =(exponential_average_factor * self.running_var + (1 - exponential_average_factor) * var)
+            self.running_var =((1 - exponential_average_factor) * self.running_var + exponential_average_factor * var)
         else:
             var = self.running_var.view(1, self.num_features, 1, 1)
         output = input / torch.sqrt(var + self.eps)
@@ -281,7 +281,7 @@ class BatchNorm2dScalingRMS(nn.Module):
 
         if bn_training:
             norm = torch.norm(input, p=2, dim=(0,2,3), keepdim=True)
-            self.running_norm =(exponential_average_factor * self.running_norm + (1 - exponential_average_factor) * norm)
+            self.running_norm =((1 - exponential_average_factor) * self.running_norm + exponential_average_factor * norm)
         else:
             norm = self.running_norm.view(1, self.num_features, 1, 1)
         output = input / (norm / (frac ** (1/2)) + self.eps)
