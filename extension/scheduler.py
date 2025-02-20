@@ -30,8 +30,7 @@ def setting(optimizer, args, lr_func=None, **kwargs):
     elif lr_method == 'steps':
         scheduler = MultiStepLR(optimizer, args.lr_steps, args.lr_gamma)
     elif lr_method == 'ploy':
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
-                                                      lambda _epoch: (1. - _epoch / args.epochs) ** args.lr_gamma)
+        scheduler = LambdaLR(optimizer, lambda _epoch: (1. - _epoch / args.epochs) ** args.lr_gamma)
     elif lr_method == 'auto':
         scheduler = ReduceLROnPlateau(optimizer, factor=args.lr_gamma, patience=args.lr_step, verbose=True)
     elif lr_method == 'exp':

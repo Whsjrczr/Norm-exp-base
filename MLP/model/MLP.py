@@ -22,7 +22,7 @@ class MLP(nn.Module):
 class PreNormMLP(nn.Module):
     def __init__(self, depth=4, width=100, input_size=28*28, output_size=10, **kwargs):
         super(PreNormMLP, self).__init__()
-        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(), ext.Norm(width)]
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width)]
         for index in range(depth-1):
             layers.append(nn.Linear(width, width))
             layers.append(ext.Activation())
