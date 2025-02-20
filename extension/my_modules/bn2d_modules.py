@@ -7,16 +7,14 @@ from torch.nn.parameter import Parameter
 
 class BatchNorm2dCentering(nn.Module):
     _version = 2
-    __constants__ = ["track_running_stats", "momentum", "eps", "num_features", "affine"]
+    __constants__ = ["track_running_stats", "momentum", "num_features", "affine"]
     num_features: int
-    eps: float
     momentum: float | None
     affine: bool
     track_running_stats: bool
     def __init__(
         self,
         num_features: int,
-        eps: float = 1e-5,
         momentum: float | None = 0.1,
         affine: bool = True,
         track_running_stats: bool = True,
@@ -30,10 +28,8 @@ class BatchNorm2dCentering(nn.Module):
         self.affine = affine
         self.track_running_stats = track_running_stats
         if self.affine:
-            self.weight = Parameter(torch.empty(num_features, **factory_kwargs))
             self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
         else:
-            self.register_parameter("weight", None)
             self.register_parameter("bias", None)
         if self.track_running_stats:
             self.register_buffer(
@@ -61,7 +57,6 @@ class BatchNorm2dCentering(nn.Module):
     def reset_parameters(self) -> None:
         self.reset_running_stats()
         if self.affine:
-            init.ones_(self.weight)
             init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
@@ -90,9 +85,8 @@ class BatchNorm2dCentering(nn.Module):
             mean = self.running_mean.view(1, self.num_features, 1, 1)
         output = input - mean
         if self.affine:
-            weight = self.weight.view(1, self.num_features, 1, 1)
             bias = self.bias.view(1, self.num_features, 1, 1)
-            output = weight * output + bias
+            output = output + bias
         return output
     
     def extra_repr(self):
@@ -128,10 +122,8 @@ class BatchNorm2dScaling(nn.Module):
         self.track_running_stats = track_running_stats
         if self.affine:
             self.weight = Parameter(torch.empty(num_features, **factory_kwargs))
-            self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
         else:
             self.register_parameter("weight", None)
-            self.register_parameter("bias", None)
         if self.track_running_stats:
             self.register_buffer(
                 "running_var", torch.zeros(num_features, **factory_kwargs)
@@ -159,7 +151,6 @@ class BatchNorm2dScaling(nn.Module):
         self.reset_running_stats()
         if self.affine:
             init.ones_(self.weight)
-            init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
         if self.momentum is None:
@@ -188,8 +179,7 @@ class BatchNorm2dScaling(nn.Module):
         output = input / torch.sqrt(var + self.eps)
         if self.affine:
             weight = self.weight.view(1, self.num_features, 1, 1)
-            bias = self.bias.view(1, self.num_features, 1, 1)
-            output = weight * output + bias
+            output = weight * output
         return output
     
     def extra_repr(self):
@@ -225,10 +215,8 @@ class BatchNorm2dScalingRMS(nn.Module):
         self.track_running_stats = track_running_stats
         if self.affine:
             self.weight = Parameter(torch.empty(num_features, **factory_kwargs))
-            self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
         else:
             self.register_parameter("weight", None)
-            self.register_parameter("bias", None)
         if self.track_running_stats:
             self.register_buffer(
                 "running_norm", torch.zeros(num_features, **factory_kwargs)
@@ -256,7 +244,6 @@ class BatchNorm2dScalingRMS(nn.Module):
         self.reset_running_stats()
         if self.affine:
             init.ones_(self.weight)
-            init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
         if self.momentum is None:
@@ -287,8 +274,7 @@ class BatchNorm2dScalingRMS(nn.Module):
         output = input / (norm / (frac ** (1/2)) + self.eps)
         if self.affine:
             weight = self.weight.view(1, self.num_features, 1, 1)
-            bias = self.bias.view(1, self.num_features, 1, 1)
-            output = weight * output + bias
+            output = weight * output
         return output
     def extra_repr(self):
         return (

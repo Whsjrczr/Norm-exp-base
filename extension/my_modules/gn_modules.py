@@ -12,17 +12,15 @@ from typing import List, Optional, Tuple, Union
 _shape_t = Union[int, List[int], Size]
 
 class GroupNormCentering(nn.Module):
-    __constants__ = ["num_groups", "num_channels", "eps", "affine"]
+    __constants__ = ["num_groups", "num_channels", "affine"]
     num_groups: int
     num_channels: int
-    eps: float
     affine: bool
 
     def __init__(
         self,
         num_groups: int,
         num_channels: int,
-        eps: float = 1e-5,
         affine: bool = True,
         device=None,
         dtype=None,
@@ -34,10 +32,8 @@ class GroupNormCentering(nn.Module):
 
         self.num_groups = num_groups
         self.num_channels = num_channels
-        self.eps = eps
         self.affine = affine
         if self.affine:
-            self.weight = Parameter(torch.empty(num_channels, **factory_kwargs))
             self.bias = Parameter(torch.empty(num_channels, **factory_kwargs))
         else:
             self.register_parameter("weight", None)
@@ -47,7 +43,6 @@ class GroupNormCentering(nn.Module):
 
     def reset_parameters(self) -> None:
         if self.affine:
-            init.ones_(self.weight)
             init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
@@ -62,13 +57,12 @@ class GroupNormCentering(nn.Module):
         
         if self.affine:
             dims_to_affine = [1 for i in range (2, len(size))]
-            weight = self.weight.view(1, self.num_channels,*dims_to_affine)
             bias = self.bias.view(1, self.num_channels,*dims_to_affine)
-            output = output * weight + bias
+            output = output + bias
         return output
     
     def extra_repr(self) -> str:
-        return "{num_groups}, {num_channels}, eps={eps}, " "affine={affine}".format(
+        return "{num_groups}, {num_channels}, " "affine={affine}".format(
             **self.__dict__
         )
     
@@ -100,17 +94,14 @@ class GroupNormScaling(nn.Module):
         self.affine = affine
         if self.affine:
             self.weight = Parameter(torch.empty(num_channels, **factory_kwargs))
-            self.bias = Parameter(torch.empty(num_channels, **factory_kwargs))
         else:
             self.register_parameter("weight", None)
-            self.register_parameter("bias", None)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         if self.affine:
             init.ones_(self.weight)
-            init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
         size = input.shape
@@ -126,8 +117,7 @@ class GroupNormScaling(nn.Module):
         if self.affine:
             dims_to_affine = [1 for i in range (2, len(size))]
             weight = self.weight.view(1, self.num_channels,*dims_to_affine)
-            bias = self.bias.view(1, self.num_channels,*dims_to_affine)
-            output = output * weight + bias
+            output = output * weight
         return output
     
     def extra_repr(self) -> str:
@@ -163,17 +153,14 @@ class GroupNormScalingRMS(nn.Module):
         self.affine = affine
         if self.affine:
             self.weight = Parameter(torch.empty(num_channels, **factory_kwargs))
-            self.bias = Parameter(torch.empty(num_channels, **factory_kwargs))
         else:
             self.register_parameter("weight", None)
-            self.register_parameter("bias", None)
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         if self.affine:
             init.ones_(self.weight)
-            init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
         size = input.shape
@@ -190,8 +177,7 @@ class GroupNormScalingRMS(nn.Module):
         if self.affine:
             dims_to_affine = [1 for i in range (2, len(size))]
             weight = self.weight.view(1, self.num_channels,*dims_to_affine)
-            bias = self.bias.view(1, self.num_channels,*dims_to_affine)
-            output = output * weight + bias
+            output = output * weight
         return output
     
     def extra_repr(self) -> str:
