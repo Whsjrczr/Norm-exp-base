@@ -25,7 +25,7 @@ class PreNormMLP(nn.Module):
         layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width)]
         for index in range(depth-1):
             layers.append(nn.Linear(width, width))
-            layers.append(ext.Activation())
+            layers.append(ext.Activation(width))
             layers.append(ext.Norm(width))
         layers.append(nn.Linear(width, output_size))
         self.net = nn.Sequential(*layers)
