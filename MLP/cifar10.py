@@ -79,9 +79,11 @@ class MNIST:
                 "width": self.cfg.width,
                 "normalization": ext.normalization.setting(self.cfg),
                 "activation": self.cfg.activation,
+                "dropout_prob": self.cfg.dropout,
 
                 "learning_rate": self.cfg.lr,
                 "batch_size": self.cfg.batch_size[0],
+                "weight_decay": self.cfg.weight_decay,
                 "seed": self.cfg.seed,
                 "optimizer": self.cfg.optimizer,
 
@@ -130,6 +132,7 @@ class MNIST:
         for epoch in range(self.cfg.start_epoch + 1, self.cfg.epochs):
             if self.cfg.lr_method != 'auto':
                 self.scheduler.step()
+            wandb.log({"learning_rate": self.scheduler.get_last_lr()[0]}) # learning rate log
             self.train_epoch(epoch)
             accuracy, val_loss = self.validate(epoch)
             self.saver.save_checkpoint(epoch=epoch, best_acc=self.best_acc)

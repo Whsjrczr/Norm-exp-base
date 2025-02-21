@@ -52,3 +52,35 @@ class CenDropScalingMLP(nn.Module):
 
     def forward(self, input):
         return self.net(input)
+
+
+class CenDropScalingPreNormMLP(nn.Module):
+    # Activation -> LNCentering -> Dropout -> Scaling 
+    def __init__(self, depth=4, width=100, input_size=28 * 28, output_size=10, dropout_prob=0, **kwargs):
+        super(CenDropScalingPreNormMLP, self).__init__()
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width)]
+        for index in range(depth - 1):
+            layers.append(nn.Linear(width, width))
+            layers.append(ext.Activation(width))
+            layers.append(LayerNormCentering(width, elementwise_affine=False))  # centering
+            if (dropout_prob > 0):
+                layers.append(nn.Dropout(dropout_prob))  # dropout
+            layers.append(LayerNormScaling(width, elementwise_affine=True))  # scaling
+        layers.append(nn.Linear(width, output_size))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, input):
+        return self.net(input)
+
+# ResMLP
+# - ┬ -> linear -> activation -> centering -> dropout -┬ -> scaling
+#   └ ->   -------------------------------------   -> -┘
+# 残差只能用forward写，所以需要单独建一个block
+
+
+# class ResBlockDropout(nn.Module):
+
+#     def __init__(self, width=100, dropout_prob=0, **kwargs):
+
+#     def forward(self, input):
+#         return self.net(input)
