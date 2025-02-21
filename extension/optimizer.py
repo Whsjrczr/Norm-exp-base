@@ -40,7 +40,7 @@ def setting(model: torch.nn.Module, cfg: argparse.Namespace, **kwargs):
         kwargs.setdefault('momentum', 0.9)
     if hasattr(cfg, 'lr'):
         kwargs['lr'] = cfg.lr
-    # kwargs['weight_decay'] = cfg.weight_decay
+    kwargs['weight_decay'] = cfg.weight_decay
     kwargs.update(cfg.optimizer_config)
     params = model.parameters()
     # params = add_grouped_weight_decay(model, weight_decay=cfg.weight_decay)

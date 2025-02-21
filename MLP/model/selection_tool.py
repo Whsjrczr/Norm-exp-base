@@ -1,7 +1,7 @@
 from model import *
 import torchvision.transforms as transforms
 
-def get_model(model_name, model_width, model_depth, dataset):
+def get_model(model_name, model_width, model_depth, dataset, dropout_prob=0):
     if dataset in ('mnist', 'fashion-mnist', 'mnist_RandomLabel', 'fashion-mnist_RandomLabel'):
         input_size = 28 * 28
         output_size = 10
@@ -17,6 +17,8 @@ def get_model(model_name, model_width, model_depth, dataset):
 
     if model_name == 'MLP':
         model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
+    elif model_name == 'CenDropScalingMLP':
+        model_out = CenDropScalingMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size, dropout_prob=dropout_prob)
     elif model_name == 'PreNormMLP':
         model_out = PreNormMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
     elif model_name =='resnet18':

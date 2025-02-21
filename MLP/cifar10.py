@@ -35,7 +35,7 @@ class MNIST:
         self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, self.cfg.resume is not None)
         ext.trainer.setting(self.cfg)
 
-        self.model, transform = get_model(self.cfg.arch, self.cfg.width, self.cfg.depth, self.cfg.dataset)
+        self.model, transform = get_model(self.cfg.arch, self.cfg.width, self.cfg.depth, self.cfg.dataset, self.cfg.dropout)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -65,12 +65,12 @@ class MNIST:
 
         taiyi_config = {
             # nn.BatchNorm2d: [['MeanTID', 'linear(5,0)'],'InputSndNorm']
-            'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']]
+            # 'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']]
         }
         self.monitor = Monitor(self.model, taiyi_config)
 
         wandb.init(
-            project="Norm-Exp",
+            project="LN & RMSNorm",
             name=self.model_name,
             notes=str(self.cfg) + ' ---- ' + str(taiyi_config),
             config={
@@ -95,13 +95,16 @@ class MNIST:
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
-        model_names = ['MLP', 'LinearModel', 'Linear', 'resnet18', 'resnet34', 'resnet50','MLPReLU', 'PreNormMLP']
+        model_names = ['MLP','CenDropScalingMLP', 'LinearModel', 'Linear', 'resnet18', 'resnet34', 'resnet50','MLPReLU', 'PreNormMLP']
         parser.add_argument('-a', '--arch', metavar='ARCH', default=model_names[0], choices=model_names,
                             help='model architecture: ' + ' | '.join(model_names))
         parser.add_argument('-width', '--width', type=int, default=100)
         parser.add_argument('-depth', '--depth', type=int, default=4)
+        parser.add_argument('-dropout', '--dropout', type=float, default=0)
+        parser.add_argument('-lr_method', '--lr_method', default='fix')
+        # parser.add_argument('-learn_rate', '--learn_rate', default=2e-4)
         ext.trainer.add_arguments(parser)
-        parser.set_defaults(epochs=10)
+        parser.set_defaults(epochs=20)
         ext.dataset.add_arguments(parser)
         parser.set_defaults(dataset='cifar10', workers=1, batch_size=[64, 1000])
         ext.scheduler.add_arguments(parser)
