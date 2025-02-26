@@ -61,10 +61,11 @@ class LayerNormCentering(nn.Module):
     
     
 class LayerNormScaling(nn.Module):
-    __constants__ = ["normalized_shape", "eps", "elementwise_affine"]
+    __constants__ = ["normalized_shape", "eps", "elementwise_affine", "bias"]
     normalized_shape: Tuple[int, ...]
     eps: float
     elementwise_affine: bool
+    bias: bool
     
     def __init__(self, 
         normalized_shape: _shape_t,
@@ -91,6 +92,8 @@ class LayerNormScaling(nn.Module):
                 self.bias = Parameter(
                     torch.empty(self.normalized_shape, **factory_kwargs)
                 )
+            else:
+                self.register_parameter("bias", None)
         else:
             self.register_parameter("weight", None)
             self.register_parameter("bias", None)

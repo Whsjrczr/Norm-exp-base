@@ -68,11 +68,13 @@ class GroupNormCentering(nn.Module):
     
 
 class GroupNormScaling(nn.Module):
-    __constants__ = ["num_groups", "num_channels", "eps", "affine"]
+    __constants__ = ["num_groups", "num_channels", "eps", "affine", "bias"]
     num_groups: int
     num_channels: int
     eps: float
     affine: bool
+    bias: bool
+
 
     def __init__(
         self,
@@ -80,6 +82,7 @@ class GroupNormScaling(nn.Module):
         num_channels: int,
         eps: float = 1e-5,
         affine: bool = True,
+        bias: bool = False,
         device=None,
         dtype=None,
     ) -> None:
@@ -92,9 +95,17 @@ class GroupNormScaling(nn.Module):
         self.num_channels = num_channels
         self.eps = eps
         self.affine = affine
+        self.affine_bias = bias
         if self.affine:
             self.weight = Parameter(torch.empty(num_channels, **factory_kwargs))
+            if self.affine_bias:
+                self.bias = Parameter(
+                    torch.empty(self.normalized_shape, **factory_kwargs)
+                )
+            else:
+                self.register_parameter("bias", None)
         else:
+            self.register_parameter("bias", None)
             self.register_parameter("weight", None)
 
         self.reset_parameters()
@@ -102,6 +113,8 @@ class GroupNormScaling(nn.Module):
     def reset_parameters(self) -> None:
         if self.affine:
             init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
         size = input.shape
@@ -118,6 +131,9 @@ class GroupNormScaling(nn.Module):
             dims_to_affine = [1 for i in range (2, len(size))]
             weight = self.weight.view(1, self.num_channels,*dims_to_affine)
             output = output * weight
+            if self.affine_bias:
+                bias = self.bias.view(1, self.num_channels,*dims_to_affine)
+                output = output + bias
         return output
     
     def extra_repr(self) -> str:

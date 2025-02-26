@@ -106,18 +106,21 @@ class BatchNorm1dCentering(nn.Module):
     
 class BatchNorm1dScaling(nn.Module):
     _version = 2
-    __constants__ = ["track_running_stats", "momentum", "eps", "num_features", "affine"]
+    __constants__ = ["track_running_stats", "momentum", "eps", "num_features", "affine", "bias"]
     num_features: int
     eps: float
     momentum: float | None
     affine: bool
+    bias: bool
     track_running_stats: bool
+
     def __init__(
         self,
         num_features: int,
         eps: float = 1e-5,
         momentum: float | None = 0.1,
         affine: bool = True,
+        bias: bool = False,
         track_running_stats: bool = True,
         device=None,
         dtype=None,
@@ -129,10 +132,16 @@ class BatchNorm1dScaling(nn.Module):
         self.momentum = momentum
         self.affine = affine
         self.track_running_stats = track_running_stats
+        self.affine_bias = bias
         if self.affine:
             self.weight = Parameter(torch.empty(num_features, **factory_kwargs))
+            if self.affine_bias:
+                self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
+            else:
+                self.register_parameter("bias", None)
         else:
             self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
         if self.track_running_stats:
             self.register_buffer(
                 "running_var", torch.zeros(num_features, **factory_kwargs)
@@ -160,6 +169,8 @@ class BatchNorm1dScaling(nn.Module):
         self.reset_running_stats()
         if self.affine:
             init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
         if self.momentum is None:
@@ -197,6 +208,9 @@ class BatchNorm1dScaling(nn.Module):
         if self.affine:
             weight = self.weight.view(*shape)
             output = output * weight
+            if self.affine_bias:
+                bias = self.bias.view(*shape)
+                output = output + bias
         return output
     
     def extra_repr(self):

@@ -29,6 +29,10 @@ def get_model(model_name, model_width, model_depth, dataset, dropout_prob=0):
         model_out = resnet34(num_classes=output_size)
     elif model_name =='resnet50':
         model_out = resnet50(num_classes=output_size)
+    elif model_name == 'ResCenDropScalingMLP':
+        model_out = ResCenDropScalingMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size, dropout_prob=dropout_prob)
+    elif model_name == 'ResMLP':
+        model_out = ResMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size, dropout_prob=dropout_prob)
     else:
         model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
     return model_out, transform

@@ -92,10 +92,52 @@ class ResBlockDropout(nn.Module):
 
     def forward(self, x):
         identity = x
-
         x = self.fc1(x)
         x = self.activation(x)
         x = self.centering(x)
         x = self.dropout(x)
         x += identity
         return self.scaling(x)
+
+
+class ResCenDropScalingMLP(nn.Module):
+    def __init__(self, depth=4, width=100, input_size=28*28, output_size=10, dropout_prob=0,  **kwargs):
+        super(ResCenDropScalingMLP, self).__init__()
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width, dropout_prob=dropout_prob)]
+        for index in range(depth - 1):
+            layers.append(ResBlockDropout(width,dropout_prob=dropout_prob))
+        layers.append(nn.Linear(width, output_size))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, input):
+        return self.net(input)
+    
+
+
+class ResBlock(nn.Module):
+    def __init__(self, width=100, **kwargs):
+        super(ResBlock, self).__init__()
+        self.fc1 = nn.Linear(width, width)
+        self.activation = nn.ReLU()
+        self.norm = ext.norm(width)
+
+    def forward(self, x):
+        identity = x
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.norm(x)
+        x += identity
+        return 
+
+
+class ResMLP(nn.Module):
+    def __init__(self, depth=4, width=100, input_size=28*28, output_size=10, **kwargs):
+        super(ResMLP, self).__init__()
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width)]
+        for index in range(depth - 1):
+            layers.append(ResBlock(width))
+        layers.append(nn.Linear(width, output_size))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, input):
+        return self.net(input)
