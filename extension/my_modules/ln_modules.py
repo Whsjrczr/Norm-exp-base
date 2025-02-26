@@ -70,6 +70,7 @@ class LayerNormScaling(nn.Module):
         normalized_shape: _shape_t,
         eps: float = 1e-5,
         elementwise_affine: bool = True,
+        bias: bool = False,
         device=None,
         dtype=None,
     ) -> None:
@@ -81,18 +82,26 @@ class LayerNormScaling(nn.Module):
         self.normalized_shape = tuple(normalized_shape)  # type: ignore[arg-type]
         self.eps = eps
         self.elementwise_affine = elementwise_affine
+        self.affine_bias = bias
         if self.elementwise_affine:
             self.weight = Parameter(
                 torch.empty(self.normalized_shape, **factory_kwargs)
             )
+            if self.affine_bias:
+                self.bias = Parameter(
+                    torch.empty(self.normalized_shape, **factory_kwargs)
+                )
         else:
             self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
 
         self.reset_parameters()
     
     def reset_parameters(self) -> None:
         if self.elementwise_affine:
             init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
 
     def forward(self, input: Tensor) -> Tensor:
         length = len(self.normalized_shape)
@@ -101,6 +110,8 @@ class LayerNormScaling(nn.Module):
         centered_tensor = input / torch.sqrt(var + self.eps)
         if self.elementwise_affine:
             centered_tensor = centered_tensor * self.weight
+            if self.affine_bias:
+                centered_tensor += self.bias
         return centered_tensor
     
     def extra_repr(self) -> str:

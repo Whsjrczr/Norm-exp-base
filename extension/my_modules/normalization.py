@@ -33,6 +33,14 @@ def _RMSNorm(normalized_shape, eps=1e-5, affine=True, *args, **kwargs):
     return LayerNormScalingRMS(normalized_shape, eps=eps, elementwise_affine=affine)
 
 
+def _CenteringDropoutScaling(num_features,dropout_prob=0.0, eps=1e-05, affine=True, *args, **kwargs):
+    return nn.Sequential(
+        LayerNormCentering(num_features, elementwise_affine=False),
+        nn.Dropout(p=dropout_prob),
+        LayerNormScaling(num_features, elementwise_affine=affine,bias=True, eps=eps)
+    )
+
+
 # BN
 def _BatchNorm(num_features, dim=4, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
     return (nn.BatchNorm2d if dim == 4 else nn.BatchNorm1d)(num_features, eps=eps, momentum=momentum, affine=affine,
@@ -74,8 +82,8 @@ def _Identity_fn(x, *args, **kwargs):
 class _config:
     norm = 'BN'
     norm_cfg = {}
-    norm_methods = {'BN': _BatchNorm, 'GN': _GroupNorm, 'LN': _LayerNorm, 'IN': _InstanceNorm, 
-                    'LNc': _LayerNormCentering, 'LNs': _LayerNormScaling, 'RMS': _RMSNorm, 
+    norm_methods = {'BN': _BatchNorm, 'GN': _GroupNorm, 'LN': _LayerNorm, 'IN': _InstanceNorm,
+                    'LNc': _LayerNormCentering, 'LNs': _LayerNormScaling, 'RMS': _RMSNorm, 'CDS': _CenteringDropoutScaling,
                     'BNc': _BatchNormCentering, 'BNs': _BatchNormScaling,
                     'GNc': _GroupNormCentering, 'GNs': _GroupNormScaling, 'No': _IdentityModule}  # 'No': _LayerNorm, 
 
