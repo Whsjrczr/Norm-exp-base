@@ -19,6 +19,8 @@ def get_model(model_name, model_width, model_depth, dataset, dropout_prob=0):
         model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
     elif model_name == 'CenDropScalingMLP':
         model_out = CenDropScalingMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size, dropout_prob=dropout_prob)
+    elif model_name == 'CenDropScalingPreNormMLP':
+        model_out = CenDropScalingPreNormMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size, dropout_prob=dropout_prob)
     elif model_name == 'PreNormMLP':
         model_out = PreNormMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
     elif model_name =='resnet18':
