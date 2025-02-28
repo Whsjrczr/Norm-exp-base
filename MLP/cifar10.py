@@ -26,7 +26,7 @@ class MNIST:
         self.cfg = self.add_arguments()
         self.model_name = self.cfg.dataset + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(self.cfg.width)+ '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg)
         self.model_name = self.model_name + '_lr' + str(self.cfg.lr) + '_bs' + str(
-            self.cfg.batch_size[0]) + '_seed' + str(self.cfg.seed)
+            self.cfg.batch_size[0]) + '_seed' + str(self.cfg.seed)+ '_dropout' + str(self.cfg.dropout)
         # print(self.cfg.norm_cfg)
         # print(self.cfg.dataset)
         self.result_path = os.path.join(self.cfg.output, self.model_name, self.cfg.log_suffix)
@@ -104,6 +104,8 @@ class MNIST:
         parser.add_argument('-depth', '--depth', type=int, default=4)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
         parser.add_argument('-lr_method', '--lr_method', default='fix')
+        parser.add_argument('--lr_step', default=10, type=int, help='')
+        parser.add_argument('--lr_gamma', default=0.95, type=float, help='')
         # parser.add_argument('-learn_rate', '--learn_rate', default=2e-4)
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=20)
