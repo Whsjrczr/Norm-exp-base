@@ -24,9 +24,11 @@ from model.selection_tool import get_model
 class MNIST:
     def __init__(self):
         self.cfg = self.add_arguments()
-        self.model_name = self.cfg.dataset + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(self.cfg.width)+ '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg)
-        self.model_name = self.model_name + '_lr' + str(self.cfg.lr) + '_bs' + str(
-            self.cfg.batch_size[0]) + '_seed' + str(self.cfg.seed)+ '_dropout' + str(self.cfg.dropout)
+        self.model_name = self.cfg.dataset + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(
+            self.cfg.width) + '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg)
+        self.model_name = (self.model_name + '_lr' + str(self.cfg.lr) + '_bs' + str(
+            self.cfg.batch_size[0]) + '_seed' + str(self.cfg.seed) + '_dropout' + str(self.cfg.dropout) +
+                           '_wd' + str(self.cfg.weight_decay))
         # print(self.cfg.norm_cfg)
         # print(self.cfg.dataset)
         self.result_path = os.path.join(self.cfg.output, self.model_name, self.cfg.log_suffix)
@@ -60,6 +62,9 @@ class MNIST:
         if self.cfg.resume:
             saved = self.saver.resume(self.cfg.resume)
             self.cfg.start_epoch = saved['epoch']
+            if 'wandb_id' in saved.keys():
+                self.wandb_id = saved['wandb_id']
+                self.step = saved['step']
             self.best_acc = saved['best_acc']
         self.criterion = nn.MSELoss() if self.cfg.arch == 'AE' else nn.CrossEntropyLoss()
 
@@ -69,17 +74,45 @@ class MNIST:
         }
         self.monitor = Monitor(self.model, taiyi_config)
 
-        wandb.init(
-            project="LN & RMSNorm",
-            name=self.model_name,
-            notes=str(self.cfg) + ' ---- ' + str(taiyi_config),
-            config={
-                "model": self.cfg.arch,
-                "depth": self.cfg.depth,
-                "width": self.cfg.width,
-                "normalization": ext.normalization.setting(self.cfg),
-                "activation": self.cfg.activation,
-                "dropout_prob": self.cfg.dropout,
+        if self.cfg.resume and self.wandb_id:
+            print("resume wandb from id "+str(self.wandb_id))
+            wandb.init(
+                project="LN & RMSNorm",
+                name=self.model_name,
+                id=self.wandb_id,
+                resume="must",
+                notes=str(self.cfg) + ' ---- ' + str(taiyi_config),
+                config={
+                    "model": self.cfg.arch,
+                    "depth": self.cfg.depth,
+                    "width": self.cfg.width,
+                    "normalization": ext.normalization.setting(self.cfg),
+                    "activation": self.cfg.activation,
+                    "dropout_prob": self.cfg.dropout,
+
+                    "learning_rate": self.cfg.lr,
+                    "batch_size": self.cfg.batch_size[0],
+                    "weight_decay": self.cfg.weight_decay,
+                    "seed": self.cfg.seed,
+                    "optimizer": self.cfg.optimizer,
+
+                    "dataset": self.cfg.dataset,
+                    "epochs": self.cfg.epochs,
+
+                }
+            )
+        else:
+            wandb.init(
+                project="LN & RMSNorm",
+                name=self.model_name,
+                notes=str(self.cfg) + ' ---- ' + str(taiyi_config),
+                config={
+                    "model": self.cfg.arch,
+                    "depth": self.cfg.depth,
+                    "width": self.cfg.width,
+                    "normalization": ext.normalization.setting(self.cfg),
+                    "activation": self.cfg.activation,
+                    "dropout_prob": self.cfg.dropout,
 
                 "learning_rate": self.cfg.lr,
                 "batch_size": self.cfg.batch_size[0],
@@ -87,17 +120,18 @@ class MNIST:
                 "seed": self.cfg.seed,
                 "optimizer": self.cfg.optimizer,
 
-                "dataset": self.cfg.dataset,
-                "epochs": self.cfg.epochs,
+                    "dataset": self.cfg.dataset,
+                    "epochs": self.cfg.epochs,
 
-            }
-        )
+                }
+            )
         self.vis_wandb = Visualization(self.monitor, wandb)
         return
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
-        model_names = ['MLP','CenDropScalingMLP','CenDropScalingPreNormMLP', 'LinearModel', 'Linear', 'resnet18', 'resnet34', 'resnet50','MLPReLU', 'PreNormMLP']
+        model_names = ['MLP', 'ResCenDropScalingMLP', 'CenDropScalingMLP', 'CenDropScalingPreNormMLP', 'LinearModel',
+                       'Linear', 'resnet18', 'resnet34', 'resnet50', 'MLPReLU', 'PreNormMLP']
         parser.add_argument('-a', '--arch', metavar='ARCH', default=model_names[0], choices=model_names,
                             help='model architecture: ' + ' | '.join(model_names))
         parser.add_argument('-width', '--width', type=int, default=100)
@@ -130,14 +164,17 @@ class MNIST:
             self.validate()
             return
         # train model
-        self.step=0
+        if not hasattr(self, 'step'):
+            self.step = 0
         for epoch in range(self.cfg.start_epoch + 1, self.cfg.epochs):
             if self.cfg.lr_method != 'auto':
                 self.scheduler.step()
-            wandb.log({"learning_rate": self.scheduler.get_last_lr()[0]}) # learning rate log
+
             self.train_epoch(epoch)
+            wandb.log({"learning_rate": self.scheduler.get_last_lr()[0],"steps":self.step})  # learning rate log
+
             accuracy, val_loss = self.validate(epoch)
-            self.saver.save_checkpoint(epoch=epoch, best_acc=self.best_acc)
+            self.saver.save_checkpoint(epoch=epoch, best_acc=self.best_acc, wandb_id=wandb.run.id, step=self.step)
             if self.cfg.lr_method == 'auto':
                 self.scheduler.step(val_loss)
         # finish train
@@ -193,7 +230,7 @@ class MNIST:
                     10)
         train_loss /= total
         accuracy = 100. * correct / total
-        wandb.log({"train_acc":accuracy, "train_loss":train_loss, "epochs":epoch})
+        wandb.log({"train_acc": accuracy, "train_loss": train_loss, "epochs": epoch , "steps":self.step})
         self.logger(
             'Train on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(epoch, train_loss,
                 accuracy, correct, total, progress_bar.time_used()))
@@ -220,7 +257,7 @@ class MNIST:
                 progress_bar.step('Loss: {:.5g} | Accuracy: {:.2f}%'.format(test_loss / total, 100. * correct / total))
         test_loss /= total
         accuracy = correct * 100. / total
-        wandb.log({"test_acc":accuracy,"test_loss":test_loss, "epochs":epoch})
+        wandb.log({"test_acc": accuracy, "test_loss": test_loss, "epochs": epoch,"steps":self.step})
         self.logger('Test on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(epoch, test_loss,
             accuracy, correct, total, progress_bar.time_used()))
         if not self.cfg.test and accuracy > self.best_acc:

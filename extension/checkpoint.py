@@ -87,7 +87,7 @@ class Checkpoint(object):
         # DataParallel or DistributedDataParallel during serialization,
         # remove the "module" prefix before performing the matching
         loaded_state_dict = _strip_prefix_if_present(checkpoint, prefix="module.")
-        self.model.load_state_dict(loaded_state_dict, strict=self.cfg.load_no_strict)
+        self.model.load_state_dict(loaded_state_dict['model'], strict=self.cfg.load_no_strict)
 
         return checkpoint
 
