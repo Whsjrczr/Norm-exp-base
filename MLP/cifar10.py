@@ -114,11 +114,11 @@ class MNIST:
                     "activation": self.cfg.activation,
                     "dropout_prob": self.cfg.dropout,
 
-                "learning_rate": self.cfg.lr,
-                "batch_size": self.cfg.batch_size[0],
-                "weight_decay": self.cfg.weight_decay,
-                "seed": self.cfg.seed,
-                "optimizer": self.cfg.optimizer,
+                    "learning_rate": self.cfg.lr,
+                    "batch_size": self.cfg.batch_size[0],
+                    "weight_decay": self.cfg.weight_decay,
+                    "seed": self.cfg.seed,
+                    "optimizer": self.cfg.optimizer,
 
                     "dataset": self.cfg.dataset,
                     "epochs": self.cfg.epochs,
