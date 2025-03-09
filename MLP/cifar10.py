@@ -66,7 +66,9 @@ class MNIST:
                 self.wandb_id = saved['wandb_id']
                 self.step = saved['step']
             self.best_acc = saved['best_acc']
+            self.cfg.seed = saved['seed']
         self.criterion = nn.MSELoss() if self.cfg.arch == 'AE' else nn.CrossEntropyLoss()
+        ext.trainer.set_seed(self.cfg)
 
         taiyi_config = {
             # nn.BatchNorm2d: [['MeanTID', 'linear(5,0)'],'InputSndNorm']
@@ -137,6 +139,7 @@ class MNIST:
         parser.add_argument('-width', '--width', type=int, default=100)
         parser.add_argument('-depth', '--depth', type=int, default=4)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
+        parser.add_argument('--seed', default=-1, type=int, help='manual seed')
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=20)
         ext.dataset.add_arguments(parser)

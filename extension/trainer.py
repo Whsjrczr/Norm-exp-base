@@ -28,6 +28,14 @@ def setting(cfg: argparse.Namespace):
     logger = get_logger()
     logger('==> args: {}'.format(cfg))
     logger('==> the results path: {}'.format(cfg.output))
+    logger('==> PyTorch version: {}, cudnn version: {}'.format(torch.__version__, cudnn.version()))
+    git_version = os.popen('git log --pretty=oneline | head -n 1').readline()[:-1]
+    logger('==> git version: {}'.format(git_version))
+    return
+
+
+def set_seed(cfg:argparse.Namespace):
+    logger = get_logger()
     if not hasattr(cfg, 'seed') or cfg.seed < 0:
         cfg.seed = int(time.time())
     
@@ -38,9 +46,6 @@ def setting(cfg: argparse.Namespace):
     torch.cuda.manual_seed_all(cfg.seed)
 
     logger('==> seed: {}'.format(cfg.seed))
-    logger('==> PyTorch version: {}, cudnn version: {}'.format(torch.__version__, cudnn.version()))
-    git_version = os.popen('git log --pretty=oneline | head -n 1').readline()[:-1]
-    logger('==> git version: {}'.format(git_version))
     return
 
 #
