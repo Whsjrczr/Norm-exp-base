@@ -71,7 +71,11 @@ class MNIST:
         ext.trainer.set_seed(self.cfg)
 
         taiyi_config = {
-            # nn.BatchNorm2d: [['MeanTID', 'linear(5,0)'],'InputSndNorm']
+            nn.LayerNorm: [['InputSndNorm','linear(5,0)'],'WeightNorm',['OutputGradSndNorm','linear(5,0)']],
+            'LayerNormScalingRMS': [['InputSndNorm', 'linear(5,0)'],'WeightNorm', ['OutputGradSndNorm', 'linear(5,0)']],
+            'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm','linear(5,0)']],
+            'LayerNormScaling':[['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']],
+
             # 'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']]
         }
         self.monitor = Monitor(self.model, taiyi_config)
@@ -139,9 +143,9 @@ class MNIST:
         parser.add_argument('-width', '--width', type=int, default=100)
         parser.add_argument('-depth', '--depth', type=int, default=4)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
-        parser.add_argument('--seed', default=-1, type=int, help='manual seed')
+        # parser.add_argument('--seed', default=-1, type=int, help='manual seed')
         ext.trainer.add_arguments(parser)
-        parser.set_defaults(epochs=20)
+        parser.set_defaults(epochs=500)
         ext.dataset.add_arguments(parser)
         parser.set_defaults(dataset='cifar10', workers=1, batch_size=[64, 1000])
         ext.scheduler.add_arguments(parser)
