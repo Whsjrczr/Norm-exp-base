@@ -71,8 +71,8 @@ class MNIST:
         ext.trainer.set_seed(self.cfg)
 
         taiyi_config = {
-            nn.LayerNorm: [['InputSndNorm','linear(5,0)'],'WeightNorm',['OutputGradSndNorm','linear(5,0)']],
-            'LayerNormScalingRMS': [['InputSndNorm', 'linear(5,0)'],'WeightNorm', ['OutputGradSndNorm', 'linear(5,0)']],
+            nn.LayerNorm: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
+            'LayerNormScalingRMS': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm', 'linear(5,0)']],
             'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm','linear(5,0)']],
             'LayerNormScaling':[['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']],
 
