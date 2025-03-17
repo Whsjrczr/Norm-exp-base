@@ -37,7 +37,7 @@ def _CenteringDropoutScaling(num_features,dropout_prob=0.0, eps=1e-05, affine=Tr
     return nn.Sequential(
         LayerNormCentering(num_features, elementwise_affine=False),
         nn.Dropout(p=dropout_prob),
-        LayerNormScaling(num_features, elementwise_affine=affine,bias=True, eps=eps)
+        LayerNormScaling(num_features, elementwise_affine=affine,bias=affine, eps=eps)
     )
 
 
