@@ -31,6 +31,7 @@ def setting(cfg: argparse.Namespace):
     logger('==> PyTorch version: {}, cudnn version: {}'.format(torch.__version__, cudnn.version()))
     git_version = os.popen('git log --pretty=oneline | head -n 1').readline()[:-1]
     logger('==> git version: {}'.format(git_version))
+    set_seed(cfg)
     return
 
 
