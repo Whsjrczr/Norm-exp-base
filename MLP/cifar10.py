@@ -59,6 +59,8 @@ class MNIST:
         self.model.cuda()
 
         self.best_acc = 0
+        if self.cfg.offline:
+            os.environ['WANDB_MODE'] = 'offline'
         if self.cfg.resume:
             saved = self.saver.resume(self.cfg.resume)
             self.cfg.start_epoch = saved['epoch']
@@ -131,6 +133,7 @@ class MNIST:
 
                 }
             )
+        self.run_dir = os.path.dirname(wandb.run.dir)
         self.vis_wandb = Visualization(self.monitor, wandb)
         return
 
@@ -143,6 +146,7 @@ class MNIST:
         parser.add_argument('-width', '--width', type=int, default=100)
         parser.add_argument('-depth', '--depth', type=int, default=4)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
+        parser.add_argument('--offline', '-offline', action='store_true', help='offline mode')
         # parser.add_argument('--seed', default=-1, type=int, help='manual seed')
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=500)
@@ -190,6 +194,9 @@ class MNIST:
 
         new_log_filename = r'{}_{}_{:5.2f}%%.txt'.format(self.model_name, now_date, self.best_acc)
         self.logger('==> Network training completed. Copy log file to {}'.format(new_log_filename))
+        if self.cfg.offline:
+            print(f"syncing wandb...{self.run_dir}")
+            os.system(f"wandb sync {self.run_dir}")
         new_log_path = os.path.join(self.result_path, new_log_filename)
         shutil.copy(self.logger.filename, new_log_path)
         # print("trainend.")
