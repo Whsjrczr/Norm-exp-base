@@ -33,11 +33,38 @@ def _RMSNorm(normalized_shape, eps=1e-5, affine=True, *args, **kwargs):
     return LayerNormScalingRMS(normalized_shape, eps=eps, elementwise_affine=affine)
 
 
-def _CenteringDropoutScaling(num_features,dropout_prob=0.0, eps=1e-05, affine=True, *args, **kwargs):
+def _CenteringDropoutScaling(normalized_shape,dropout_prob=0.0, eps=1e-05, affine=True, *args, **kwargs):
     return nn.Sequential(
+        LayerNormCentering(normalized_shape, elementwise_affine=False),
+        nn.Dropout(p=dropout_prob),
+        LayerNormScaling(normalized_shape, elementwise_affine=affine,bias=affine, eps=eps)
+    )
+
+def _bCenteringDropoutScaling(num_features,dropout_prob=0.0, eps=1e-05, affine=True, *args, **kwargs):
+    return nn.Sequential(
+        BatchNorm1dCentering(num_features, affine=False),
+        nn.Dropout(p=dropout_prob),
+        LayerNormScaling(num_features, elementwise_affine=affine,bias=affine, eps=eps)
+    )
+
+def _bCenlCenDropScaling(num_features,dropout_prob=0.0, eps=1e-05, affine=True, *args, **kwargs):
+    return nn.Sequential(
+        BatchNorm1dCentering(num_features, affine=False),
         LayerNormCentering(num_features, elementwise_affine=False),
         nn.Dropout(p=dropout_prob),
         LayerNormScaling(num_features, elementwise_affine=affine,bias=affine, eps=eps)
+    )
+
+def _bCLayerNorm(num_features, eps=1e-5, affine=True, *args, **kwargs):
+    return nn.Sequential(
+        BatchNorm1dCentering(num_features, affine=False),
+        nn.LayerNorm(num_features, eps=eps, elementwise_affine=affine)
+    )
+
+def _bCRMSNorm(num_features, eps=1e-5, affine=True, *args, **kwargs):
+    return nn.Sequential(
+        BatchNorm1dCentering(num_features, affine=False),
+        LayerNormScalingRMS(num_features, eps=eps, elementwise_affine=affine)
     )
 
 
@@ -85,6 +112,8 @@ class _config:
     norm_methods = {'BN': _BatchNorm, 'GN': _GroupNorm, 'LN': _LayerNorm, 'IN': _InstanceNorm,
                     'LNc': _LayerNormCentering, 'LNs': _LayerNormScaling, 'RMS': _RMSNorm, 'CDS': _CenteringDropoutScaling,
                     'BNc': _BatchNormCentering, 'BNs': _BatchNormScaling,
+                    'bCDS':_bCenteringDropoutScaling, 'bClCDS':_bCenlCenDropScaling, 'bCLN': _bCLayerNorm,
+                    'bCRMS':_bCRMSNorm,
                     'GNc': _GroupNormCentering, 'GNs': _GroupNormScaling, 'No': _IdentityModule}  # 'No': _LayerNorm, 
 
 
