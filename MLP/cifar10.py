@@ -143,7 +143,8 @@ class MNIST:
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
         model_names = ['MLP', 'ResCenDropScalingMLP', 'CenDropScalingMLP', 'CenDropScalingPreNormMLP', 'LinearModel',
-                       'Linear', 'resnet18', 'resnet34', 'resnet50', 'MLPReLU', 'PreNormMLP','ConvBN','ConvBNPre']
+                       'Linear', 'resnet18', 'resnet34', 'resnet50', 'MLPReLU', 'PreNormMLP','ConvBN','ConvBNPre',
+                       'ConvBNRes','ConvBNResPre']
         parser.add_argument('-a', '--arch', metavar='ARCH', default=model_names[0], choices=model_names,
                             help='model architecture: ' + ' | '.join(model_names))
         parser.add_argument('-width', '--width', type=int, default=100)

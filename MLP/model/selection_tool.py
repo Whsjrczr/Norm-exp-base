@@ -39,6 +39,12 @@ def get_model(model_name, model_width, model_depth, dataset, dropout_prob=0):
     elif model_name == 'ConvBNPre':
         model_out =  ConvBNPre(width=model_width, depth=model_depth, input_size=input_size,
                            output_size=output_size)
+    elif model_name == 'ConvBNRes':
+        model_out = ConvBNRes(width=model_width, depth=model_depth, input_size=input_size,
+                           output_size=output_size)
+    elif model_name == 'ConvBNResPre':
+        model_out = ConvBNResPre(width=model_width, depth=model_depth, input_size=input_size,
+                           output_size=output_size)
     else:
         model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)    
     return model_out, transform
