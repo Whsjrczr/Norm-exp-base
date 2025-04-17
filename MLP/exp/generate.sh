@@ -2,24 +2,25 @@
 
 archs=(ConvBNPre)
 batch_sizes=(128)
-methods=(RMS RMS-C LN)
-ls=(l CC l)
+depth=3
+width=128
+methods=(BNs BN)
 lrs=(1e-4)
-epochs=70
+activations=relu
+epochs=100
 wd=1e-4
-num_classes=100
+opt=sgd
 datasetroot="~/autodl-tmp/imagenet100/"
 dumppath="~/autodl-tmp/result/"
-seeds=1
-patchsizes=4
-numworkers=10
+seeds=(1)
+
 
 
 l=${#archs[@]}
 n=${#batch_sizes[@]}
-m=${#seeds[@]}
+m=${#methods[@]}
 t=${#lrs[@]}
-f=${#wd[@]}
+f=${#seeds[@]}
 
 for ((a=0;a<$l;++a))
 do 
@@ -32,33 +33,33 @@ do
 
           for ((i=0;i<$n;++i))
           do
-                baseString="execute_${archs[$a]}_b${batch_sizes[$i]}_${methods[$i]}_${ls[$i]}_lr${lrs[$k]}_wd${wd[$b]}_s${seeds[$j]}_"
+                baseString="execute_${archs[$a]}_b${batch_sizes[$i]}_w${width}_d${depth}_${methods[$j]}_lr${lrs[$k]}_wd${wd}_s${seeds[$b]}_"
                 fileName="${baseString}.sh"
    	            echo "${baseString}"
                 touch "${fileName}"
                 echo  "#!/usr/bin/env bash
 cd \"\$(dirname \$0)/..\" 
-CUDA_VISIBLE_DEVICES=0 /home/layernorm/conda_envs/norm-base/bin/python /home/layernorm/centering/Norm-exp-base/MLP/cifar10.py \
- -a=${archs[$a]} \
- --batch-size=${batch_sizes[$i]} \
- --depth=3 \
- --width=128 \
- --epochs=100 \
- -oo=sgd \
- -oc=momentum=0 \
- -wd=0 \
- --lr=0.01 \
- --lr-method=step \
- --lr-step=5 \
- --lr-gamma=0.9 \
- --dataset=cifar10_nogrey \
- --dataset-root='/home/layernorm/centering/Norm-exp-base/dataset/' \
- --norm=BNs \
- --norm-cfg=T=5,num_channels=0,num_groups=2,dim=4 \
- --activation=relu \
- --activation-cfg=num_groups=16 \
- --seed=1 \
- --log-suffix=base \" >> ${fileName}
+CUDA_VISIBLE_DEVICES=0 /home/layernorm/conda_envs/norm-base/bin/python /home/layernorm/centering/Norm-exp-base/MLP/cifar10.py \\
+ -a=${archs[$a]} \\
+ --batch-size=${batch_sizes[$i]} \\
+ --depth=${depth} \\
+ --width=${width} \\
+ --epochs=${epochs} \\
+ -oo=${opt} \\
+ -oc=momentum=0 \\
+ -wd=0 \\
+ --lr=0.01 \\
+ --lr-method=step \\
+ --lr-step=5 \\
+ --lr-gamma=0.9 \\
+ --dataset=cifar10_nogrey \\
+ --dataset-root='/home/layernorm/centering/Norm-exp-base/dataset/' \\
+ --norm=${methods[$j]} \\
+ --norm-cfg=T=5,num_channels=0,num_groups=2,dim=4 \\
+ --activation=${activation} \\
+ --activation-cfg=num_groups=16 \\
+ --seed=${seeds[$b]} \\
+ --log-suffix=base \\" >> ${fileName}
                 echo  "nohup bash ${fileName} >output_${baseString}.out 2>&1 & wait" >> z_bash_excute.sh
            done
          done
