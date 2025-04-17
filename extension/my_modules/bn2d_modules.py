@@ -111,7 +111,7 @@ class BatchNorm2dScaling(nn.Module):
         eps: float = 1e-5,
         momentum: float | None = 0.1,
         affine: bool = True,
-        bias: bool = True,
+        bias: bool = False,
         track_running_stats: bool = True,
         device=None,
         dtype=None,
@@ -135,7 +135,7 @@ class BatchNorm2dScaling(nn.Module):
             self.register_parameter("bias", None)
         if self.track_running_stats:
             self.register_buffer(
-                "running_var", torch.zeros(num_features, **factory_kwargs)
+                "running_var", torch.zeros([1, num_features, 1, 1], **factory_kwargs)
             )
             self.running_var: Tensor | None
             self.register_buffer(
@@ -151,6 +151,8 @@ class BatchNorm2dScaling(nn.Module):
             self.register_buffer("running_var", None)
             self.register_buffer("num_batches_tracked", None)
         self.reset_parameters()
+        # print(f'init_running_var:{self.running_var.shape}')
+        # print(self.running_var)
 
     def reset_running_stats(self) -> None:
         if self.track_running_stats:
@@ -184,14 +186,22 @@ class BatchNorm2dScaling(nn.Module):
 
         if bn_training:
             var = torch.var(input, dim=(0,2,3), unbiased=False, keepdim=True)
+            # print(f'var1:{var.shape}')
+            # # print(var)
             self.running_var =((1 - exponential_average_factor) * self.running_var + exponential_average_factor * var)
+            # var.view(1, self.num_features, 1, 1)
+            # print(f'var2:{var.shape}')
+            # print(var)
+            # print(f'runvar:{self.running_var.shape}')
+            # print(self.running_var)
         else:
+            # print(f'run_var:{self.running_var.shape}')
             var = self.running_var.view(1, self.num_features, 1, 1)
         output = input / torch.sqrt(var + self.eps)
         if self.affine:
             weight = self.weight.view(1, self.num_features, 1, 1)
             output = weight * output
-            if self.bias:
+            if self.affine_bias:
                 bias = self.bias.view(1, self.num_features, 1, 1)
                 output = output + bias
         return output

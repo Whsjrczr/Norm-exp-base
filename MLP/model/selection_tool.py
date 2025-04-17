@@ -33,6 +33,12 @@ def get_model(model_name, model_width, model_depth, dataset, dropout_prob=0):
         model_out = ResCenDropScalingMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size, dropout_prob=dropout_prob)
     elif model_name == 'ResMLP':
         model_out = ResMLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size, dropout_prob=dropout_prob)
+    elif model_name == 'ConvBN':
+        model_out = ConvBN(width=model_width, depth=model_depth, input_size=input_size,
+                           output_size=output_size)
+    elif model_name == 'ConvBNPre':
+        model_out =  ConvBNPre(width=model_width, depth=model_depth, input_size=input_size,
+                           output_size=output_size)
     else:
-        model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)
+        model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)    
     return model_out, transform

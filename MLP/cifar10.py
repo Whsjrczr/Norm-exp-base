@@ -73,10 +73,10 @@ class MNIST:
         ext.trainer.set_seed(self.cfg)
 
         taiyi_config = {
-            nn.LayerNorm: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
-            'LayerNormScalingRMS': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm', 'linear(5,0)']],
-            'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm','linear(5,0)']],
-            'LayerNormScaling':[['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']],
+            ext.BatchNorm2dScaling: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
+            # 'LayerNormScalingRMS': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm', 'linear(5,0)']],
+            # 'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm','linear(5,0)']],
+            # 'LayerNormScaling':[['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']],
 
             # 'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']]
         }
@@ -140,7 +140,7 @@ class MNIST:
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
         model_names = ['MLP', 'ResCenDropScalingMLP', 'CenDropScalingMLP', 'CenDropScalingPreNormMLP', 'LinearModel',
-                       'Linear', 'resnet18', 'resnet34', 'resnet50', 'MLPReLU', 'PreNormMLP']
+                       'Linear', 'resnet18', 'resnet34', 'resnet50', 'MLPReLU', 'PreNormMLP','ConvBN','ConvBNPre']
         parser.add_argument('-a', '--arch', metavar='ARCH', default=model_names[0], choices=model_names,
                             help='model architecture: ' + ' | '.join(model_names))
         parser.add_argument('-width', '--width', type=int, default=100)

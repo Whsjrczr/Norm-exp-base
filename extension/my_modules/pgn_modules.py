@@ -56,7 +56,7 @@ class PointwiseGroupNorm(nn.Module):
         mean = input.mean(dim=2, keepdim=True)
         output = (input - mean) / torch.sqrt(var + self.eps)
         output = output.view(*size)
-        print(mean.shape)
+        # print(mean.shape)
         
         if self.affine:
             output = output * self.weight + self.bias
