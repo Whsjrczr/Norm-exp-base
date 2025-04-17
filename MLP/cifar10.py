@@ -74,6 +74,7 @@ class MNIST:
 
         taiyi_config = {
             ext.BatchNorm2dScaling: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
+            nn.BatchNorm2d: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
             # 'LayerNormScalingRMS': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm', 'linear(5,0)']],
             # 'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm','linear(5,0)']],
             # 'LayerNormScaling':[['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']],
@@ -86,6 +87,7 @@ class MNIST:
             print("resume wandb from id "+str(self.wandb_id))
             wandb.init(
                 project="LN & RMSNorm",
+                entity="whsjrc-buaa",
                 name=self.model_name,
                 id=self.wandb_id,
                 resume="must",
@@ -112,6 +114,7 @@ class MNIST:
         else:
             wandb.init(
                 project="LN & RMSNorm",
+                entity="whsjrc-buaa",
                 name=self.model_name,
                 notes=str(self.cfg) + ' ---- ' + str(taiyi_config),
                 config={
