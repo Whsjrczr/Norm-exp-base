@@ -24,4 +24,4 @@ wandb/
 MLP/test_wandb/
 
 # test
-MLP/exp/a.txt
+MLP/exp/
