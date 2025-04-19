@@ -45,6 +45,18 @@ def get_model(model_name, model_width, model_depth, dataset, dropout_prob=0):
     elif model_name == 'ConvBNResPre':
         model_out = ConvBNResPre(width=model_width, depth=model_depth, input_size=input_size,
                            output_size=output_size)
+    elif model_name == 'ConvLN':
+        model_out = ConvLN(width=model_width, depth=model_depth, input_size=input_size,
+                           output_size=output_size)
+    elif model_name == 'ConvLNPre':
+        model_out =  ConvLNPre(width=model_width, depth=model_depth, input_size=input_size,
+                           output_size=output_size)
+    elif model_name == 'ConvLNRes':
+        model_out = ConvLNRes(width=model_width, depth=model_depth, input_size=input_size,
+                           output_size=output_size)
+    elif model_name == 'ConvLNResPre':
+        model_out = ConvLNResPre(width=model_width, depth=model_depth, input_size=input_size,
+                           output_size=output_size)
     else:
         model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)    
     return model_out, transform

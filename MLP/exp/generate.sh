@@ -1,17 +1,15 @@
 #!/bin/bash
 
-archs=(ConvBNPre)
+archs=(ConvLNPre ConvLN ConvLNRes ConvLNPre)
 batch_sizes=(128)
-depth=3
+depth=5
 width=128
-methods=(BNs BN)
+methods=(LNs LN)
 lrs=(1e-4)
 activations=relu
 epochs=100
-wd=1e-4
+wd=0
 opt=sgd
-datasetroot="~/autodl-tmp/imagenet100/"
-dumppath="~/autodl-tmp/result/"
 seeds=(1)
 
 
@@ -56,7 +54,7 @@ CUDA_VISIBLE_DEVICES=0 /home/layernorm/conda_envs/norm-base/bin/python /home/lay
  --dataset-root='/home/layernorm/centering/Norm-exp-base/dataset/' \\
  --norm=${methods[$j]} \\
  --norm-cfg=T=5,num_channels=0,num_groups=2,dim=4 \\
- --activation=${activation} \\
+ --activation=${activations} \\
  --activation-cfg=num_groups=16 \\
  --seed=${seeds[$b]} \\
  --log-suffix=base \\" >> ${fileName}

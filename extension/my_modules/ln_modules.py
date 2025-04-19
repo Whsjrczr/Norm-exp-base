@@ -184,7 +184,7 @@ if __name__ == '__main__':
     lc = LayerNormCentering(6, elementwise_affine=True)
     rms = LayerNormScalingRMS(6, elementwise_affine=True)
     ls = LayerNormScaling(6, elementwise_affine=True)
-    ln = nn.LayerNorm([3,6], elementwise_affine=True)
+    ln = nn.LayerNorm(6, elementwise_affine=True)
 
     print(lc)
     print(rms)
