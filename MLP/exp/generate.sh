@@ -37,7 +37,7 @@ do
                 touch "${fileName}"
                 echo  "#!/usr/bin/env bash
 cd \"\$(dirname \$0)/..\" 
-CUDA_VISIBLE_DEVICES=0 /home/layernorm/conda_envs/norm-base/bin/python /home/layernorm/centering/Norm-exp-base/MLP/cifar10.py \\
+CUDA_VISIBLE_DEVICES=1 /home/layernorm/conda_envs/norm-base/bin/python /home/layernorm/centering/Norm-exp-base/MLP/cifar10.py \\
  -a=${archs[$a]} \\
  --batch-size=${batch_sizes[$i]} \\
  --depth=${depth} \\

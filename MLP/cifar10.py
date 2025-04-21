@@ -75,6 +75,9 @@ class MNIST:
         taiyi_config = {
             ext.BatchNorm2dScaling: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
             nn.BatchNorm2d: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
+            ext.LayerNormScaling: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
+            nn.LayerNorm: [['InputSndNorm','linear(5,0)'],['OutputGradSndNorm','linear(5,0)']],
+            
             # 'LayerNormScalingRMS': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm', 'linear(5,0)']],
             # 'LayerNormCentering': [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm','linear(5,0)']],
             # 'LayerNormScaling':[['InputSndNorm', 'linear(5,0)'],['OutputGradSndNorm', 'linear(5,0)']],
