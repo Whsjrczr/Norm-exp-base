@@ -1,19 +1,18 @@
 from model import *
 import torchvision.transforms as transforms
 
-def get_model(model_name, model_width, model_depth, dataset, dropout_prob=0):
-    if dataset in ('mnist', 'fashion-mnist', 'mnist_RandomLabel', 'fashion-mnist_RandomLabel'):
-        input_size = 28 * 28
-        output_size = 10
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-    elif dataset in ('cifar10', 'cifar10_RandomLabel'):
-        input_size = 32 * 32
-        output_size = 10
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,)),transforms.Grayscale()])
-    elif dataset == 'cifar10_nogrey':
-        input_size = 32 * 32 * 3
-        output_size = 10
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+def get_model(cfg): #model_name, model_width, model_depth, im_size, dropout_prob=0):
+    model_name = cfg.arch
+    model_width = cfg.width
+    model_depth = cfg.depth
+    im_size = cfg.im_size
+    output_size= cfg.dataset_classes
+    dropout_prob = cfg.dropout
+
+    input_size = 1
+    for dim in im_size:
+        input_size = input_size * dim
+
 
     if model_name == 'MLP':
         model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size, dropout_prob = dropout_prob)
@@ -59,4 +58,4 @@ def get_model(model_name, model_width, model_depth, dataset, dropout_prob=0):
                            output_size=output_size)
     else:
         model_out = MLP(width=model_width, depth=model_depth, input_size=input_size, output_size=output_size)    
-    return model_out, transform
+    return model_out

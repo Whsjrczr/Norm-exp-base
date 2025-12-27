@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=0 /home/layernorm/conda_envs/norm-base/bin/python /home/layernorm/centering/Norm-exp-base/MLP/cifar10.py \
+CUDA_VISIBLE_DEVICES=0 /home/dlth/miniconda3/envs/norm-base/bin/python /home/dlth/norm-exp-code/Norm-exp-base/MLP/cifar10_ori.py \
  -a=ConvBNPre \
  --batch-size=100 \
  --depth=3 \
@@ -11,9 +11,10 @@ CUDA_VISIBLE_DEVICES=0 /home/layernorm/conda_envs/norm-base/bin/python /home/lay
  --lr-method=step \
  --lr-step=5 \
  --lr-gamma=0.9 \
- --dataset=cifar10_nogrey \
- --dataset-root='/home/layernorm/centering/Norm-exp-base/dataset/' \
- --norm=BNs \
+ --dataset=cifar10 \
+ --dataset-cfg=nogrey=True \
+ --dataset-root='/home/dlth/norm-exp-code/dataset' \
+ --norm=BN \
  --norm-cfg=T=5,num_channels=0,num_groups=2,dim=4 \
  --activation=relu \
  --activation-cfg=num_groups=16 \

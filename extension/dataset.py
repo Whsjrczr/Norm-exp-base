@@ -5,17 +5,20 @@ import torchvision
 import torch.utils.data
 from . import utils
 from .logger import get_logger
+from .utils import str2dict
 from torchvision.datasets.folder import has_file_allowed_extension, default_loader, IMG_EXTENSIONS
 import random
 import numpy as np
 
-dataset_list = ['mnist', 'fashion-mnist', 'mnist_RandomLabel', 'fashion-mnist_RandomLabel', 'cifar10', 'cifar10_nogrey','cifar10_RandomLabel', 'ImageNet', 'folder']
+# dataset_list = ['mnist', 'fashion-mnist', 'mnist_RandomLabel', 'fashion-mnist_RandomLabel', 'cifar10', 'cifar10_nogrey','cifar10_RandomLabel', 'ImageNet', 'folder']
+dataset_list= ['mnist', 'fashion-mnist', 'cifar10', 'ImageNet', 'folder']
 
 
 def add_arguments(parser: argparse.ArgumentParser):
     group = parser.add_argument_group('Dataset Option')
     group.add_argument('--dataset', metavar='NAME', default='cifar10', choices=dataset_list,
                        help='The name of dataset in {' + ', '.join(dataset_list) + '}')
+    group.add_argument('--dataset-cfg',type=str2dict, default={}, metavar='DICT', help='dataset config.')
     group.add_argument('--dataset-root', metavar='PATH', default=os.path.expanduser('/home/PycharmProjects/data/cifar10/'), type=utils.path,
                        help='The directory which contains needed dataset.')
     group.add_argument('-b', '--batch-size', type=utils.str2list, default=[64], metavar='NUMs',
@@ -25,6 +28,30 @@ def add_arguments(parser: argparse.ArgumentParser):
                        help='Resize image to special size. (default: no resize)')
     group.add_argument('--dataset-classes', type=int, default=None, help='The number of classes in dataset.')
     return group
+
+class _config:
+    dataset = 'mnist'
+    dataset_cfg = {}
+    _methods = ['mnist', 'fashion-mnist', 'cifar10', 'ImageNet', 'folder']
+
+
+def getDatasetConfigFlag():
+    flag = ''
+    flag += _config.dataset
+    if str.find(_config.dataset, 'cifar10')>-1 or str.find(_config.dataset, 'ImageNet')>-1:
+        if _config.dataset_cfg.get('nogrey') != None:
+            flag += '_nogrey'
+    if _config.dataset_cfg.get('random_label') != None:
+        flag += '_RL'
+    return flag
+
+
+def setting(cfg: argparse.Namespace, **kwargs):
+    for key, value in vars(cfg).items():
+        if key in _config.__dict__:
+            setattr(_config, key, value)
+    flagname = getDatasetConfigFlag()
+    return flagname
 
 
 def make_dataset(dir, extensions):
@@ -94,24 +121,27 @@ class DatasetFlatFolder(torch.utils.data.Dataset):
         return fmt_str
 
 
-def get_dataset_loader(args: argparse.Namespace, transforms=None, target_transform=None, train=True, use_cuda=True):
+def get_dataset_loader(args: argparse.Namespace, target_transform=None, train=True, use_cuda=True):
     args.dataset_root = os.path.expanduser(args.dataset_root)
     root = args.dataset_root
     assert os.path.exists(root), 'Please assign the correct dataset root path with --dataset-root <PATH>'
     print("Successfully find the dataset root path")
-    if args.dataset != 'folder':
-        if args.dataset == 'mnist_RandomLabel':
-            root = os.path.join(root, 'mnist')
-        elif args.dataset == 'fashion-mnist_RandomLabel':
-            root = os.path.join(root, 'fashion-mnist')
-        elif args.dataset in ('cifar10_nogrey', 'cifar10_RandomLabel'):
-            root = os.path.join(root, 'cifar10')  
-        else:
-            root = os.path.join(root, args.dataset)
     
-
-    if isinstance(transforms, list):
-        transforms = torchvision.transforms.Compose(transforms)
+    nogrey = _config.dataset_cfg.get('nogrey', False)
+    random_label = _config.dataset_cfg.get('random_label', False)
+    
+    if args.dataset != 'folder':
+        root = os.path.join(root, args.dataset)  
+    if args.dataset in ['mnist', 'fashion-mnist']:
+        transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.5,), (0.5,))])
+    elif args.dataset in ['cifar10', 'ImageNet', 'folder']:
+        transform_list = [torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))]
+        if not nogrey:
+            transform_list.append(torchvision.transforms.Grayscale())
+        transforms = torchvision.transforms.Compose(transform_list)
+    
+    args.im_size = []
+    #### TODO: add resize transform
 
     if args.dataset == 'mnist':
         if len(args.im_size) == 0:
@@ -123,60 +153,36 @@ def get_dataset_loader(args: argparse.Namespace, transforms=None, target_transfo
             args.im_size = (1, 28, 28)
         args.dataset_classes = 10
         dataset = torchvision.datasets.FashionMNIST(root, train, transforms, target_transform, download=True)
-    elif args.dataset == 'mnist_RandomLabel':
+    elif args.dataset == 'cifar10':
         if len(args.im_size) == 0:
-            args.im_size = (1, 28, 28)
-        args.dataset_classes = 10
-        mnist_dataset = torchvision.datasets.mnist.MNIST(root, train, transforms, target_transform, download=True)
-        label_filename = f"{'train' if train else 'val'}_mnist_random_labels1.npy"
-        if os.path.exists(os.path.join(root,label_filename)):
-            random_labels = torch.from_numpy(np.load(os.path.join(root,label_filename)))
-        else:
-            random_labels = torch.from_numpy(np.random.randint(0, 10, size=len(mnist_dataset)))
-            np.save(os.path.join(root,label_filename), random_labels.numpy())
-        mnist_dataset.targets = random_labels
-        dataset = mnist_dataset
-        # dataset = torch.utils.data.Subset(mnist_dataset,range(20000))
-        print(dataset)
-    elif args.dataset == 'fashion-mnist_RandomLabel':
-        if len(args.im_size) == 0:
-            args.im_size = (1, 28, 28)
-        args.dataset_classes = 10
-        mnist_dataset = torchvision.datasets.FashionMNIST(root, train, transforms, target_transform, download=False)
-        label_filename = f"{'train' if train else 'val'}_mnist_random_labels1.npy"
-        if os.path.exists(os.path.join(root,label_filename)):
-            random_labels = torch.from_numpy(np.load(os.path.join(root,label_filename)))
-        else:
-            random_labels = torch.from_numpy(np.random.randint(0, 10, size=len(mnist_dataset)))
-            np.save(os.path.join(root,label_filename), random_labels.numpy())
-        mnist_dataset.targets = random_labels
-        dataset = mnist_dataset
-    elif args.dataset == 'cifar10' or args.dataset == 'cifar10_nogrey':
-        if len(args.im_size) == 0:
-            args.im_size = (3, 32, 32)
+            if nogrey:
+                args.im_size = (3, 32, 32)
+            else:
+                args.im_size = (1, 32, 32)
         args.dataset_classes = 10
         dataset = torchvision.datasets.CIFAR10(root, train, transforms, target_transform, download=True)
-    elif args.dataset == 'cifar10_RandomLabel':
-        if len(args.im_size) == 0:
-            args.im_size = (3, 32, 32)
-        args.dataset_classes = 10
-        cifar_dataset = torchvision.datasets.CIFAR10(root, train, transforms, target_transform, download=True)
-        label_filename = f"{'train' if train else 'val'}_cifar_random_labels.npy"
-        if os.path.exists(os.path.join(root,label_filename)):
-            random_labels = torch.from_numpy(np.load(os.path.join(root,label_filename)))
-        else:
-            random_labels = torch.from_numpy(np.random.randint(0, 10, size=len(cifar_dataset)))
-            np.save(os.path.join(root,label_filename), random_labels.numpy())
-        cifar_dataset.targets = random_labels
-        dataset = cifar_dataset
     elif args.dataset in ['ImageNet', 'folder']:
         if len(args.im_size) == 0:
-            args.im_size = (3, 256, 256)
+            if nogrey:
+                args.im_size = (3, 256, 256)
+            else:
+                args.im_size = (1, 256, 256)
         args.dataset_classes = 1000
         root = os.path.join(root, 'train' if train else 'val')
         dataset = torchvision.datasets.ImageFolder(root, transforms, target_transform)
     else:
         raise FileNotFoundError('No such dataset')
+
+
+    if random_label and hasattr(dataset, 'targets'):
+        label_filename = f"{'train' if train else 'val'}_{args.dataset}_random_labels.npy"
+        label_path = os.path.join(root, label_filename)
+        if os.path.exists(label_path):
+            random_labels = torch.from_numpy(np.load(label_path))
+        else:
+            random_labels = torch.from_numpy(np.random.randint(0, args.dataset_classes, size=len(dataset)))
+            np.save(label_path, random_labels.numpy())
+        dataset.targets = random_labels
 
     loader_kwargs = {'num_workers': args.workers, 'pin_memory': True} if use_cuda else {}
     if len(args.batch_size) == 0:

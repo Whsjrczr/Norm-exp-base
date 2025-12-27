@@ -20,9 +20,10 @@ from model.selection_tool import get_model
 class MNIST:
     def __init__(self):
         self.cfg = self.add_arguments()
-        self.model_name = self.cfg.dataset + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(self.cfg.width)+ '_' + ext.normalization.setting(self.cfg)
+        self.model_name = self.cfg.arch + '_' + ext.dataset.setting(self.cfg) + '_d' + str(self.cfg.depth) + '_w' + str(self.cfg.width)+ '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg)
         self.model_name = self.model_name + '_lr' + str(self.cfg.lr) + '_bs' + str(
-            self.cfg.batch_size[0]) + '_seed' + str(self.cfg.seed)
+            self.cfg.batch_size[0]) + '_dropout' + str(self.cfg.dropout) + \
+                           '_wd' + str(self.cfg.weight_decay) + '_seed' + str(self.cfg.seed)
         # print(self.cfg.norm_cfg)
         # print(self.cfg.dataset)
         self.result_path = os.path.join(self.cfg.output, self.model_name, self.cfg.log_suffix)
@@ -32,7 +33,11 @@ class MNIST:
         self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, self.cfg.resume is not None)
         ext.trainer.setting(self.cfg)
 
-        self.model, transform = get_model(self.cfg.arch, self.cfg.width, self.cfg.depth, self.cfg.dataset)
+        # dataset loader
+        self.train_loader = ext.dataset.get_dataset_loader(self.cfg, train=True, use_cuda=False)
+        self.val_loader = ext.dataset.get_dataset_loader(self.cfg, train=False, use_cuda=False)
+
+        self.model = get_model(self.cfg)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -40,10 +45,6 @@ class MNIST:
 
         self.saver = ext.checkpoint.Checkpoint(self.model, self.cfg, self.optimizer, self.scheduler, self.result_path, not self.cfg.test)
         self.saver.load(self.cfg.load)
-
-        # dataset loader
-        self.train_loader = ext.dataset.get_dataset_loader(self.cfg, transform, train=True, use_cuda=False)
-        self.val_loader = ext.dataset.get_dataset_loader(self.cfg, transform, train=False, use_cuda=False)
 
         self.device = torch.device('cuda')
         # self.device = torch.device('cpu')
@@ -67,11 +68,15 @@ class MNIST:
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
-        model_names = ['MLP', 'LinearModel', 'Linear', 'resnet18', 'resnet34', 'resnet50','MLPReLU']
+        model_names = ['MLP', 'ResCenDropScalingMLP', 'CenDropScalingMLP', 'CenDropScalingPreNormMLP', 'LinearModel',
+                       'Linear', 'resnet18', 'resnet34', 'resnet50', 'MLPReLU', 'PreNormMLP','ConvBN','ConvBNPre',
+                       'ConvBNRes','ConvBNResPre', 'ConvLN','ConvLNPre',
+                       'ConvLNRes','ConvLNResPre']
         parser.add_argument('-a', '--arch', metavar='ARCH', default=model_names[0], choices=model_names,
                             help='model architecture: ' + ' | '.join(model_names))
         parser.add_argument('-width', '--width', type=int, default=100)
         parser.add_argument('-depth', '--depth', type=int, default=4)
+        parser.add_argument('-dropout', '--dropout', type=float, default=0)
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=10)
         ext.dataset.add_arguments(parser)
@@ -84,6 +89,7 @@ class MNIST:
         ext.checkpoint.add_arguments(parser)
         ext.normalization.add_arguments(parser)
         ext.visualization.add_arguments(parser)
+        ext.activation.add_arguments(parser)
         args = parser.parse_args()
         if args.resume:
             args = parser.parse_args(namespace=ext.checkpoint.Checkpoint.load_config(args.resume))
