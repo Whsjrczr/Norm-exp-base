@@ -5,8 +5,10 @@ from .ln_modules import *
 from .bn1d_modules import *
 from .bn2d_modules import *
 from .gn_modules import *
+from .pln import ParallelLN
 
 from ..utils import str2dict
+
 
 
 # GN
@@ -105,16 +107,36 @@ def _Identity_fn(x, *args, **kwargs):
     """return first input"""
     return x
 
+def _ParallelLayerNorm(num_features, num_per_group=8, eps=1e-5, centering=True, *args, **kwargs):
+    return ParallelLN(num_features, num_per_group=num_per_group, eps=eps, centering=centering, *args, **kwargs)
+
+def _ParallelLayerScaling(num_features, num_per_group=8, eps=1e-5, centering=False, *args, **kwargs):
+    return ParallelLN(num_features, num_per_group=num_per_group, eps=eps, centering=centering, *args, **kwargs)
+
+
 
 class _config:
     norm = 'BN'
     norm_cfg = {}
-    norm_methods = {'BN': _BatchNorm, 'GN': _GroupNorm, 'LN': _LayerNorm, 'IN': _InstanceNorm,
-                    'LNc': _LayerNormCentering, 'LNs': _LayerNormScaling, 'RMS': _RMSNorm, 'CDS': _CenteringDropoutScaling,
-                    'BNc': _BatchNormCentering, 'BNs': _BatchNormScaling,
-                    'bCDS':_bCenteringDropoutScaling, 'bClCDS':_bCenlCenDropScaling, 'bCLN': _bCLayerNorm,
+    norm_methods = {'BN': _BatchNorm,
+                    'GN': _GroupNorm,
+                    'LN': _LayerNorm,
+                    'IN': _InstanceNorm,
+                    'LNc': _LayerNormCentering,
+                    'LNs': _LayerNormScaling,
+                    'RMS': _RMSNorm,
+                    'CDS': _CenteringDropoutScaling,
+                    'BNc': _BatchNormCentering,
+                    'BNs': _BatchNormScaling,
+                    'bCDS':_bCenteringDropoutScaling,
+                    'bClCDS':_bCenlCenDropScaling,
+                    'bCLN': _bCLayerNorm,
                     'bCRMS':_bCRMSNorm,
-                    'GNc': _GroupNormCentering, 'GNs': _GroupNormScaling, 'No': _IdentityModule}  # 'No': _LayerNorm, 
+                    'GNc': _GroupNormCentering,
+                    'GNs': _GroupNormScaling,
+                    "PLN": _ParallelLayerNorm, #partial(ParallelLN, centering=True, norm_method="default"),
+                    "PLS": _ParallelLayerScaling,#partial(ParallelLN, centering=False, norm_method="default"),
+                    'No': _IdentityModule}  # 'No': _LayerNorm, 
 
 
 def add_arguments(parser: argparse.ArgumentParser):
@@ -143,6 +165,17 @@ def getNormConfigFlag():
     if _config.norm_cfg.get('momentum') != None:
         flag += '_MM' + str(_config.norm_cfg.get('momentum'))
     #print(_config.normConv_cfg)
+    if str.find(_config.norm, "PL") > -1:
+        if _config.norm_cfg.get("num_per_group") != None:
+            flag += str(_config.norm_cfg.get("num_per_group"))
+        else:
+            flag += "8"
+        if _config.norm_cfg.get("affine") == False:
+            flag += "_NoAF"
+        if _config.norm_cfg.get("norm_p") != None:
+            flag += "P" + str(_config.norm_cfg.get("norm_p"))
+
+
     return flag
 
 def setting(cfg: argparse.Namespace):

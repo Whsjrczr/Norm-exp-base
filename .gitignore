@@ -9,6 +9,9 @@ Taiyi/
 
 # pycache
 MLP/model/__pycache__/
+KAN/model/__pycache__/
+KAN/__pycache__/
+PDE/__pycache__/
 extension/__pycache__/
 extension/.ipynb_checkpoints/
 extension/modules/__pycache__/
@@ -18,10 +21,13 @@ extension/my_modules/__pycache__/
 # result
 MLP/results/
 results/
+PDE/results/
+PDE/test
 
 # wandb related
 wandb/
 MLP/test_wandb/
+PDE/wandb/
 
 # test
 MLP/exp/

@@ -1,0 +1,18 @@
+CUDA_VISIBLE_DEVICES=0 /home/dlth/miniconda3/envs/norm-base/bin/python /home/dlth/norm-exp-code/Norm-exp-base/PDE/pde.py \
+ -a=MLP \
+ --width=32 \
+ --depth=4 \
+ --dropout=0 \
+ --pde_type=helmholtz \
+ --lr=0.01 \
+ --epochs=1000 \
+ --norm=LN \
+ --norm-cfg=num_per_group=4,dim=2 \
+ --optimizer=adam \
+ --activation=no \
+ --seed=1 \
+ --log-suffix=base \
+ --no_save_best \
+ --display_every=10 \
+ --output ./exp1 \
+ --metrics "l2 relative error,MSE" \
