@@ -24,7 +24,8 @@ extension/my_modules/__pycache__/
 MLP/results/
 results/
 PDE/results/
-PDE/test
+PDE/test/
+PDE/exp*
 
 # wandb related
 wandb/

@@ -51,8 +51,11 @@ class PDEBuilder:
 
     def define_helmholtz(self):
         def pde(x, y):
-            dy_xx = dde.grad.hessian(y, x)
-            return -dy_xx + (np.pi**2) * y - np.pi**2 * torch.sin(np.pi * x[:, 0])
+            dy_xx = dde.grad.hessian(y, x, component=0, i=0, j=0)
+            pi = torch.pi
+            rhs = 2.0 * (pi**2) * torch.sin(pi * x[:, 0:1])
+            return -dy_xx + (pi**2) * y - rhs
+
 
         def boundary(x, on_boundary):
             return on_boundary

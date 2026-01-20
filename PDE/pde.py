@@ -36,6 +36,7 @@ class PDETrainer:
         # Set cfg for model selection
         self.cfg.im_size = [1]
         self.cfg.dataset_classes = 1
+        
         self.model = get_model(self.cfg)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
@@ -125,6 +126,7 @@ class PDETrainer:
         parser.add_argument('--no_save_best', action='store_true', help='do not save best model during training')
         parser.add_argument('--display_every', type=int, default=1000, help='display and log every N iterations')
         parser.add_argument('--metrics', type=str2list, default='l2 relative error', help='comma-separated list of metrics to evaluate')
+        parser.add_argument('--batch_size', type=int, default=128)
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=10000)
         ext.logger.add_arguments(parser)
