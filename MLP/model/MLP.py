@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 import extension as ext
-from extension.my_modules.normalization import *
+from extension.normalization import *
 
 
 class MLP(nn.Module):

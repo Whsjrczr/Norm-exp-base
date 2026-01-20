@@ -1,13 +1,13 @@
 import argparse
 import torch.nn as nn
 
-from .ln_modules import *
-from .bn1d_modules import *
-from .bn2d_modules import *
-from .gn_modules import *
-from .pln import ParallelLN
+from .my_modules.ln_modules import *
+from .my_modules.bn1d_modules import *
+from .my_modules.bn2d_modules import *
+from .my_modules.gn_modules import *
+from .my_modules.pln import ParallelLN
 
-from ..utils import str2dict
+from .utils import str2dict
 
 
 

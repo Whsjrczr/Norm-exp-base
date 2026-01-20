@@ -4,7 +4,7 @@ from .utils import str2dict
 from .logger import get_logger
 
 _methods = {'sgd': torch.optim.SGD, 'adam': torch.optim.Adam, 'adamax': torch.optim.Adamax,
-            'RMSprop': torch.optim.RMSprop}
+            'RMSprop': torch.optim.RMSprop, 'lbfgs': torch.optim.LBFGS}
 
 
 def add_arguments(parser: argparse.ArgumentParser):

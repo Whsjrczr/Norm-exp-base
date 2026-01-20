@@ -25,7 +25,7 @@ sys.path.append("..")
 import shutil
 import argparse
 import extension as ext
-from extension.normalization.pln import ParallelLN
+from extension.my_modules.pln import ParallelLN
 from extension.stat_tracker import StatTracker
 
 

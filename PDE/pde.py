@@ -20,6 +20,7 @@ import extension as ext
 from extension.utils import str2list
 sys.path.append('../MLP')
 from model.selection_tool import get_model
+from pde_dataset import PDEBuilder
 
 
 class PDETrainer:
@@ -45,14 +46,8 @@ class PDETrainer:
         self.saver.load(self.cfg.load)
 
         # Define PDE problem
-        if self.cfg.pde_type == 'poisson':
-            self.define_poisson()
-        elif self.cfg.pde_type == 'helmholtz':
-            self.define_helmholtz()
-        elif self.cfg.pde_type == 'allen_cahn':
-            self.define_allen_cahn()
-        else:
-            raise ValueError("Unsupported PDE type")
+        pde_builder = PDEBuilder(self.cfg, self.model, self.optimizer)
+        self.data, self.net, self.model = pde_builder.build()
 
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
@@ -68,7 +63,7 @@ class PDETrainer:
             if self.cfg.resume and hasattr(self, 'wandb_id'):
                 print("resume wandb from id "+str(self.wandb_id))
                 wandb.init(
-                    project="PDE Solving",
+                    project="PDE Solving Updated",
                     entity="whsjrc-buaa",
                     name=self.model_name,
                     id=self.wandb_id,
@@ -91,7 +86,7 @@ class PDETrainer:
                 )
             else:
                 wandb.init(
-                    project="PDE Solving",
+                    project="PDE Solving Updated",
                     entity="whsjrc-buaa",
                     name=self.model_name,
                     notes=str(self.cfg),
@@ -116,64 +111,6 @@ class PDETrainer:
             self.vis_wandb = None
         return
 
-    def define_poisson(self):
-        def pde(x, y):
-            dy_xx = dde.grad.hessian(y, x)
-            return -dy_xx - 1
-
-        def boundary(x, on_boundary):
-            return on_boundary
-
-        def func(x):
-            return (x**2 - 1) / 2
-
-        geom = dde.geometry.Interval(-1, 1)
-        bc = dde.DirichletBC(geom, func, boundary)
-        self.data = dde.data.PDE(geom, pde, bc, num_domain=100, num_boundary=2, solution=func)
-        self.model.regularizer = None
-        self.net = self.model
-        self.model = dde.Model(self.data, self.net)
-        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
-
-    def define_helmholtz(self):
-        def pde(x, y):
-            dy_xx = dde.grad.hessian(y, x)
-            return -dy_xx + (np.pi**2) * y - np.pi**2 * torch.sin(np.pi * x[:, 0])
-
-        def boundary(x, on_boundary):
-            return on_boundary
-
-        def func(x):
-            return np.sin(np.pi * x[:, 0])
-
-        geom = dde.geometry.Interval(-1, 1)
-        bc = dde.DirichletBC(geom, func, boundary)
-        self.data = dde.data.PDE(geom, pde, bc, num_domain=100, num_boundary=2, solution=func)
-        self.model.regularizer = None
-        self.net = self.model
-        self.model = dde.Model(self.data, self.net)
-        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
-
-    def define_allen_cahn(self):
-        epsilon = 0.01
-        def pde(x, y):
-            dy_xx = dde.grad.hessian(y, x)
-            return epsilon * dy_xx + y - y**3
-
-        def boundary(x, on_boundary):
-            return on_boundary
-
-        def func(x):
-            return np.tanh(x[:, 0] / np.sqrt(2 * epsilon))
-
-        geom = dde.geometry.Interval(-1, 1)
-        bc = dde.DirichletBC(geom, func, boundary)
-        self.data = dde.data.PDE(geom, pde, bc, num_domain=100, num_boundary=2, solution=func)
-        self.model.regularizer = None
-        self.net = self.model
-        self.model = dde.Model(self.data, self.net)
-        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
-
     def add_arguments(self):
         parser = argparse.ArgumentParser('PDE Solving')
         model_names = ['MLP', 'PreNormMLP', 'CenDropScalingMLP', 'CenDropScalingPreNormMLP', 'ResCenDropScalingMLP']
@@ -182,7 +119,7 @@ class PDETrainer:
         parser.add_argument('-width', '--width', type=int, default=50)
         parser.add_argument('-depth', '--depth', type=int, default=3)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
-        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'allen_cahn'], help='PDE type')
+        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity'], help='PDE type')
         parser.add_argument('--offline', action='store_true', help='offline mode')
         parser.add_argument('--visualize', action='store_true', help='use wandb for visualization and logging')
         parser.add_argument('--no_save_best', action='store_true', help='do not save best model during training')
@@ -206,7 +143,8 @@ class PDETrainer:
             self.validate()
             return
         # Train model
-        losshistory, train_state = self.model.train(iterations=self.cfg.epochs, display_every=self.cfg.display_every)
+        losshistory, train_state = self.model.train(iterations=self.cfg.epochs, batch_size=self.cfg.batch_size, display_every=self.cfg.display_every)
+
         self.logger('==> Training completed.')
         # Log to wandb
         if self.cfg.visualize:

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 import extension as ext
-from extension.my_modules.normalization import *
+from extension.normalization import *
 
 class ConvBN(nn.Module):
     def __init__(self, depth=3, width=64, input_size=32*32*3, output_size=10, num_classes=10):

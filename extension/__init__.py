@@ -1,4 +1,4 @@
-from .my_modules import normalization
+from . import normalization
 from .modules import *
 from .my_modules import *
 
