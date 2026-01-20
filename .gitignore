@@ -1,5 +1,7 @@
 # python setting
 .conda/
+.vscode/
+__pycache__/
 
 # dataset
 dataset/
