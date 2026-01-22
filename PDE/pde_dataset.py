@@ -30,6 +30,14 @@ class PDEBuilder:
             raise ValueError("Unsupported PDE type")
         return self.data, self.net, self.model
 
+    def _as_col(self, z):
+        # ensure (N,1)
+        return z if z.ndim == 2 else z.reshape(-1, 1)
+
+    def _is_torch(self, x):
+        return torch.is_tensor(x)
+
+
     def define_poisson(self):
         def pde(x, y):
             dy_xx = dde.grad.hessian(y, x)
@@ -39,7 +47,13 @@ class PDEBuilder:
             return on_boundary
 
         def func(x):
-            return (x**2 - 1) / 2
+            if torch.is_tensor(x):
+                x0 = x[:, 0:1]
+                return (x0**2 - 1.0) / 2.0
+            else:
+                x0 = x[:, 0:1]
+                return (x0**2 - 1.0) / 2.0
+
 
         geom = dde.geometry.Interval(-1, 1)
         bc = dde.DirichletBC(geom, func, boundary)
@@ -61,7 +75,10 @@ class PDEBuilder:
             return on_boundary
 
         def func(x):
-            return np.sin(np.pi * x[:, 0])
+            if torch.is_tensor(x):
+                return torch.sin(torch.pi * x[:, 0:1])
+            else:
+                return np.sin(np.pi * x[:, 0:1])
 
         geom = dde.geometry.Interval(-1, 1)
         bc = dde.DirichletBC(geom, func, boundary)
@@ -346,7 +363,12 @@ class PDEBuilder:
             return on_boundary
 
         def func(x):
-            return torch.tanh(x[:, 0] / torch.sqrt(2 * epsilon))
+            if torch.is_tensor(x):
+                eps = torch.tensor(2.0 * epsilon, dtype=x.dtype, device=x.device).sqrt()
+                return torch.tanh(x[:, 0:1] / eps)
+            else:
+                eps_np = np.sqrt(2.0 * epsilon)
+                return np.tanh(x[:, 0:1] / eps_np)
 
         geom = dde.geometry.Interval(-1, 1)
         bc = dde.DirichletBC(geom, func, boundary)

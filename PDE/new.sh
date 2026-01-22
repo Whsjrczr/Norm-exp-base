@@ -13,14 +13,14 @@ CUDA_VISIBLE_DEVICES=0 /home/dlth/miniconda3/envs/norm-base/bin/python /home/dlt
  --lr-gamma=0.9 \
  --epochs=6000 \
  --norm=LN \
- --activation=no \
+ --activation=sinarctan \
  --optimizer=adam \
  --weight-decay=0.0 \
  --seed=1 \
  --log-suffix=base \
  --no_save_best \
  --display_every=10 \
- --output ./exp9 \
  --metrics "l2 relative error,MSE" \
+#   --output ./exp9 \
 #  --visualize \
  #  --optimizer-config=momentum=0 \
