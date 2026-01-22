@@ -49,7 +49,7 @@ def set_seed(cfg:argparse.Namespace):
     logger('==> seed: {}'.format(cfg.seed))
     return
 
-#
+
 # class Trainer(object):
 #
 #     def __init__(self, num_model=1):
