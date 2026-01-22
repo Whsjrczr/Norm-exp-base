@@ -346,7 +346,7 @@ class PDEBuilder:
             return on_boundary
 
         def func(x):
-            return np.tanh(x[:, 0] / np.sqrt(2 * epsilon))
+            return torch.tanh(x[:, 0] / torch.sqrt(2 * epsilon))
 
         geom = dde.geometry.Interval(-1, 1)
         bc = dde.DirichletBC(geom, func, boundary)

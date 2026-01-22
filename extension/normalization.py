@@ -136,7 +136,8 @@ class _config:
                     'GNs': _GroupNormScaling,
                     "PLN": _ParallelLayerNorm, #partial(ParallelLN, centering=True, norm_method="default"),
                     "PLS": _ParallelLayerScaling,#partial(ParallelLN, centering=False, norm_method="default"),
-                    'No': _IdentityModule}  # 'No': _LayerNorm, 
+                    'No': _IdentityModule,
+                    'no': _IdentityModule,}  # 'No': _LayerNorm, 
 
 
 def add_arguments(parser: argparse.ArgumentParser):

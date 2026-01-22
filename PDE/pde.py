@@ -8,7 +8,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import deepxde as dde
+dde.config.set_default_float("float64")
 import torch
+torch.set_default_dtype(torch.float64)
 import sys
 
 from Taiyi.taiyi.monitor import Monitor
@@ -36,8 +38,14 @@ class PDETrainer:
         # Set cfg for model selection
         self.cfg.im_size = [1]
         self.cfg.dataset_classes = 1
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.num_gpu = torch.cuda.device_count()
+        self.logger('==> use {:d} GPUs'.format(self.num_gpu))
+        if self.num_gpu > 1:
+            self.model = torch.nn.DataParallel(self.model)
         
-        self.model = get_model(self.cfg)
+        self.model = get_model(self.cfg).to(self.device)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -49,6 +57,8 @@ class PDETrainer:
         # Define PDE problem
         pde_builder = PDEBuilder(self.cfg, self.model, self.optimizer)
         self.data, self.net, self.model = pde_builder.build()
+        if hasattr(self.net, "to"):
+            self.net = self.net.to(self.device)
 
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
@@ -64,7 +74,7 @@ class PDETrainer:
             if self.cfg.resume and hasattr(self, 'wandb_id'):
                 print("resume wandb from id "+str(self.wandb_id))
                 wandb.init(
-                    project="PDE Solving Updated",
+                    project="PDE Solving Updated3",
                     entity="whsjrc-buaa",
                     name=self.model_name,
                     id=self.wandb_id,
@@ -81,13 +91,12 @@ class PDETrainer:
                         "learning_rate": self.cfg.lr,
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
-                        "optimizer": ext.optimizer.setting_name(self.cfg),
-                        "scheduler": ext.scheduler.setting_name(self.cfg),
+                        "optimizer": self.cfg.optimizer,
                     }
                 )
             else:
                 wandb.init(
-                    project="PDE Solving Updated",
+                    project="PDE Solving Updated3",
                     entity="whsjrc-buaa",
                     name=self.model_name,
                     notes=str(self.cfg),
@@ -102,8 +111,7 @@ class PDETrainer:
                         "learning_rate": self.cfg.lr,
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
-                        "optimizer": ext.optimizer.setting_name(self.cfg),
-                        "scheduler": ext.scheduler.setting_name(self.cfg),
+                        "optimizer": self.cfg.optimizer,
                     }
                 )
             self.run_dir = os.path.dirname(wandb.run.dir)
