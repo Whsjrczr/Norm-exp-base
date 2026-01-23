@@ -69,6 +69,7 @@ class PDETrainer:
         # Monitor and wandb setup (simplified)
         taiyi_config = {}  # No specific layers for PDE
         self.monitor = Monitor(self.net, taiyi_config)
+        print(self.cfg.subject_name)
 
         if self.cfg.visualize:
             if self.cfg.offline:
@@ -76,7 +77,7 @@ class PDETrainer:
             if self.cfg.resume and hasattr(self, 'wandb_id'):
                 print("resume wandb from id "+str(self.wandb_id))
                 wandb.init(
-                    project="PDE Solving Updated2",
+                    project=self.cfg.subject_name,
                     entity="whsjrc-buaa",
                     name=self.model_name,
                     id=self.wandb_id,
@@ -94,11 +95,13 @@ class PDETrainer:
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
                         "optimizer": self.cfg.optimizer,
+                        "scheduler": self.cfg.scheduler,
+                        "scheduler_cfg": self.cfg.scheduler_cfg,
                     }
                 )
             else:
                 wandb.init(
-                    project="PDE Solving Updated2",
+                    project=self.cfg.subject_name,
                     entity="whsjrc-buaa",
                     name=self.model_name,
                     notes=str(self.cfg),
@@ -114,6 +117,8 @@ class PDETrainer:
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
                         "optimizer": self.cfg.optimizer,
+                        "scheduler": self.cfg.scheduler,
+                        "scheduler_cfg": self.cfg.scheduler_cfg,
                     }
                 )
             self.run_dir = os.path.dirname(wandb.run.dir)
@@ -138,6 +143,7 @@ class PDETrainer:
         parser.add_argument('--metrics', type=str2list, default='l2 relative error', help='comma-separated list of metrics to evaluate')
         parser.add_argument('--batch_size', type=int, default=128)
         parser.add_argument('--float64', action='store_true', help='train with float64 precision')
+        parser.add_argument('--subject_name', type=str, default='default_subject', help='subject name for logging')
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=10000)
         ext.logger.add_arguments(parser)

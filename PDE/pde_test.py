@@ -76,7 +76,7 @@ class PDETrainer:
             if self.cfg.resume and hasattr(self, 'wandb_id'):
                 print("resume wandb from id "+str(self.wandb_id))
                 wandb.init(
-                    project=self.subject_name,
+                    project=self.cfg.subject_name,
                     entity="whsjrc-buaa",
                     name=self.model_name,
                     id=self.wandb_id,
@@ -94,13 +94,13 @@ class PDETrainer:
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
                         "optimizer": self.cfg.optimizer,
-                        "scheduler": self.cfg.scheduler,
-                        "scheduler_cfg": self.cfg.scheduler_cfg,
+                        "scheduler": self.cfg.lr_method,
+                        "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
                     }
                 )
             else:
                 wandb.init(
-                    project="PDE Solving Updated2",
+                    project=self.cfg.subject_name,
                     entity="whsjrc-buaa",
                     name=self.model_name,
                     notes=str(self.cfg),
@@ -116,7 +116,8 @@ class PDETrainer:
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
                         "optimizer": self.cfg.optimizer,
-                        "scheduler_cfg": self.cfg.scheduler_cfg,
+                        "scheduler": self.cfg.lr_method,
+                        "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
                     }
                 )
             self.run_dir = os.path.dirname(wandb.run.dir)

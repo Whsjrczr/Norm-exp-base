@@ -21,6 +21,8 @@ CUDA_VISIBLE_DEVICES=0 /home/dlth/miniconda3/envs/norm-base/bin/python /home/dlt
  --no_save_best \
  --display_every=10 \
  --metrics "l2 relative error,MSE" \
-#   --output ./exp9 \
+ --subject_name="PDE Solving Updated 2" \
 #  --visualize \
+#   --output ./exp9 \
+
  #  --optimizer-config=momentum=0 \
