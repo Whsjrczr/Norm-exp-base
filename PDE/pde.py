@@ -69,7 +69,6 @@ class PDETrainer:
         # Monitor and wandb setup (simplified)
         taiyi_config = {}  # No specific layers for PDE
         self.monitor = Monitor(self.net, taiyi_config)
-        print(self.cfg.subject_name)
 
         if self.cfg.visualize:
             if self.cfg.offline:
@@ -95,8 +94,8 @@ class PDETrainer:
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
                         "optimizer": self.cfg.optimizer,
-                        "scheduler": self.cfg.scheduler,
-                        "scheduler_cfg": self.cfg.scheduler_cfg,
+                        "scheduler": self.cfg.lr_method,
+                        "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
                     }
                 )
             else:
@@ -117,8 +116,8 @@ class PDETrainer:
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
                         "optimizer": self.cfg.optimizer,
-                        "scheduler": self.cfg.scheduler,
-                        "scheduler_cfg": self.cfg.scheduler_cfg,
+                        "scheduler": self.cfg.lr_method,
+                        "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
                     }
                 )
             self.run_dir = os.path.dirname(wandb.run.dir)
@@ -135,7 +134,8 @@ class PDETrainer:
         parser.add_argument('-width', '--width', type=int, default=50)
         parser.add_argument('-depth', '--depth', type=int, default=3)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
-        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity'], help='PDE type')
+        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_learnable'], help='PDE type')
+        parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
         parser.add_argument('--visualize', action='store_true', help='use wandb for visualization and logging')
         parser.add_argument('--no_save_best', action='store_true', help='do not save best model during training')
