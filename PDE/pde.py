@@ -44,10 +44,10 @@ class PDETrainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_gpu = torch.cuda.device_count()
         self.logger('==> use {:d} GPUs'.format(self.num_gpu))
-        if self.num_gpu > 1:
-            self.model = torch.nn.DataParallel(self.model)
         
         self.model = get_model(self.cfg).to(self.device)
+        if self.num_gpu > 1:
+            self.model = torch.nn.DataParallel(self.model)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -96,6 +96,7 @@ class PDETrainer:
                         "optimizer": self.cfg.optimizer,
                         "scheduler": self.cfg.lr_method,
                         "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
+                        "loss_weights": self.cfg.loss_weights,
                     }
                 )
             else:
@@ -118,6 +119,7 @@ class PDETrainer:
                         "optimizer": self.cfg.optimizer,
                         "scheduler": self.cfg.lr_method,
                         "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
+                        "loss_weights": self.cfg.loss_weights,
                     }
                 )
             self.run_dir = os.path.dirname(wandb.run.dir)
@@ -134,7 +136,7 @@ class PDETrainer:
         parser.add_argument('-width', '--width', type=int, default=50)
         parser.add_argument('-depth', '--depth', type=int, default=3)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
-        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_learnable'], help='PDE type')
+        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_learnable', 'helmholtz_learnable_2'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
         parser.add_argument('--visualize', action='store_true', help='use wandb for visualization and logging')
@@ -211,6 +213,10 @@ class PDETrainer:
             y_true = (x**2 - 1) / 2
         elif self.cfg.pde_type == 'helmholtz':
             y_true = np.sin(np.pi * x[:, 0])
+        elif self.cfg.pde_type == 'helmholtz_learnable':
+            y_true = np.sin(np.pi * x[:, 0:1]) 
+        elif self.cfg.pde_type == 'helmholtz_learnable_2':
+            y_true = np.sin(np.pi * x[:, 0:1])
         elif self.cfg.pde_type == 'allen_cahn':
             epsilon = 0.01
             y_true = np.tanh(x[:, 0] / np.sqrt(2 * epsilon))

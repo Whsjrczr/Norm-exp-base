@@ -16,6 +16,8 @@ class PDEBuilder:
             self.define_helmholtz()
         elif self.cfg.pde_type == 'helmholtz_learnable':
             self.define_helmholtz_learnable()
+        elif self.cfg.pde_type == 'helmholtz_learnable_2':
+            self.define_helmholtz_learnable_2()
         elif self.cfg.pde_type == 'helmholtz2d':
             self.define_helmholtz2d()
         elif self.cfg.pde_type == 'wave':
@@ -28,6 +30,7 @@ class PDEBuilder:
             self.define_cavity()
         elif self.cfg.pde_type == 'allen_cahn':
             self.define_allen_cahn()
+            
         else:
             raise ValueError("Unsupported PDE type")
         return self.data, self.net, self.model
@@ -112,6 +115,30 @@ class PDEBuilder:
         self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], 1.0])
+
+    def define_helmholtz_learnable_2(self):
+        def pde(x, y):
+            dy_xx = dde.grad.hessian(y, x, component=0, i=0, j=0)
+            pi = torch.pi
+            rhs = 2.0 * (pi**2) * torch.sin(pi * x[:, 0:1])
+            return -dy_xx + (pi**2) * y - rhs
+
+        def boundary(x, on_boundary):
+            return on_boundary
+
+        def func(x):
+            if torch.is_tensor(x):
+                return torch.sin(torch.pi * x[:, 0:1])
+            else:
+                return np.sin(np.pi * x[:, 0:1])
+
+        geom = dde.geometry.Interval(-1, 1)
+        bc = dde.DirichletBC(geom, func, boundary)
+        self.data = dde.data.PDE(geom, pde, bc, num_domain=5000, num_boundary=500, solution=func)
+        self.model.regularizer = None
+        self.net = self.model
+        self.model = dde.Model(self.data, self.net)
+        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], self.cfg.loss_weights[1]])
 
     def define_helmholtz2d(self):
         geom = dde.geometry.Rectangle([-1, -1], [1, 1])
