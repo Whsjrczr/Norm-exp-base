@@ -12,12 +12,18 @@ class PDEBuilder:
     def build(self):
         if self.cfg.pde_type == 'poisson':
             self.define_poisson()
+        elif self.cfg.pde_type == 'poisson_new':
+            self.define_poisson_new()
         elif self.cfg.pde_type == 'helmholtz':
             self.define_helmholtz()
-        elif self.cfg.pde_type == 'helmholtz_learnable':
-            self.define_helmholtz_learnable()
+        elif self.cfg.pde_type == 'helmholtz_new':
+            self.define_helmholtz_new()
         elif self.cfg.pde_type == 'helmholtz_learnable_2':
             self.define_helmholtz_learnable_2()
+        elif self.cfg.pde_type == 'allen_cahn':
+            self.define_allen_cahn()
+        elif self.cfg.pde_type == 'allen_cahn_new':
+            self.define_allen_cahn_new()
         elif self.cfg.pde_type == 'helmholtz2d':
             self.define_helmholtz2d()
         elif self.cfg.pde_type == 'wave':
@@ -27,10 +33,7 @@ class PDEBuilder:
         elif self.cfg.pde_type == 'convdiff':
             self.define_convdiff()
         elif self.cfg.pde_type == 'cavity':
-            self.define_cavity()
-        elif self.cfg.pde_type == 'allen_cahn':
-            self.define_allen_cahn()
-            
+            self.define_cavity()            
         else:
             raise ValueError("Unsupported PDE type")
         return self.data, self.net, self.model
@@ -68,6 +71,31 @@ class PDEBuilder:
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
 
+    def define_poisson_new(self):
+        def pde(x, y):
+            dy_xx = dde.grad.hessian(y, x)
+            return -dy_xx - 1
+
+        def boundary(x, on_boundary):
+            return on_boundary
+
+        def func(x):
+            if torch.is_tensor(x):
+                x0 = x[:, 0:1]
+                return (x0**2 - 1.0) / 2.0
+            else:
+                x0 = x[:, 0:1]
+                return (x0**2 - 1.0) / 2.0
+
+
+        geom = dde.geometry.Interval(-1, 1)
+        bc = dde.DirichletBC(geom, func, boundary)
+        self.data = dde.data.PDE(geom, pde, bc, num_domain=1000, num_boundary=50, solution=func)
+        self.model.regularizer = None
+        self.net = self.model
+        self.model = dde.Model(self.data, self.net)
+        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], self.cfg.loss_weights[1]])
+
     def define_helmholtz(self):
         def pde(x, y):
             dy_xx = dde.grad.hessian(y, x, component=0, i=0, j=0)
@@ -92,7 +120,7 @@ class PDEBuilder:
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
 
-    def define_helmholtz_learnable(self):
+    def define_helmholtz_learnable_2(self):
         def pde(x, y):
             dy_xx = dde.grad.hessian(y, x, component=0, i=0, j=0)
             pi = torch.pi
@@ -114,9 +142,9 @@ class PDEBuilder:
         self.model.regularizer = None
         self.net = self.model
         self.model = dde.Model(self.data, self.net)
-        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], 1.0])
+        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], self.cfg.loss_weights[1]])
 
-    def define_helmholtz_learnable_2(self):
+    def define_helmholtz_new(self):
         def pde(x, y):
             dy_xx = dde.grad.hessian(y, x, component=0, i=0, j=0)
             pi = torch.pi
@@ -134,7 +162,59 @@ class PDEBuilder:
 
         geom = dde.geometry.Interval(-1, 1)
         bc = dde.DirichletBC(geom, func, boundary)
-        self.data = dde.data.PDE(geom, pde, bc, num_domain=5000, num_boundary=500, solution=func)
+        self.data = dde.data.PDE(geom, pde, bc, num_domain=5000, num_boundary=100, solution=func)
+        self.model.regularizer = None
+        self.net = self.model
+        self.model = dde.Model(self.data, self.net)
+        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], self.cfg.loss_weights[1]])
+
+    def define_allen_cahn(self):
+        epsilon = 0.01
+
+        def pde(x, y):
+            dy_xx = dde.grad.hessian(y, x)
+            return epsilon * dy_xx + y - y**3
+
+        def boundary(x, on_boundary):
+            return on_boundary
+
+        def func(x):
+            if torch.is_tensor(x):
+                eps = torch.tensor(2.0 * epsilon, dtype=x.dtype, device=x.device).sqrt()
+                return torch.tanh(x[:, 0:1] / eps)
+            else:
+                eps_np = np.sqrt(2.0 * epsilon)
+                return np.tanh(x[:, 0:1] / eps_np)
+
+        geom = dde.geometry.Interval(-1, 1)
+        bc = dde.DirichletBC(geom, func, boundary)
+        self.data = dde.data.PDE(geom, pde, bc, num_domain=10000, num_boundary=500, solution=func)
+        self.model.regularizer = None
+        self.net = self.model
+        self.model = dde.Model(self.data, self.net)
+        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
+
+    def define_allen_cahn_new(self):
+        epsilon = 0.01
+
+        def pde(x, y):
+            dy_xx = dde.grad.hessian(y, x)
+            return epsilon * dy_xx + y - y**3
+
+        def boundary(x, on_boundary):
+            return on_boundary
+
+        def func(x):
+            if torch.is_tensor(x):
+                eps = torch.tensor(2.0 * epsilon, dtype=x.dtype, device=x.device).sqrt()
+                return torch.tanh(x[:, 0:1] / eps)
+            else:
+                eps_np = np.sqrt(2.0 * epsilon)
+                return np.tanh(x[:, 0:1] / eps_np)
+
+        geom = dde.geometry.Interval(-1, 1)
+        bc = dde.DirichletBC(geom, func, boundary)
+        self.data = dde.data.PDE(geom, pde, bc, num_domain=12000, num_boundary=200, solution=func)
         self.model.regularizer = None
         self.net = self.model
         self.model = dde.Model(self.data, self.net)
@@ -404,28 +484,3 @@ class PDEBuilder:
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=loss_weights)
 
-    def define_allen_cahn(self):
-        epsilon = 0.01
-
-        def pde(x, y):
-            dy_xx = dde.grad.hessian(y, x)
-            return epsilon * dy_xx + y - y**3
-
-        def boundary(x, on_boundary):
-            return on_boundary
-
-        def func(x):
-            if torch.is_tensor(x):
-                eps = torch.tensor(2.0 * epsilon, dtype=x.dtype, device=x.device).sqrt()
-                return torch.tanh(x[:, 0:1] / eps)
-            else:
-                eps_np = np.sqrt(2.0 * epsilon)
-                return np.tanh(x[:, 0:1] / eps_np)
-
-        geom = dde.geometry.Interval(-1, 1)
-        bc = dde.DirichletBC(geom, func, boundary)
-        self.data = dde.data.PDE(geom, pde, bc, num_domain=10000, num_boundary=500, solution=func)
-        self.model.regularizer = None
-        self.net = self.model
-        self.model = dde.Model(self.data, self.net)
-        self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)

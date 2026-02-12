@@ -136,7 +136,7 @@ class PDETrainer:
         parser.add_argument('-width', '--width', type=int, default=50)
         parser.add_argument('-depth', '--depth', type=int, default=3)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
-        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_learnable', 'helmholtz_learnable_2'], help='PDE type')
+        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'possion_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
         parser.add_argument('--visualize', action='store_true', help='use wandb for visualization and logging')
@@ -209,15 +209,11 @@ class PDETrainer:
         # Predict and compute error
         x = np.linspace(-1, 1, 100).reshape(-1, 1)
         y_pred = self.model.predict(x)
-        if self.cfg.pde_type == 'poisson':
+        if self.cfg.pde_type == 'poisson' or self.cfg.pde_type == 'poisson_new':
             y_true = (x**2 - 1) / 2
-        elif self.cfg.pde_type == 'helmholtz':
-            y_true = np.sin(np.pi * x[:, 0])
-        elif self.cfg.pde_type == 'helmholtz_learnable':
-            y_true = np.sin(np.pi * x[:, 0:1]) 
-        elif self.cfg.pde_type == 'helmholtz_learnable_2':
+        elif self.cfg.pde_type == 'helmholtz' or self.cfg.pde_type == 'helmholtz_new' or self.cfg.pde_type == 'helmholtz_learnable_2':
             y_true = np.sin(np.pi * x[:, 0:1])
-        elif self.cfg.pde_type == 'allen_cahn':
+        elif self.cfg.pde_type == 'allen_cahn' or self.cfg.pde_type == 'allen_cahn_new':
             epsilon = 0.01
             y_true = np.tanh(x[:, 0] / np.sqrt(2 * epsilon))
         error = np.mean((y_pred - y_true)**2)
