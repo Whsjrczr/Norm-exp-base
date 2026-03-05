@@ -139,7 +139,6 @@ class PDETrainer:
         parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'possion_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
-        parser.add_argument('--visualize', action='store_true', help='use wandb for visualization and logging')
         parser.add_argument('--no_save_best', action='store_true', help='do not save best model during training')
         parser.add_argument('--display_every', type=int, default=1000, help='display and log every N iterations')
         parser.add_argument('--metrics', type=str2list, default='l2 relative error', help='comma-separated list of metrics to evaluate')

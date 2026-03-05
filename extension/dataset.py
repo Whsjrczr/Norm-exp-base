@@ -19,7 +19,7 @@ def add_arguments(parser: argparse.ArgumentParser):
     group.add_argument('--dataset', metavar='NAME', default='cifar10', choices=dataset_list,
                        help='The name of dataset in {' + ', '.join(dataset_list) + '}')
     group.add_argument('--dataset-cfg',type=str2dict, default={}, metavar='DICT', help='dataset config.')
-    group.add_argument('--dataset-root', metavar='PATH', default=os.path.expanduser('/home/PycharmProjects/data/cifar10/'), type=utils.path,
+    group.add_argument('--dataset-root', metavar='PATH', default=os.path.expanduser('E:\\norm-exp\\dataset'), type=utils.path,
                        help='The directory which contains needed dataset.')
     group.add_argument('-b', '--batch-size', type=utils.str2list, default=[64], metavar='NUMs',
                        help='The size of mini-batch')

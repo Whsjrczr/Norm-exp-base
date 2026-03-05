@@ -145,7 +145,7 @@ class PDETrainer:
         parser.add_argument('--metrics', type=str2list, default='l2 relative error', help='comma-separated list of metrics to evaluate')
         parser.add_argument('--batch_size', type=int, default=128)
         parser.add_argument('--float64', action='store_true', help='train with float64 precision')
-        parser.add_argument('--subject_name', type=str, default='default_subject', help='subject name for logging')
+        parser.add_argument('--subject_name', type=str, default='test', help='subject name for logging')
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=10000)
         ext.logger.add_arguments(parser)
@@ -163,30 +163,89 @@ class PDETrainer:
         if self.cfg.test:
             self.validate()
             return
-        # Train model
-        losshistory, train_state = self.model.train(iterations=self.cfg.epochs, batch_size=self.cfg.batch_size, display_every=self.cfg.display_every)
+
+        stages = getattr(ext.optimizer, "get_stages", lambda _cfg: None)(self.cfg)
+
+        all_histories = []
+        iter_offset = 0
+
+        if stages:
+            self.logger(f"==> Multi-stage training enabled: {len(stages)} stages")
+            for si, st in enumerate(stages, 1):
+                opt_name = (st.get("optimizer") or st.get("name") or self.cfg.optimizer)
+                lr = st.get("lr", getattr(self.cfg, "lr", None))
+                bs = st.get("batch_size", self.cfg.batch_size)
+                iters = st.get("iterations", st.get("iters", st.get("epochs", None)))
+                st_loss_weights = st.get("loss_weights", self.cfg.loss_weights)
+                st_metrics = st.get("metrics", self.cfg.metrics)
+
+                # Optimizer config (mainly for L-BFGS options)
+                st_opt_cfg = st.get("optimizer_config", st.get("config", {})) or {}
+
+                # DeepXDE expects optimizer names like "adam" and "L-BFGS"
+                opt_lower = str(opt_name).lower()
+                if opt_lower in {"lbfgs", "l-bfgs", "l_bfgs"}:
+                    dde_opt = "L-BFGS"
+                    compile_kwargs = {"loss_weights": st_loss_weights, "metrics": st_metrics}
+                    if st_opt_cfg:
+                        compile_kwargs["options"] = st_opt_cfg
+                    self.model.compile(dde_opt, **compile_kwargs)
+                else:
+                    dde_opt = opt_lower
+                    compile_kwargs = {"lr": lr, "loss_weights": st_loss_weights, "metrics": st_metrics}
+                    # For torch backend, weight_decay isn't supported via string optimizer in DeepXDE.
+                    self.model.compile(dde_opt, **compile_kwargs)
+
+                self.logger(f"==> Stage {si}/{len(stages)}: optimizer={dde_opt}, lr={lr}, iters={iters}, batch_size={bs}, opt_cfg={st_opt_cfg}")
+
+                if iters is None and dde_opt == "L-BFGS":
+                    losshistory, train_state = self.model.train(display_every=self.cfg.display_every)
+                else:
+                    losshistory, train_state = self.model.train(
+                        iterations=int(iters) if iters is not None else self.cfg.epochs,
+                        batch_size=bs,
+                        display_every=self.cfg.display_every,
+                    )
+
+                all_histories.append((dde_opt, losshistory, train_state, iter_offset))
+                if losshistory is not None and hasattr(losshistory, "loss_train"):
+                    iter_offset += len(losshistory.loss_train)
+        else:
+            # Single-stage (backward compatible)
+            losshistory, train_state = self.model.train(
+                iterations=self.cfg.epochs,
+                batch_size=self.cfg.batch_size,
+                display_every=self.cfg.display_every,
+            )
+            all_histories.append((self.cfg.optimizer, losshistory, train_state, 0))
 
         self.logger('==> Training completed.')
+
         # Log to wandb
         if self.cfg.visualize:
-            for i in range(len(losshistory.loss_train)):
-                log_dict = {"iterations": i + 1}
-                train_losses = losshistory.loss_train[i]
-                test_losses = losshistory.loss_test[i]
-                metrics = losshistory.metrics_test[i]
-                for j in range(len(train_losses)):
-                    log_dict[f"train_loss_{j}"] = float(train_losses[j])
-                for j in range(len(test_losses)):
-                    log_dict[f"test_loss_{j}"] = float(test_losses[j])
-                for j in range(len(metrics)):
-                    metric_name = self.cfg.metrics[j].replace(' ', '_').replace('(', '').replace(')', '').replace(',', '').replace('.', '')
-                    log_dict[f"metrics_{metric_name}"] = float(metrics[j])
-                wandb.log(log_dict)
+            for (opt_name, losshistory, train_state, offset) in all_histories:
+                if losshistory is None:
+                    continue
+                for i in range(len(losshistory.loss_train)):
+                    log_dict = {"iterations": offset + i + 1, "stage_optimizer": opt_name}
+                    train_losses = losshistory.loss_train[i]
+                    test_losses = losshistory.loss_test[i]
+                    metrics = losshistory.metrics_test[i]
+                    for j in range(len(train_losses)):
+                        log_dict[f"train_loss_{j}"] = float(train_losses[j])
+                    for j in range(len(test_losses)):
+                        log_dict[f"test_loss_{j}"] = float(test_losses[j])
+                    for j in range(len(metrics)):
+                        metric_name = self.cfg.metrics[j].replace(' ', '_').replace('(', '').replace(')', '').replace(',', '').replace('.', '')
+                        log_dict[f"metrics_{metric_name}"] = float(metrics[j])
+                    wandb.log(log_dict)
             val_error = self.validate()
             wandb.log({"val_error": val_error})
+
         # Save model
         if not self.cfg.no_save_best:
             self.model.save(os.path.join(self.result_path, 'model'))
+
         # Finish
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))
@@ -204,7 +263,6 @@ class PDETrainer:
             new_log_path = os.path.join(self.result_path, new_log_filename)
             shutil.copy(self.logger.filename, new_log_path)
         return
-
     def validate(self):
         # Predict and compute error
         x = np.linspace(-1, 1, 100).reshape(-1, 1)
