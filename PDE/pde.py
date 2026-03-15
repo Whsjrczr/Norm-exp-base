@@ -136,7 +136,7 @@ class PDETrainer:
         parser.add_argument('-width', '--width', type=int, default=50)
         parser.add_argument('-depth', '--depth', type=int, default=3)
         parser.add_argument('-dropout', '--dropout', type=float, default=0)
-        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'possion_new', 'allen_cahn_new'], help='PDE type')
+        parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'poisson_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
         parser.add_argument('--no_save_best', action='store_true', help='do not save best model during training')
@@ -153,6 +153,7 @@ class PDETrainer:
         ext.activation.add_arguments(parser)
         ext.optimizer.add_arguments(parser)
         ext.scheduler.add_arguments(parser)
+        ext.vis_taiyi.add_arguments(parser)
         args = parser.parse_args()
         if args.resume:
             args = parser.parse_args(namespace=ext.checkpoint.Checkpoint.load_config(args.resume))
