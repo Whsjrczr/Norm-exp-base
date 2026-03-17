@@ -49,13 +49,13 @@ class MNIST:
         self.saver = ext.checkpoint.Checkpoint(self.model, self.cfg, self.optimizer, self.scheduler, self.result_path, not self.cfg.test)
         self.saver.load(self.cfg.load)
 
-        self.device = torch.device('cuda')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         # self.device = torch.device('cpu')
         self.num_gpu = torch.cuda.device_count()
         self.logger('==> use {:d} GPUs'.format(self.num_gpu))
         if self.num_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
-        self.model.cuda()
+        self.model.to(self.device)
 
         self.best_acc = 0
         if self.cfg.visualize and self.cfg.offline:
