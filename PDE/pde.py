@@ -37,11 +37,16 @@ class PDETrainer:
         if self.cfg.float64:
             dde.config.set_default_float("float64")
             torch.set_default_dtype(torch.float64)
+            dde.backend.torch.torch.set_default_dtype(torch.float64)
+        else:
+            dde.config.set_default_float("float32")
+            torch.set_default_dtype(torch.float32)
+            dde.backend.torch.torch.set_default_dtype(torch.float32)
         # Set cfg for model selection
         self.cfg.im_size = [1]
         self.cfg.dataset_classes = 1
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         self.num_gpu = torch.cuda.device_count()
         self.logger('==> use {:d} GPUs'.format(self.num_gpu))
         
