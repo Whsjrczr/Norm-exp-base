@@ -8,7 +8,6 @@ import time
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-import wandb
 from sklearn.metrics import r2_score
 
 KAN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -78,12 +77,10 @@ class KANTrainer:
         self.model.to(self.device)
 
         self.best_r2 = float("-inf")
-        if self.cfg.visualize and self.cfg.offline:
-            os.environ["WANDB_MODE"] = "offline"
         if self.cfg.resume:
             saved = self.saver.resume(self.cfg.resume)
             self.cfg.start_epoch = saved["epoch"]
-            if self.cfg.visualize and "wandb_id" in saved:
+            if self.cfg.wandb and "wandb_id" in saved:
                 self.wandb_id = saved["wandb_id"]
                 self.step = saved["step"]
             self.best_r2 = saved.get("best_r2", self.best_r2)
@@ -92,52 +89,51 @@ class KANTrainer:
         self.criterion = nn.MSELoss()
         ext.trainer.set_seed(self.cfg)
 
-        if self.cfg.visualize:
-            wandb_kwargs = dict(
-                project=self.cfg.wandb_project,
-                entity="whsjrc-buaa",
-                name=self.model_name,
-                notes=str(self.cfg),
-                config={
-                    "model": self.cfg.arch,
-                    "layers_hidden": self.cfg.layers_hidden,
-                    "normalization": ext.normalization.setting(self.cfg),
-                    "activation": ext.activation.setting(self.cfg),
-                    "optimizer": self.cfg.optimizer,
-                    "learning_rate": self.cfg.lr,
-                    "batch_size": self.cfg.batch_size[0],
-                    "weight_decay": self.cfg.weight_decay,
-                    "dataset": self.cfg.function,
-                    "epochs": self.cfg.epochs,
-                    "seed": self.cfg.seed,
-                    "scheduler": getattr(self.cfg, "lr_method", None),
-                    "scheduler_cfg": f"step{getattr(self.cfg, 'lr_step', None)}_gamma{getattr(self.cfg, 'lr_gamma', None)}",
-                    "error": self.cfg.error,
-                    "grid_size": self.cfg.grid_size,
-                    "spline_order": self.cfg.spline_order,
-                    "update_grid": self.cfg.update_grid,
-                },
-            )
-            if self.cfg.resume and hasattr(self, "wandb_id") and self.wandb_id:
-                wandb_kwargs.update(dict(id=self.wandb_id, resume="must"))
-            wandb.init(**wandb_kwargs)
-            self.run_dir = os.path.dirname(wandb.run.dir)
+        wandb_kwargs = dict(
+            project=self.cfg.wandb_project,
+            entity="whsjrc-buaa",
+            name=self.model_name,
+            notes=str(self.cfg),
+            config={
+                "model": self.cfg.arch,
+                "layers_hidden": self.cfg.layers_hidden,
+                "normalization": ext.normalization.setting(self.cfg),
+                "activation": ext.activation.setting(self.cfg),
+                "residual_activation": self.cfg.residual_activation,
+                "residual_branch_enabled": not getattr(self.cfg, "disable_residual_branch", False),
+                "optimizer": self.cfg.optimizer,
+                "learning_rate": self.cfg.lr,
+                "batch_size": self.cfg.batch_size[0],
+                "weight_decay": self.cfg.weight_decay,
+                "dataset": self.cfg.function,
+                "epochs": self.cfg.epochs,
+                "seed": self.cfg.seed,
+                "scheduler": getattr(self.cfg, "lr_method", None),
+                "scheduler_cfg": f"step{getattr(self.cfg, 'lr_step', None)}_gamma{getattr(self.cfg, 'lr_gamma', None)}",
+                "error": self.cfg.error,
+                "grid_size": self.cfg.grid_size,
+                "spline_order": self.cfg.spline_order,
+                "update_grid": self.cfg.update_grid,
+            },
+        )
+        if self.cfg.resume and hasattr(self, "wandb_id") and self.wandb_id:
+            wandb_kwargs.update(dict(id=self.wandb_id, resume="must"))
 
-        if self.cfg.vis:
-            self.vis = ext.visualization.setting(
-                self.cfg,
-                self.model_name,
-                {
-                    "train loss": "loss",
-                    "val loss": "loss",
-                    "train r2": "metric",
-                    "val r2": "metric",
-                    "test loss": "loss",
-                    "test r2": "metric",
-                    "true test loss": "loss",
-                    "true test r2": "metric",
-                },
-            )
+        self.visualizer = ext.tracking.setting(
+            self.cfg,
+            env_name=self.model_name,
+            vis_names={
+                "train loss": "loss",
+                "val loss": "loss",
+                "train r2": "metric",
+                "val r2": "metric",
+                "test loss": "loss",
+                "test r2": "metric",
+                "true test loss": "loss",
+                "true test r2": "metric",
+            },
+            wandb_kwargs=wandb_kwargs,
+        )
 
     def add_arguments(self):
         parser = argparse.ArgumentParser("KAN Regression")
@@ -156,8 +152,8 @@ class KANTrainer:
         ext.checkpoint.add_arguments(parser)
         ext.normalization.add_arguments(parser)
         ext.activation.add_arguments(parser)
-        ext.vis_taiyi.add_arguments(parser)
-        ext.visualization.add_arguments(parser)
+        ext.tracking.add_arguments(parser)
+        ext.taiyi.add_arguments(parser)
 
         args = parser.parse_args()
         if args.resume:
@@ -176,14 +172,19 @@ class KANTrainer:
             args.epochs = stage_total_epochs
         args.im_size = [args.input_dim]
         args.dataset_classes = args.output_dim
-        return args
+        return ext.tracking.normalize_config(args)
 
     def _build_model_name(self):
         hidden = "-".join(str(v) for v in self.cfg.layers_hidden) if self.cfg.layers_hidden else f"{self.cfg.depth}x{self.cfg.width}"
+        residual_activation = getattr(self.cfg, "residual_activation", "same")
+        residual_enabled = not getattr(self.cfg, "disable_residual_branch", False)
+        residual_flag = "on" if residual_enabled else "off"
         return (
             f"KAN_{self.cfg.arch}_{self.cfg.function}"
             f"_h{hidden}"
             f"_{ext.normalization.setting(self.cfg)}_{ext.activation.setting(self.cfg)}"
+            f"_residual{residual_flag}"
+            f"_res{residual_activation}"
             f"_lr{self.cfg.lr}_bs{self.cfg.batch_size[0]}"
             f"_wd{self.cfg.weight_decay}_noise{self.cfg.error}_seed{self.cfg.seed}"
         )
@@ -277,27 +278,26 @@ class KANTrainer:
                 train_loss, train_r2 = self.train_epoch(epoch)
                 val_loss, val_r2, true_val_loss, true_val_r2 = self.validate(epoch)
 
-                if self.cfg.visualize:
-                    wandb.log(
-                        {
-                            "learning_rate": self.scheduler.get_last_lr()[0],
-                            "epochs": epoch,
-                            "steps": self.step,
-                            "stage": stage_idx,
-                            "train_loss": train_loss,
-                            "train_r2": train_r2,
-                            "val_loss": val_loss,
-                            "val_r2": val_r2,
-                            "true_val_loss": true_val_loss,
-                            "true_val_r2": true_val_r2,
-                        }
-                    )
+                self.visualizer.log(
+                    {
+                        "learning_rate": self.scheduler.get_last_lr()[0],
+                        "epochs": epoch,
+                        "steps": self.step,
+                        "stage": stage_idx,
+                        "train_loss": train_loss,
+                        "train_r2": train_r2,
+                        "val_loss": val_loss,
+                        "val_r2": val_r2,
+                        "true_val_loss": true_val_loss,
+                        "true_val_r2": true_val_r2,
+                    }
+                )
 
-                if self.cfg.visualize:
+                if self.visualizer.wandb_enabled:
                     self.saver.save_checkpoint(
                         epoch=epoch,
                         best_r2=self.best_r2,
-                        wandb_id=wandb.run.id,
+                        wandb_id=self.visualizer.run_id,
                         step=self.step,
                         seed=self.cfg.seed,
                     )
@@ -317,8 +317,7 @@ class KANTrainer:
 
         new_log_filename = f"{self.model_name}_{now_date}.txt"
         self.logger("==> Network training completed. Copy log file to {}".format(new_log_filename))
-        if self.cfg.offline and self.cfg.visualize:
-            os.system(f"wandb sync {self.run_dir}")
+        self.visualizer.finish(sync_offline=self.cfg.offline)
         shutil.copy(self.logger.filename, os.path.join(self.result_path, new_log_filename))
 
     def train_epoch(self, epoch):
@@ -358,9 +357,8 @@ class KANTrainer:
         avg_loss = total_loss / max(total_count, 1)
         train_r2 = self._compute_r2(torch.cat(outputs_list), torch.cat(targets_list))
 
-        if self.cfg.vis:
-            self.vis.add_value("train loss", avg_loss)
-            self.vis.add_value("train r2", train_r2)
+        self.visualizer.add_value("train loss", avg_loss)
+        self.visualizer.add_value("train r2", train_r2)
         self.logger(
             "Train on epoch {}: average loss={:.5g}, r2={:.4f}".format(epoch, avg_loss, train_r2)
         )
@@ -370,9 +368,8 @@ class KANTrainer:
         val_loss, val_r2 = self._evaluate_loader(self.val_loader)
         true_loss, true_r2 = self._evaluate_true_targets(self.val_loader, split="val")
 
-        if self.cfg.vis:
-            self.vis.add_value("val loss", val_loss)
-            self.vis.add_value("val r2", val_r2)
+        self.visualizer.add_value("val loss", val_loss)
+        self.visualizer.add_value("val r2", val_r2)
         self.logger(
             "Validate on epoch {}: loss={:.5g}, r2={:.4f}, true_loss={:.5g}, true_r2={:.4f}".format(
                 epoch, val_loss, val_r2, true_loss, true_r2
@@ -388,20 +385,18 @@ class KANTrainer:
     def test(self):
         test_loss, test_r2 = self._evaluate_loader(self.test_loader)
         true_loss, true_r2 = self._evaluate_true_targets(self.test_loader, split="test")
-        if self.cfg.vis:
-            self.vis.add_value("test loss", test_loss)
-            self.vis.add_value("test r2", test_r2)
-            self.vis.add_value("true test loss", true_loss)
-            self.vis.add_value("true test r2", true_r2)
-        if self.cfg.visualize:
-            wandb.log(
-                {
-                    "test_loss": test_loss,
-                    "test_r2": test_r2,
-                    "true_test_loss": true_loss,
-                    "true_test_r2": true_r2,
-                }
-            )
+        self.visualizer.add_value("test loss", test_loss)
+        self.visualizer.add_value("test r2", test_r2)
+        self.visualizer.add_value("true test loss", true_loss)
+        self.visualizer.add_value("true test r2", true_r2)
+        self.visualizer.log(
+            {
+                "test_loss": test_loss,
+                "test_r2": test_r2,
+                "true_test_loss": true_loss,
+                "true_test_r2": true_r2,
+            }
+        )
         self.logger(
             "Test: loss={:.5g}, r2={:.4f}, true_loss={:.5g}, true_r2={:.4f}".format(
                 test_loss, test_r2, true_loss, true_r2

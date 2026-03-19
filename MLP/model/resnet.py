@@ -33,7 +33,15 @@ class BasicBlock(nn.Module):
         out = self.ln2(out)
         # out = self.bn2(out)
 
-        out += identity
+        branch = out
+        out = out + identity
+        self.residual_states = {
+            "default": {
+                "stream": identity,
+                "branch": branch,
+                "output": out,
+            }
+        }
         # out = self.relu(out)
 
         return out
@@ -90,7 +98,15 @@ class Bottleneck(nn.Module):
         out = self.ln3(out)
         # out = self.bn3(out)
 
-        out += identity
+        branch = out
+        out = out + identity
+        self.residual_states = {
+            "default": {
+                "stream": identity,
+                "branch": branch,
+                "output": out,
+            }
+        }
         # out = self.relu(out)
 
         return out

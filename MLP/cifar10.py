@@ -9,10 +9,6 @@ import torch.nn as nn
 from torchvision.utils import save_image
 import sys
 
-from Taiyi.taiyi.monitor import Monitor
-import wandb
-from Taiyi.visualize import Visualization
-
 sys.path.append('../')
 import extension as ext
 from model.selection_tool import add_model_arguments, get_model
@@ -56,13 +52,10 @@ class MNIST:
         self.model.to(self.device)
 
         self.best_acc = 0
-        if self.cfg.visualize and self.cfg.offline:
-            os.environ['WANDB_MODE'] = 'offline'
-
         if self.cfg.resume:
             saved = self.saver.resume(self.cfg.resume)
             self.cfg.start_epoch = saved['epoch']
-            if self.cfg.visualize and 'wandb_id' in saved.keys():
+            if self.cfg.wandb and 'wandb_id' in saved.keys():
                 self.wandb_id = saved['wandb_id']
                 self.step = saved['step']
             self.best_acc = saved['best_acc']
@@ -76,52 +69,54 @@ class MNIST:
             nn.BatchNorm2d: [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm', 'linear(5,0)']],
             ext.LayerNormScaling: [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm', 'linear(5,0)']],
             nn.LayerNorm: [['InputSndNorm', 'linear(5,0)'], ['OutputGradSndNorm', 'linear(5,0)']],
+            'ResidualBlock': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'ResBlockDropout': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'BasicBlock': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'Bottleneck': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
         }
 
-        if self.cfg.visualize:
-            if self.cfg.taiyi:
-                self.monitor = Monitor(self.model, taiyi_config)
+        wandb_kwargs = dict(
+            project=self.cfg.wandb_project if hasattr(self.cfg, "wandb_project") else "test",
+            entity="whsjrc-buaa",
+            name=self.model_name,
+            notes=str(self.cfg) + " ---- " + str(taiyi_config),
+            config={
+                "model": self.cfg.arch,
+                "depth": self.cfg.depth,
+                "width": self.cfg.width,
+                "normalization": ext.normalization.setting(self.cfg),
+                "activation": ext.activation.setting(self.cfg),
+                "dropout_prob": self.cfg.dropout,
+                "optimizer": self.cfg.optimizer,
+                "learning_rate": self.cfg.lr,
+                "batch_size": self.cfg.batch_size[0],
+                "weight_decay": self.cfg.weight_decay,
+                "dataset": self.cfg.dataset,
+                "epochs": self.cfg.epochs,
+                "seed": self.cfg.seed,
+                "scheduler": getattr(self.cfg, "lr_method", None),
+                "scheduler_cfg": f"step{getattr(self.cfg,'lr_step',None)}_gamma{getattr(self.cfg,'lr_gamma',None)}",
+            },
+        )
 
-            wandb_kwargs = dict(
-                project=self.cfg.wandb_project if hasattr(self.cfg, "wandb_project") else "test",
-                entity="whsjrc-buaa",
-                name=self.model_name,
-                notes=str(self.cfg) + " ---- " + str(taiyi_config),
-                config={
-                    "model": self.cfg.arch,
-                    "depth": self.cfg.depth,
-                    "width": self.cfg.width,
-                    "normalization": ext.normalization.setting(self.cfg),
-                    "activation": ext.activation.setting(self.cfg),
-                    "dropout_prob": self.cfg.dropout,
-                    "optimizer": self.cfg.optimizer,
-                    "learning_rate": self.cfg.lr,
-                    "batch_size": self.cfg.batch_size[0],
-                    "weight_decay": self.cfg.weight_decay,
-                    "dataset": self.cfg.dataset,
-                    "epochs": self.cfg.epochs,
-                    "seed": self.cfg.seed,
-                    "scheduler": getattr(self.cfg, "lr_method", None),
-                    "scheduler_cfg": f"step{getattr(self.cfg,'lr_step',None)}_gamma{getattr(self.cfg,'lr_gamma',None)}",
-                },
-            )
+        if self.cfg.resume and hasattr(self, 'wandb_id') and self.wandb_id:
+            print("resume wandb from id " + str(self.wandb_id))
+            wandb_kwargs.update(dict(id=self.wandb_id, resume="must"))
 
-            if self.cfg.resume and hasattr(self, 'wandb_id') and self.wandb_id:
-                print("resume wandb from id " + str(self.wandb_id))
-                wandb_kwargs.update(dict(id=self.wandb_id, resume="must"))
-
-            wandb.init(**wandb_kwargs)
-            self.run_dir = os.path.dirname(wandb.run.dir)
-
-            if self.cfg.taiyi:
-                self.vis_wandb = Visualization(self.monitor, wandb)
-                self.logger('==> taiyi config: {}'.format(taiyi_config))
-            if self.cfg.vis:
-                self.vis = ext.visualization.setting(
-                    self.cfg,
-                    self.model_name,
-                    {'train loss': 'loss', 'test loss': 'loss', 'train accuracy': 'accuracy', 'test accuracy': 'accuracy'}
-                )
+        self.visualizer = ext.tracking.setting(
+            self.cfg,
+            env_name=self.model_name,
+            vis_names={'train loss': 'loss', 'test loss': 'loss', 'train accuracy': 'accuracy', 'test accuracy': 'accuracy'},
+            wandb_kwargs=wandb_kwargs,
+        )
+        self.taiyi = ext.taiyi.setting(
+            self.cfg,
+            model=self.model,
+            monitor_config=taiyi_config,
+            wandb=self.visualizer.wandb,
+        )
+        if self.taiyi.enabled:
+            self.logger('==> taiyi config: {}'.format(taiyi_config))
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
@@ -140,8 +135,8 @@ class MNIST:
         ext.checkpoint.add_arguments(parser)
         ext.normalization.add_arguments(parser)
         ext.activation.add_arguments(parser)
-        ext.vis_taiyi.add_arguments(parser)
-        ext.visualization.add_arguments(parser)
+        ext.tracking.add_arguments(parser)
+        ext.taiyi.add_arguments(parser)
 
         args = parser.parse_args()
         if args.resume:
@@ -150,7 +145,7 @@ class MNIST:
         stage_total_epochs = getattr(ext.optimizer, "infer_total_epochs", lambda _stages: None)(stages)
         if stage_total_epochs is not None:
             args.epochs = stage_total_epochs
-        return args
+        return ext.tracking.normalize_config(args)
 
     def _rebuild_optim_sched_and_sync_saver(self):
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -247,13 +242,12 @@ class MNIST:
 
                 self.train_epoch(epoch)
 
-                if self.cfg.visualize:
-                    wandb.log({"learning_rate": self.scheduler.get_last_lr()[0], "steps": self.step, "stage": si, "epochs": epoch})
+                self.visualizer.log({"learning_rate": self.scheduler.get_last_lr()[0], "steps": self.step, "stage": si, "epochs": epoch})
 
                 accuracy, val_loss = self.validate(epoch)
 
-                if self.cfg.visualize:
-                    self.saver.save_checkpoint(epoch=epoch, best_acc=self.best_acc, wandb_id=wandb.run.id, step=self.step)
+                if self.visualizer.wandb_enabled:
+                    self.saver.save_checkpoint(epoch=epoch, best_acc=self.best_acc, wandb_id=self.visualizer.run_id, step=self.step)
                 else:
                     self.saver.save_checkpoint(epoch=epoch, best_acc=self.best_acc)
 
@@ -263,16 +257,13 @@ class MNIST:
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))
 
-        if self.cfg.visualize and self.cfg.taiyi:
-            self.vis_wandb.close()
-            self.monitor.get_output()
+        taiyi_info = self.taiyi.finish()
+        finish_info = self.visualizer.finish(sync_offline=self.cfg.offline)
+        if taiyi_info["taiyi_output"]:
             self.logger("==> Wandb successfully get output.")
 
         new_log_filename = r'{}_{}_{:5.2f}%%.txt'.format(self.model_name, now_date, self.best_acc)
         self.logger('==> Network training completed. Copy log file to {}'.format(new_log_filename))
-        if self.cfg.offline and self.cfg.visualize:
-            print(f"syncing wandb...{self.run_dir}")
-            os.system(f"wandb sync {self.run_dir}")
         new_log_path = os.path.join(self.result_path, new_log_filename)
         shutil.copy(self.logger.filename, new_log_path)
 
@@ -299,9 +290,7 @@ class MNIST:
             losses.backward()
             self.optimizer.step()
 
-            if self.cfg.visualize and self.cfg.taiyi:
-                self.monitor.track(self.step)
-                self.vis_wandb.show(self.step)
+            self.taiyi.track(self.step)
 
             self.step += 1
 
@@ -321,11 +310,9 @@ class MNIST:
         train_loss /= total
         accuracy = 100. * correct / total
 
-        if self.cfg.visualize:
-            wandb.log({"train_acc": accuracy, "train_loss": train_loss, "epochs": epoch, "steps": self.step})
-        if self.cfg.vis:
-            self.vis.add_value('train loss', train_loss)
-            self.vis.add_value('train accuracy', accuracy)
+        self.visualizer.log({"train_acc": accuracy, "train_loss": train_loss, "epochs": epoch, "steps": self.step})
+        self.visualizer.add_value('train loss', train_loss)
+        self.visualizer.add_value('train accuracy', accuracy)
 
         self.logger('Train on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(
             epoch, train_loss, accuracy, correct, total, progress_bar.time_used()
@@ -354,11 +341,9 @@ class MNIST:
         test_loss /= total
         accuracy = correct * 100. / total
 
-        if self.cfg.vis:
-            self.vis.add_value('test loss', test_loss)
-            self.vis.add_value('test accuracy', accuracy)
-        if self.cfg.visualize:
-            wandb.log({"test_acc": accuracy, "test_loss": test_loss, "epochs": epoch, "steps": self.step})
+        self.visualizer.add_value('test loss', test_loss)
+        self.visualizer.add_value('test accuracy', accuracy)
+        self.visualizer.log({"test_acc": accuracy, "test_loss": test_loss, "epochs": epoch, "steps": self.step})
 
         self.logger('Test on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(
             epoch, test_loss, accuracy, correct, total, progress_bar.time_used()

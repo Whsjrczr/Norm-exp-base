@@ -170,7 +170,8 @@ python KAN/KAN.py \
 - `--weight-norm`
 - `--kan-regularization`
 - `--kan-init`: `origin` / `xavier` / `kaiming`
-- `--no-base-branch`
+- `--residual-activation`: 单独控制 KAN residual/base branch 上的激活函数，`same` 表示跟随 `--activation`
+- `--disable-residual-branch`: 关闭 KAN residual/base branch，仅保留 spline branch
 
 ### 数据与任务参数
 

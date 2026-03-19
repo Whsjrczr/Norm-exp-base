@@ -74,8 +74,17 @@ class ResidualBlock(nn.Module):
         x = self.fc1(x)
         x = self.norm1(x)
         x = self.activation(x)
-        x = x + residual  # Residual connection
-        return self.activation(x)
+        branch = x
+        x = branch + residual  # Residual connection
+        x = self.activation(x)
+        self.residual_states = {
+            "default": {
+                "stream": residual,
+                "branch": branch,
+                "output": x,
+            }
+        }
+        return x
 
 
 

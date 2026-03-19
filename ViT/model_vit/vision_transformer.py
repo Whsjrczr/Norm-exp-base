@@ -132,8 +132,25 @@ class Block(nn.Module):
         y, attn = self.attn(self.norm1(x))
         if return_attention:
             return attn
-        x = x + self.drop_path(y)
-        x = x + self.drop_path(self.mlp(self.norm2(x)))
+        attn_stream = x
+        attn_branch = self.drop_path(y)
+        x = attn_stream + attn_branch
+
+        mlp_stream = x
+        mlp_branch = self.drop_path(self.mlp(self.norm2(x)))
+        x = mlp_stream + mlp_branch
+        self.residual_states = {
+            "attn": {
+                "stream": attn_stream,
+                "branch": attn_branch,
+                "output": attn_stream + attn_branch,
+            },
+            "mlp": {
+                "stream": mlp_stream,
+                "branch": mlp_branch,
+                "output": x,
+            },
+        }
         return x
 
 

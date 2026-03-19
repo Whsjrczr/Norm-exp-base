@@ -100,8 +100,17 @@ class ResBlockDropout(nn.Module):
         x = self.activation(x)
         x = self.centering(x)
         x = self.dropout(x)
-        x += identity
-        return self.scaling(x)
+        branch = x
+        x = x + identity
+        x = self.scaling(x)
+        self.residual_states = {
+            "default": {
+                "stream": identity,
+                "branch": branch,
+                "output": x,
+            }
+        }
+        return x
 
 
 class ResCenDropScalingMLP(nn.Module):
@@ -123,15 +132,23 @@ class ResBlock(nn.Module):
         super(ResBlock, self).__init__()
         self.fc1 = nn.Linear(width, width)
         self.activation = nn.ReLU()
-        self.norm = ext.norm(width)
+        self.norm = ext.Norm(width)
 
     def forward(self, x):
         identity = x
         x = self.fc1(x)
         x = self.activation(x)
         x = self.norm(x)
-        x += identity
-        return 
+        branch = x
+        x = x + identity
+        self.residual_states = {
+            "default": {
+                "stream": identity,
+                "branch": branch,
+                "output": x,
+            }
+        }
+        return x
 
 
 class ResMLP(nn.Module):

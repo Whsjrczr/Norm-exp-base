@@ -1065,3 +1065,71 @@ python ViT/vit.py \
 - `nogrey` 仅保留兼容，不建议继续使用；`nogrey=True` 等价于 `grey=False`
 - `-b, --batch-size` 传单个值时会自动扩成 `[train_bs, val_bs]`
 - 对 `folder/ImageNet` 且 `dataset_cfg.loader=vit` 的加载方式，`--im-size` 会直接决定 ViT 风格的 crop / resize 尺寸
+## Visualization Update
+
+### Module Naming
+
+- 新的统一入口是 `tracking.py`
+- 新的 Visdom 专用入口是 `visdom.py`
+- 新的 Taiyi 专用入口是 `taiyi.py`
+- `visualize.py` 现在只是 `tracking.py` 的兼容别名
+- `visualization.py` 现在只是 `visdom.py` 的兼容别名
+- `vis_taiyi.py` 暂时保留为旧参数兼容入口
+
+### Recommended Usage
+
+- 推荐在训练脚本中使用 `ext.tracking.add_arguments(parser)`
+- 推荐在需要 Taiyi 时显式使用 `ext.taiyi.add_arguments(parser)`
+- 推荐用 `ext.tracking.normalize_config(args)` 做参数归一化
+- 推荐用 `ext.tracking.setting(...)` 创建统一追踪器
+- 推荐用 `ext.taiyi.setting(...)` 创建 Taiyi 追踪器
+- 如果只需要 Visdom，可以直接使用 `ext.visdom.add_arguments(parser)` 和 `ext.visdom.setting(...)`
+
+### Visualization Flags
+
+`tracking.py` 现在统一管理 WandB、Visdom、Taiyi，但三者开关已经分离。
+
+`--wandb`
+
+- 类型：`flag`
+- 作用：启用 WandB 记录
+
+`--visualize`
+
+- 类型：`flag`
+- 作用：`--wandb` 的兼容别名
+
+`--wandb-project`
+
+- 类型：`str`
+- 默认值：`test`
+- 作用：设置 WandB project 名称
+
+`--visdom`
+
+- 类型：`flag`
+- 作用：启用 Visdom 曲线可视化
+
+`--vis`
+
+- 类型：`flag`
+- 作用：`--visdom` 的兼容别名
+
+`--visdom-port` / `--vis-port`
+
+- 类型：`int`
+- 默认值：`6006`
+- 作用：设置 Visdom 服务端口
+
+`--visdom-env` / `--vis-env`
+
+- 类型：`str`
+- 默认值：`None`
+- 作用：设置 Visdom 环境名；如果不传，通常会回退到 `model_name`
+
+`--taiyi`
+
+- 类型：`flag`
+- 作用：启用 Taiyi 监控桥接
+- 当前行为：Taiyi 开关已和 WandB / Visdom 分离，但仍通过 `tracking.py` 统一接入
+- 后续方向：可以继续把 Taiyi 抽成 `extension` 下的独立工具模块

@@ -38,7 +38,23 @@ def add_model_arguments(parser: argparse.ArgumentParser):
     group.add_argument("--weight-norm", action="store_true")
     group.add_argument("--kan-regularization", type=float, default=0.0)
     group.add_argument("--kan-init", default="origin", choices=["origin", "xavier", "kaiming"])
-    group.add_argument("--no-base-branch", action="store_true")
+    group.add_argument(
+        "--residual-activation",
+        default="same",
+        choices=["same", "relu", "sigmoid", "tanh", "silu", "no"],
+        help="activation used on the KAN residual/base branch; 'same' follows --activation",
+    )
+    group.add_argument(
+        "--disable-residual-branch",
+        action="store_true",
+        help="disable the KAN residual/base branch and keep only the spline branch",
+    )
+    group.add_argument(
+        "--no-base-branch",
+        dest="disable_residual_branch",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     return group
 
 
@@ -76,20 +92,29 @@ def _resolve_layers_hidden(cfg):
     return [input_dim] + [width] * depth + [output_dim]
 
 
-def _resolve_base_activation(cfg):
-    activation_name = str(getattr(cfg, "activation", "relu")).lower()
+def _activation_name_to_module(activation_name: str):
     activation_map = {
         "relu": nn.ReLU,
         "sigmoid": nn.Sigmoid,
         "tanh": nn.Tanh,
+        "silu": nn.SiLU,
         "no": nn.Identity,
     }
     return activation_map.get(activation_name, nn.SiLU)
 
 
+def _resolve_base_activation(cfg):
+    activation_name = str(getattr(cfg, "activation", "relu")).lower()
+    residual_activation = str(getattr(cfg, "residual_activation", "same")).lower()
+    if residual_activation != "same":
+        activation_name = residual_activation
+    return _activation_name_to_module(activation_name)
+
+
 def get_model(cfg):
     model_name = getattr(cfg, "arch", "KAN")
     layers_hidden = _resolve_layers_hidden(cfg)
+    disable_residual_branch = bool(getattr(cfg, "disable_residual_branch", False))
 
     if model_name == "KAN":
         return KAN_norm(
@@ -107,10 +132,10 @@ def get_model(cfg):
             weight_norm=getattr(cfg, "weight_norm", False),
             init=getattr(cfg, "kan_init", "origin"),
             dropout_rate=getattr(cfg, "dropout", 0.0),
-            use_base_branch=not getattr(cfg, "no_base_branch", False),
+            use_base_branch=not disable_residual_branch,
         )
 
     if model_name == "MLP":
-        return MLP(layers_hidden, norm=ext.normalization.Norm, activation=_resolve_base_activation(cfg))
+        return MLP(layers_hidden, norm=ext.normalization.Norm, activation=_activation_name_to_module(str(getattr(cfg, "activation", "relu")).lower()))
 
     raise ValueError(f"Invalid model name: {model_name}. Choose 'KAN' or 'MLP'.")

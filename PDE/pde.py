@@ -9,10 +9,6 @@ import matplotlib.pyplot as plt
 
 import deepxde as dde
 import torch
-import wandb
-
-from Taiyi.taiyi.monitor import Monitor
-from Taiyi.visualize import Visualization
 
 import sys
 
@@ -69,68 +65,50 @@ class PDETrainer:
 
         ext.trainer.set_seed(self.cfg)
 
-        taiyi_config = {}
-        self.monitor = Monitor(self.net, taiyi_config) if self.cfg.visualize and self.cfg.taiyi else None
+        taiyi_config = {
+            'ResidualBlock': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'ResBlockDropout': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'BasicBlock': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'Bottleneck': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+        }
+        wandb_kwargs = dict(
+            project=self.cfg.subject_name,
+            entity="whsjrc-buaa",
+            name=self.model_name,
+            notes=str(self.cfg),
+            config={
+                "pde_type": self.cfg.pde_type,
+                "arch": self.cfg.arch,
+                "depth": self.cfg.depth,
+                "width": self.cfg.width,
+                "normalization": ext.normalization.setting(self.cfg),
+                "num_per_group": self.cfg.norm_cfg.get('num_per_group', None),
+                "activation": ext.activation.setting(self.cfg),
+                "learning_rate": self.cfg.lr,
+                "epochs": self.cfg.epochs,
+                "seed": self.cfg.seed,
+                "optimizer": self.cfg.optimizer,
+                "scheduler": self.cfg.lr_method,
+                "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
+                "loss_weights": self.cfg.loss_weights,
+            },
+        )
+        if self.cfg.resume and hasattr(self, 'wandb_id'):
+            print("resume wandb from id " + str(self.wandb_id))
+            wandb_kwargs.update(dict(id=self.wandb_id, resume="must"))
 
-        if self.cfg.visualize:
-            if self.cfg.offline:
-                os.environ['WANDB_MODE'] = 'offline'
-            if self.cfg.resume and hasattr(self, 'wandb_id'):
-                print("resume wandb from id " + str(self.wandb_id))
-                wandb.init(
-                    project=self.cfg.subject_name,
-                    entity="whsjrc-buaa",
-                    name=self.model_name,
-                    id=self.wandb_id,
-                    resume="must",
-                    notes=str(self.cfg),
-                    config={
-                        "pde_type": self.cfg.pde_type,
-                        "arch": self.cfg.arch,
-                        "depth": self.cfg.depth,
-                        "width": self.cfg.width,
-                        "normalization": ext.normalization.setting(self.cfg),
-                        "num_per_group": self.cfg.norm_cfg.get('num_per_group', None),
-                        "activation": ext.activation.setting(self.cfg),
-                        "learning_rate": self.cfg.lr,
-                        "epochs": self.cfg.epochs,
-                        "seed": self.cfg.seed,
-                        "optimizer": self.cfg.optimizer,
-                        "scheduler": self.cfg.lr_method,
-                        "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
-                        "loss_weights": self.cfg.loss_weights,
-                    }
-                )
-            else:
-                wandb.init(
-                    project=self.cfg.subject_name,
-                    entity="whsjrc-buaa",
-                    name=self.model_name,
-                    notes=str(self.cfg),
-                    config={
-                        "pde_type": self.cfg.pde_type,
-                        "arch": self.cfg.arch,
-                        "depth": self.cfg.depth,
-                        "width": self.cfg.width,
-                        "normalization": ext.normalization.setting(self.cfg),
-                        "num_per_group": self.cfg.norm_cfg.get('num_per_group', None),
-                        "activation": ext.activation.setting(self.cfg),
-                        "learning_rate": self.cfg.lr,
-                        "epochs": self.cfg.epochs,
-                        "seed": self.cfg.seed,
-                        "optimizer": self.cfg.optimizer,
-                        "scheduler": self.cfg.lr_method,
-                        "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
-                        "loss_weights": self.cfg.loss_weights,
-                    }
-                )
-            self.run_dir = os.path.dirname(wandb.run.dir)
-            self.vis_wandb = Visualization(self.monitor, wandb) if self.cfg.taiyi else None
-        else:
-            self.vis_wandb = None
-
-        if self.cfg.vis:
-            self.vis = ext.visualization.setting(self.cfg, self.model_name, self._build_vis_names())
+        self.visualizer = ext.tracking.setting(
+            self.cfg,
+            env_name=self.model_name,
+            vis_names=self._build_vis_names(),
+            wandb_kwargs=wandb_kwargs,
+        )
+        self.taiyi = ext.taiyi.setting(
+            self.cfg,
+            model=self.net,
+            monitor_config=taiyi_config,
+            wandb=self.visualizer.wandb,
+        )
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('PDE Solving')
@@ -152,8 +130,8 @@ class PDETrainer:
         ext.activation.add_arguments(parser)
         ext.optimizer.add_arguments(parser)
         ext.scheduler.add_arguments(parser)
-        ext.vis_taiyi.add_arguments(parser)
-        ext.visualization.add_arguments(parser)
+        ext.tracking.add_arguments(parser)
+        ext.taiyi.add_arguments(parser)
         args = parser.parse_args()
         if args.resume:
             args = parser.parse_args(namespace=ext.checkpoint.Checkpoint.load_config(args.resume))
@@ -161,7 +139,7 @@ class PDETrainer:
         stage_total_iterations = getattr(ext.optimizer, "infer_total_iterations", lambda _stages: None)(stages)
         if stage_total_iterations is not None:
             args.epochs = stage_total_iterations
-        return args
+        return ext.tracking.normalize_config(args)
 
     def train(self):
         if self.cfg.test:
@@ -189,9 +167,9 @@ class PDETrainer:
 
         self.logger('==> Training completed.')
 
-        if self.cfg.visualize:
+        if self.visualizer.wandb_enabled:
             self._log_histories_to_wandb(all_histories)
-        if self.cfg.vis:
+        if self.visualizer.visdom_enabled:
             self._log_histories_to_vis(all_histories)
 
         self.validate()
@@ -203,18 +181,14 @@ class PDETrainer:
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))
 
-        if self.cfg.visualize:
-            if self.vis_wandb:
-                self.vis_wandb.close()
-            if self.monitor:
-                self.monitor.get_output()
-                self.logger("==> Wandb successfully get output.")
+        taiyi_info = self.taiyi.finish()
+        finish_info = self.visualizer.finish(sync_offline=self.cfg.offline)
+        if taiyi_info["taiyi_output"]:
+            self.logger("==> Wandb successfully get output.")
 
+        if self.visualizer.wandb_enabled:
             new_log_filename = r'{}_{}.txt'.format(self.model_name, now_date)
             self.logger('==> Network training completed. Copy log file to {}'.format(new_log_filename))
-            if self.cfg.offline:
-                print(f"syncing wandb...{self.run_dir}")
-                os.system(f"wandb sync {self.run_dir}")
             new_log_path = os.path.join(self.result_path, new_log_filename)
             shutil.copy(self.logger.filename, new_log_path)
 
@@ -226,10 +200,8 @@ class PDETrainer:
 
         error = np.mean((y_pred - y_true)**2)
         self.logger('==> Validation L2 error: {:.5g}'.format(error))
-        if self.cfg.visualize:
-            wandb.log({"val_error": error})
-        if self.cfg.vis:
-            self.vis.add_value("val error", error)
+        self.visualizer.log({"val_error": error})
+        self.visualizer.add_value("val error", error)
         self.best_loss = getattr(self, 'best_loss', float('inf'))
         if not self.cfg.test and not self.cfg.no_save_best and error < self.best_loss:
             self.best_loss = error
@@ -288,7 +260,7 @@ class PDETrainer:
                 for j in range(len(metrics)):
                     metric_name = str(metrics_names[j]).replace(' ', '_').replace('(', '').replace(')', '').replace(',', '').replace('.', '')
                     log_dict[f"metrics_{metric_name}"] = float(metrics[j])
-                wandb.log(log_dict)
+                self.visualizer.log(log_dict)
 
     def _log_histories_to_vis(self, histories):
         for _stage_idx, stage_cfg, losshistory, _train_state, _offset in histories:
@@ -299,14 +271,14 @@ class PDETrainer:
                 train_losses = losshistory.loss_train[i]
                 test_losses = losshistory.loss_test[i]
                 metrics = losshistory.metrics_test[i]
-                self.vis.add_value("train total loss", float(np.sum(train_losses)))
-                self.vis.add_value("test total loss", float(np.sum(test_losses)))
+                self.visualizer.add_value("train total loss", float(np.sum(train_losses)))
+                self.visualizer.add_value("test total loss", float(np.sum(test_losses)))
                 for j in range(len(train_losses)):
-                    self.vis.add_value(f"train loss {j}", float(train_losses[j]))
+                    self.visualizer.add_value(f"train loss {j}", float(train_losses[j]))
                 for j in range(len(test_losses)):
-                    self.vis.add_value(f"test loss {j}", float(test_losses[j]))
+                    self.visualizer.add_value(f"test loss {j}", float(test_losses[j]))
                 for j in range(len(metrics)):
-                    self.vis.add_value(self._metric_vis_name(metrics_names[j]), float(metrics[j]))
+                    self.visualizer.add_value(self._metric_vis_name(metrics_names[j]), float(metrics[j]))
 
     def _build_vis_names(self):
         names = {
