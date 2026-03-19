@@ -34,5 +34,6 @@ PDE/wandb/
 
 # test
 MLP/exp/
+tmp-kan-results*/
 
 test.py

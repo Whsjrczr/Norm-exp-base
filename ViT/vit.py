@@ -15,7 +15,7 @@ import wandb
 sys.path.append("../")
 import extension as ext
 
-from model_vit.select_vit import get_model
+from model_vit.select_vit import add_model_arguments, get_model
 
 
 class ViTTrainer:
@@ -134,16 +134,9 @@ class ViTTrainer:
     def add_arguments(self):
         argv = ["--batch-size" if arg == "--batch_size" else arg for arg in sys.argv[1:]]
         parser = argparse.ArgumentParser("ViT Classification")
-        model_names = ["vit_tiny", "vit_small", "vit_base"]
-        parser.add_argument("-a", "--arch", metavar="ARCH", default="vit_small", choices=model_names,
-                            help="model architecture: " + " | ".join(model_names))
+        add_model_arguments(parser)
         parser.add_argument("--data_path", type=str, default="", help="alias of --dataset-root for ImageFolder datasets")
         parser.add_argument("--val-resize-size", dest="val_resize_size", type=int, default=None)
-        parser.add_argument("--patch-size", dest="patch_size", type=int, default=16)
-        parser.add_argument("--in-chans", dest="in_chans", type=int, default=3)
-        parser.add_argument("--num_classes", type=int, default=None)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--drop-path-rate", dest="drop_path_rate", type=float, default=0.1)
         parser.add_argument("--disable-train-shuffle", action="store_true")
         parser.add_argument("--offline", "-offline", action="store_true", help="offline mode")
         parser.add_argument("--val-batch-size", dest="val_batch_size", type=int, default=None)

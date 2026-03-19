@@ -21,7 +21,7 @@ import extension as ext
 from extension.utils import str2list
 
 sys.path.append('../MLP')
-from model.selection_tool import get_model
+from model.selection_tool import add_model_arguments, get_model
 from pde_dataset import PDEBuilder
 
 
@@ -134,12 +134,7 @@ class PDETrainer:
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('PDE Solving')
-        model_names = ['MLP', 'PreNormMLP', 'CenDropScalingMLP', 'CenDropScalingPreNormMLP', 'ResCenDropScalingMLP']
-        parser.add_argument('-a', '--arch', metavar='ARCH', default=model_names[0], choices=model_names,
-                            help='model architecture: ' + ' | '.join(model_names))
-        parser.add_argument('-width', '--width', type=int, default=50)
-        parser.add_argument('-depth', '--depth', type=int, default=3)
-        parser.add_argument('-dropout', '--dropout', type=float, default=0)
+        add_model_arguments(parser, task='pde')
         parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'poisson_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')

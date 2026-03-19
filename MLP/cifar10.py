@@ -15,7 +15,7 @@ from Taiyi.visualize import Visualization
 
 sys.path.append('../')
 import extension as ext
-from model.selection_tool import get_model
+from model.selection_tool import add_model_arguments, get_model
 
 
 def to_img(x):
@@ -125,14 +125,7 @@ class MNIST:
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
-        model_names = ['MLP', 'ResCenDropScalingMLP', 'CenDropScalingMLP', 'CenDropScalingPreNormMLP', 'LinearModel',
-                       'Linear', 'resnet18', 'resnet34', 'resnet50', 'MLPReLU', 'PreNormMLP', 'ConvBN', 'ConvBNPre',
-                       'ConvBNRes', 'ConvBNResPre', 'ConvLN', 'ConvLNPre', 'ConvLNRes', 'ConvLNResPre']
-        parser.add_argument('-a', '--arch', metavar='ARCH', default=model_names[0], choices=model_names,
-                            help='model architecture: ' + ' | '.join(model_names))
-        parser.add_argument('-width', '--width', type=int, default=100)
-        parser.add_argument('-depth', '--depth', type=int, default=4)
-        parser.add_argument('-dropout', '--dropout', type=float, default=0)
+        add_model_arguments(parser, task='classification')
         parser.add_argument('--offline', '-offline', action='store_true', help='offline mode')
 
         ext.trainer.add_arguments(parser)

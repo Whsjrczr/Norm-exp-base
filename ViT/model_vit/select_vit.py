@@ -1,9 +1,31 @@
+import argparse
 import sys
 
 sys.path.append("../")
 import extension as ext
 
 from . import vision_transformer as vits
+
+
+MODEL_NAMES = ["vit_tiny", "vit_small", "vit_base"]
+
+
+def add_model_arguments(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group("Model Options")
+    group.add_argument(
+        "-a",
+        "--arch",
+        metavar="ARCH",
+        default="vit_small",
+        choices=MODEL_NAMES,
+        help="model architecture: " + " | ".join(MODEL_NAMES),
+    )
+    group.add_argument("--patch-size", dest="patch_size", type=int, default=16)
+    group.add_argument("--in-chans", dest="in_chans", type=int, default=3)
+    group.add_argument("--num_classes", type=int, default=None)
+    group.add_argument("--dropout", type=float, default=0.0)
+    group.add_argument("--drop-path-rate", dest="drop_path_rate", type=float, default=0.1)
+    return group
 
 
 def get_model(cfg):

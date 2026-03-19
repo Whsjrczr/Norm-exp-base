@@ -1,3 +1,5 @@
+import argparse
+
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -31,19 +33,30 @@ def equation(x, func="default"):
     )
 
 
-class RegressionDatasetBuilder:
+def add_dataset_arguments(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group("Dataset Options")
+    group.add_argument("--num-samples", type=int, default=10000)
+    group.add_argument("--train-ratio", type=float, default=0.7)
+    group.add_argument("--val-ratio", type=float, default=0.15)
+    group.add_argument("--function", default="default")
+    group.add_argument("--error", type=float, default=0.05)
+    group.add_argument("--curve-points", type=int, default=200)
+    group.add_argument("--curve-min", type=float, default=-3.0)
+    group.add_argument("--curve-max", type=float, default=3.0)
+    return group
+
+
+class KANDatasetBuilder:
     def __init__(self, cfg):
         self.cfg = cfg
 
     def build(self):
-        x_data = self._sample_inputs()
-        y_true = self._target_function(x_data).unsqueeze(1)
-        y_noise = self._sample_noise(y_true.shape[0]).unsqueeze(1)
-        y_data = y_true + y_noise
-
-        splits = self._split_tensors(x_data, y_data, y_true)
-        loaders = self._build_loaders(splits)
-        return {**splits, **loaders}
+        func_name = self._normalize_function_name(self.cfg.function)
+        define_fn = getattr(self, f"define_{func_name}", None)
+        if define_fn is None:
+            raise ValueError(f"Unsupported function setting: {self.cfg.function}")
+        define_fn()
+        return self.splits
 
     def build_curve(self, num_points=200):
         num_points = int(num_points)
@@ -53,8 +66,21 @@ class RegressionDatasetBuilder:
             float(getattr(self.cfg, "curve_max", 3.0)),
             num_points,
         )
-        y_curve = self._target_function(x_curve).unsqueeze(1)
+        y_curve = self.target_fn(x_curve).unsqueeze(1)
         return x_curve, y_curve
+
+    def _normalize_function_name(self, func):
+        name = str(func).lower()
+        mapping = {
+            "default": "default",
+            "1": "func1",
+            "2": "func2",
+            "3": "func3",
+            "4": "func4",
+            "f": "funcf",
+            "3r": "func3r",
+        }
+        return mapping.get(name, name)
 
     def _sample_inputs(self):
         generator = torch.Generator().manual_seed(self.cfg.seed)
@@ -65,10 +91,16 @@ class RegressionDatasetBuilder:
         error = float(self.cfg.error)
         return torch.randn(num_samples, generator=generator) * (error * 2) - error
 
-    def _target_function(self, x):
+    def _build_dataset(self, target_fn):
         if self.cfg.input_dim < 3:
-            raise ValueError("RegressionDatasetBuilder expects input_dim >= 3.")
-        return equation(x[:, :3], self.cfg.function)
+            raise ValueError("KAN dataset expects input_dim >= 3.")
+
+        self.target_fn = target_fn
+        x_data = self._sample_inputs()
+        y_true = self.target_fn(x_data).unsqueeze(1)
+        y_noise = self._sample_noise(y_true.shape[0]).unsqueeze(1)
+        y_data = y_true + y_noise
+        self.splits = self._split_tensors(x_data, y_data, y_true)
 
     def _split_tensors(self, x_data, y_data, y_true):
         train_size = int(self.cfg.train_ratio * self.cfg.num_samples)
@@ -79,7 +111,7 @@ class RegressionDatasetBuilder:
 
         train_end = train_size
         val_end = train_size + val_size
-        return {
+        splits = {
             "x_train": x_data[:train_end],
             "y_train": y_data[:train_end],
             "y_true_train": y_true[:train_end],
@@ -90,6 +122,8 @@ class RegressionDatasetBuilder:
             "y_test": y_data[val_end:],
             "y_true_test": y_true[val_end:],
         }
+        splits.update(self._build_loaders(splits))
+        return splits
 
     def _build_loaders(self, splits):
         train_dataset = TensorDataset(splits["x_train"], splits["y_train"])
@@ -104,12 +138,32 @@ class RegressionDatasetBuilder:
         eval_batch_size = self.cfg.batch_size[1] if len(self.cfg.batch_size) > 1 else self.cfg.batch_size[0]
         val_loader = DataLoader(val_dataset, batch_size=eval_batch_size, shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=eval_batch_size, shuffle=False)
-
         return {
             "train_loader": train_loader,
             "val_loader": val_loader,
             "test_loader": test_loader,
         }
+
+    def define_default(self):
+        self._build_dataset(lambda x: equation(x[:, :3], "default"))
+
+    def define_func1(self):
+        self._build_dataset(lambda x: equation(x[:, :3], 1))
+
+    def define_func2(self):
+        self._build_dataset(lambda x: equation(x[:, :3], 2))
+
+    def define_func3(self):
+        self._build_dataset(lambda x: equation(x[:, :3], 3))
+
+    def define_func4(self):
+        self._build_dataset(lambda x: equation(x[:, :3], 4))
+
+    def define_funcf(self):
+        self._build_dataset(lambda x: equation(x[:, :3], "f"))
+
+    def define_func3r(self):
+        self._build_dataset(lambda x: equation(x[:, :3], "3r"))
 
 
 def prepare_data(seed, error=0.05, func="default", num_samples=10000):
@@ -128,7 +182,7 @@ def prepare_data(seed, error=0.05, func="default", num_samples=10000):
             "seed": seed,
         },
     )()
-    data = RegressionDatasetBuilder(cfg).build()
+    data = KANDatasetBuilder(cfg).build()
     return (
         data["x_train"],
         data["x_val"],

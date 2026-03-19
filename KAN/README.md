@@ -5,7 +5,7 @@
 ## 目录结构
 
 - `KAN.py`: KAN 回归任务训练入口
-- `dataset.py`: 合成回归数据构造器 `RegressionDatasetBuilder`
+- `kan_dataset.py`: 合成回归数据构造器 `KANDatasetBuilder`
 - `model/select_kan.py`: 模型选择入口，统一为 `get_model(cfg)`
 - `model/KAN.py`: KAN 网络封装 `KANNetwork` / `KAN_norm`
 - `model/KAN_layer.py`: KAN 核心层 `KANLinear`
@@ -66,11 +66,11 @@ def get_model(cfg):
 - 统一结果目录
 - 自动保存预测图
 
-### 4. `dataset.py` 已整理
+### 4. `kan_dataset.py` 已整理
 
-`dataset.py` 现在模仿 `pde_dataset.py` 的组织方式，主要提供：
+`kan_dataset.py` 现在模仿 `pde_dataset.py` 的组织方式，主要提供：
 
-- `RegressionDatasetBuilder`
+- `KANDatasetBuilder`
 - `equation`
 - `prepare_data`（兼容旧调用）
 
@@ -172,20 +172,20 @@ python KAN/KAN.py \
 - `--kan-init`: `origin` / `xavier` / `kaiming`
 - `--no-base-branch`
 
-### 数据参数
+### 数据与任务参数
 
 - `--num-samples`
 - `--train-ratio`
 - `--val-ratio`
 - `--function`
 - `--error`
-- `--batch-size`
 - `--curve-points`
 - `--curve-min`
 - `--curve-max`
 
 ### 训练参数
 
+- `--batch-size`
 - `--epochs`
 - `--start-epoch`
 - `--optimizer`

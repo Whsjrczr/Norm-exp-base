@@ -20,8 +20,8 @@ for path in (KAN_DIR, ROOT_DIR):
 import extension as ext
 from extension.utils import str2list
 
-from dataset import RegressionDatasetBuilder
-from model.select_kan import get_model
+from kan_dataset import KANDatasetBuilder, add_dataset_arguments
+from model.select_kan import add_model_arguments, get_model
 
 
 class KANTrainer:
@@ -47,7 +47,7 @@ class KANTrainer:
         self.num_gpu = torch.cuda.device_count()
         self.logger("==> use {:d} GPUs".format(self.num_gpu))
 
-        self.dataset_builder = RegressionDatasetBuilder(self.cfg)
+        self.dataset_builder = KANDatasetBuilder(self.cfg)
         dataset = self.dataset_builder.build()
         self.train_loader = dataset["train_loader"]
         self.val_loader = dataset["val_loader"]
@@ -141,33 +141,9 @@ class KANTrainer:
 
     def add_arguments(self):
         parser = argparse.ArgumentParser("KAN Regression")
-        parser.add_argument("-a", "--arch", default="KAN", choices=["KAN", "MLP"])
-        parser.add_argument("--layers-hidden", type=str2list, default=None)
-        parser.add_argument("--input-dim", type=int, default=3)
-        parser.add_argument("--output-dim", type=int, default=1)
-        parser.add_argument("--width", type=int, default=32)
-        parser.add_argument("--depth", type=int, default=3)
+        add_model_arguments(parser)
+        add_dataset_arguments(parser)
         parser.add_argument("--batch-size", dest="batch_size", type=str2list, default="256,1024")
-        parser.add_argument("--num-samples", type=int, default=10000)
-        parser.add_argument("--train-ratio", type=float, default=0.7)
-        parser.add_argument("--val-ratio", type=float, default=0.15)
-        parser.add_argument("--function", default="default")
-        parser.add_argument("--error", type=float, default=0.05)
-        parser.add_argument("--curve-points", type=int, default=200)
-        parser.add_argument("--curve-min", type=float, default=-3.0)
-        parser.add_argument("--curve-max", type=float, default=3.0)
-        parser.add_argument("--grid-size", type=int, default=5)
-        parser.add_argument("--spline-order", type=int, default=3)
-        parser.add_argument("--scale-noise", type=float, default=0.01)
-        parser.add_argument("--scale-base", type=float, default=1.0)
-        parser.add_argument("--scale-spline", type=float, default=1.0)
-        parser.add_argument("--grid-eps", type=float, default=0.02)
-        parser.add_argument("--grid-range", type=str2list, default="-1,1")
-        parser.add_argument("--update-grid", action="store_true")
-        parser.add_argument("--weight-norm", action="store_true")
-        parser.add_argument("--kan-regularization", type=float, default=0.0)
-        parser.add_argument("--kan-init", default="origin", choices=["origin", "xavier", "kaiming"])
-        parser.add_argument("--no-base-branch", action="store_true")
         parser.add_argument("--offline", "-offline", action="store_true")
 
         ext.trainer.add_arguments(parser)

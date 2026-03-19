@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 
 import torch
 import torch.nn as nn
@@ -12,6 +13,33 @@ if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 import extension as ext
+from extension.utils import str2list
+
+
+MODEL_NAMES = ["KAN", "MLP"]
+
+
+def add_model_arguments(parser: argparse.ArgumentParser):
+    group = parser.add_argument_group("Model Options")
+    group.add_argument("-a", "--arch", default="KAN", choices=MODEL_NAMES)
+    group.add_argument("--layers-hidden", type=str2list, default=None)
+    group.add_argument("--input-dim", type=int, default=3)
+    group.add_argument("--output-dim", type=int, default=1)
+    group.add_argument("--width", type=int, default=32)
+    group.add_argument("--depth", type=int, default=3)
+    group.add_argument("--grid-size", type=int, default=5)
+    group.add_argument("--spline-order", type=int, default=3)
+    group.add_argument("--scale-noise", type=float, default=0.01)
+    group.add_argument("--scale-base", type=float, default=1.0)
+    group.add_argument("--scale-spline", type=float, default=1.0)
+    group.add_argument("--grid-eps", type=float, default=0.02)
+    group.add_argument("--grid-range", type=str2list, default="-1,1")
+    group.add_argument("--update-grid", action="store_true")
+    group.add_argument("--weight-norm", action="store_true")
+    group.add_argument("--kan-regularization", type=float, default=0.0)
+    group.add_argument("--kan-init", default="origin", choices=["origin", "xavier", "kaiming"])
+    group.add_argument("--no-base-branch", action="store_true")
+    return group
 
 
 def _resolve_input_dim(cfg):
