@@ -8,6 +8,7 @@ from .logger import get_logger
 _methods = {
     'sgd': torch.optim.SGD,
     'adam': torch.optim.Adam,
+    'adamw': torch.optim.AdamW,
     'adamax': torch.optim.Adamax,
     'RMSprop': torch.optim.RMSprop,
     'lbfgs': torch.optim.LBFGS,
