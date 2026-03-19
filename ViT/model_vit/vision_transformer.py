@@ -1,9 +1,12 @@
 
 import math
 from functools import partial
+import copy
 
 import torch
 import torch.nn as nn
+import extension as ext
+
 
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):
     # Cut & paste from PyTorch official master until it's in a few official releases - RW
@@ -73,7 +76,7 @@ class Mlp(nn.Module):
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
         self.fc1 = nn.Linear(in_features, hidden_features)
-        self.act = act_layer()
+        self.act = act_layer(act_layer, hidden_features)
         self.fc2 = nn.Linear(hidden_features, out_features)
         self.drop = nn.Dropout(drop)
 
@@ -139,6 +142,11 @@ class PatchEmbed(nn.Module):
     """
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
         super().__init__()
+        if isinstance(img_size, (tuple, list)):
+            # Support both [H] and (C, H, W) style image size configs.
+            img_size = int(img_size[-1])
+        else:
+            img_size = int(img_size)
         num_patches = (img_size // patch_size) * (img_size // patch_size)
         self.img_size = img_size
         self.patch_size = patch_size
@@ -160,8 +168,13 @@ class VisionTransformer(nn.Module):
         super().__init__()
         self.num_features = self.embed_dim = embed_dim
 
+        if isinstance(img_size, (tuple, list)):
+            img_size = int(img_size[-1])
+        else:
+            img_size = int(img_size)
+
         self.patch_embed = PatchEmbed(
-            img_size=img_size[0], patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
+            img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -195,6 +208,8 @@ class VisionTransformer(nn.Module):
     def interpolate_pos_encoding(self, x, w, h):
         npatch = x.shape[1] - 1
         N = self.pos_embed.shape[1] - 1
+        if N == 0:
+            return self.pos_embed
         if npatch == N and w == h:
             return self.pos_embed
         class_pos_embed = self.pos_embed[:, 0]
@@ -253,4 +268,52 @@ class VisionTransformer(nn.Module):
             if len(self.blocks) - i <= n:
                 output.append(self.norm(x))
         return output
+
+
+def vit_tiny(patch_size=16, num_classes=1000, norm_layer=nn.LayerNorm, act_layer=nn.GELU, **kwargs):
+    model = VisionTransformer(
+        patch_size=patch_size,
+        embed_dim=192,
+        depth=12,
+        num_heads=3,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=norm_layer,
+        act_layer=act_layer,
+        num_classes=num_classes,
+        **kwargs,
+    )
+    return model
+
+
+def vit_small(patch_size=16, num_classes=1000, norm_layer=nn.LayerNorm, act_layer=nn.GELU, **kwargs):
+    model = VisionTransformer(
+        patch_size=patch_size,
+        embed_dim=384,
+        depth=12,
+        num_heads=6,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=norm_layer,
+        act_layer=act_layer,
+        num_classes=num_classes,
+        **kwargs,
+    )
+    return model
+
+
+def vit_base(patch_size=16, num_classes=1000, norm_layer=nn.LayerNorm, act_layer=nn.GELU, **kwargs):
+    model = VisionTransformer(
+        patch_size=patch_size,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=norm_layer,
+        act_layer=act_layer,
+        num_classes=num_classes,
+        **kwargs,
+    )
+    return model
 

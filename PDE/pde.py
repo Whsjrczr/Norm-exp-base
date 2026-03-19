@@ -42,14 +42,13 @@ class PDETrainer:
             dde.config.set_default_float("float32")
             torch.set_default_dtype(torch.float32)
             dde.backend.torch.torch.set_default_dtype(torch.float32)
-        # Set cfg for model selection
         self.cfg.im_size = [1]
         self.cfg.dataset_classes = 1
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         self.num_gpu = torch.cuda.device_count()
         self.logger('==> use {:d} GPUs'.format(self.num_gpu))
-        
+
         self.model = get_model(self.cfg).to(self.device)
         if self.num_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
@@ -61,7 +60,6 @@ class PDETrainer:
         self.saver = ext.checkpoint.Checkpoint(self.model, self.cfg, self.optimizer, self.scheduler, self.result_path, not self.cfg.test)
         self.saver.load(self.cfg.load)
 
-        # Define PDE problem
         pde_builder = PDEBuilder(self.cfg, self.model, self.optimizer)
         self.data, self.net, self.model = pde_builder.build()
         if hasattr(self.net, "to"):
@@ -71,15 +69,14 @@ class PDETrainer:
 
         ext.trainer.set_seed(self.cfg)
 
-        # Monitor and wandb setup (simplified)
-        taiyi_config = {}  # No specific layers for PDE
-        self.monitor = Monitor(self.net, taiyi_config)
+        taiyi_config = {}
+        self.monitor = Monitor(self.net, taiyi_config) if self.cfg.visualize and self.cfg.taiyi else None
 
         if self.cfg.visualize:
             if self.cfg.offline:
                 os.environ['WANDB_MODE'] = 'offline'
             if self.cfg.resume and hasattr(self, 'wandb_id'):
-                print("resume wandb from id "+str(self.wandb_id))
+                print("resume wandb from id " + str(self.wandb_id))
                 wandb.init(
                     project=self.cfg.subject_name,
                     entity="whsjrc-buaa",
@@ -94,7 +91,7 @@ class PDETrainer:
                         "width": self.cfg.width,
                         "normalization": ext.normalization.setting(self.cfg),
                         "num_per_group": self.cfg.norm_cfg.get('num_per_group', None),
-                        "activation": self.cfg.activation,
+                        "activation": ext.activation.setting(self.cfg),
                         "learning_rate": self.cfg.lr,
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
@@ -117,7 +114,7 @@ class PDETrainer:
                         "width": self.cfg.width,
                         "normalization": ext.normalization.setting(self.cfg),
                         "num_per_group": self.cfg.norm_cfg.get('num_per_group', None),
-                        "activation": self.cfg.activation,
+                        "activation": ext.activation.setting(self.cfg),
                         "learning_rate": self.cfg.lr,
                         "epochs": self.cfg.epochs,
                         "seed": self.cfg.seed,
@@ -128,10 +125,12 @@ class PDETrainer:
                     }
                 )
             self.run_dir = os.path.dirname(wandb.run.dir)
-            self.vis_wandb = Visualization(self.monitor, wandb)
+            self.vis_wandb = Visualization(self.monitor, wandb) if self.cfg.taiyi else None
         else:
             self.vis_wandb = None
-        return
+
+        if self.cfg.vis:
+            self.vis = ext.visualization.setting(self.cfg, self.model_name, self._build_vis_names())
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('PDE Solving')
@@ -159,47 +158,62 @@ class PDETrainer:
         ext.optimizer.add_arguments(parser)
         ext.scheduler.add_arguments(parser)
         ext.vis_taiyi.add_arguments(parser)
+        ext.visualization.add_arguments(parser)
         args = parser.parse_args()
         if args.resume:
             args = parser.parse_args(namespace=ext.checkpoint.Checkpoint.load_config(args.resume))
+        stages = getattr(ext.optimizer, "get_stages", lambda _cfg: None)(args)
+        stage_total_iterations = getattr(ext.optimizer, "infer_total_iterations", lambda _stages: None)(stages)
+        if stage_total_iterations is not None:
+            args.epochs = stage_total_iterations
         return args
 
     def train(self):
         if self.cfg.test:
             self.validate()
             return
-        # Train model
-        losshistory, train_state = self.model.train(iterations=self.cfg.epochs, batch_size=self.cfg.batch_size, display_every=self.cfg.display_every)
+
+        stages = getattr(ext.optimizer, "get_stages", lambda _cfg: None)(self.cfg)
+        all_histories = []
+        iter_offset = 0
+
+        if stages:
+            self.logger(f"==> Multi-stage training enabled: {len(stages)} stages")
+            for stage_idx, stage_cfg in enumerate(stages, 1):
+                losshistory, train_state = self._train_stage(stage_idx, stage_cfg)
+                all_histories.append((stage_idx, stage_cfg, losshistory, train_state, iter_offset))
+                if losshistory is not None and hasattr(losshistory, "loss_train"):
+                    iter_offset += len(losshistory.loss_train)
+        else:
+            losshistory, train_state = self.model.train(
+                iterations=self.cfg.epochs,
+                batch_size=self.cfg.batch_size,
+                display_every=self.cfg.display_every,
+            )
+            all_histories.append((1, None, losshistory, train_state, 0))
 
         self.logger('==> Training completed.')
-        # Log to wandb
+
         if self.cfg.visualize:
-            for i in range(len(losshistory.loss_train)):
-                log_dict = {"iterations": i + 1}
-                train_losses = losshistory.loss_train[i]
-                test_losses = losshistory.loss_test[i]
-                metrics = losshistory.metrics_test[i]
-                for j in range(len(train_losses)):
-                    log_dict[f"train_loss_{j}"] = float(train_losses[j])
-                for j in range(len(test_losses)):
-                    log_dict[f"test_loss_{j}"] = float(test_losses[j])
-                for j in range(len(metrics)):
-                    metric_name = self.cfg.metrics[j].replace(' ', '_').replace('(', '').replace(')', '').replace(',', '').replace('.', '')
-                    log_dict[f"metrics_{metric_name}"] = float(metrics[j])
-                wandb.log(log_dict)
-            val_error = self.validate()
-            wandb.log({"val_error": val_error})
-        # Save model
+            self._log_histories_to_wandb(all_histories)
+        if self.cfg.vis:
+            self._log_histories_to_vis(all_histories)
+
+        self.validate()
+        self._save_solution_plot()
+
         if not self.cfg.no_save_best:
             self.model.save(os.path.join(self.result_path, 'model'))
-        # Finish
+
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))
 
         if self.cfg.visualize:
-            self.vis_wandb.close()
-            self.monitor.get_output()
-            self.logger("==> Wandb successfully get output.")
+            if self.vis_wandb:
+                self.vis_wandb.close()
+            if self.monitor:
+                self.monitor.get_output()
+                self.logger("==> Wandb successfully get output.")
 
             new_log_filename = r'{}_{}.txt'.format(self.model_name, now_date)
             self.logger('==> Network training completed. Copy log file to {}'.format(new_log_filename))
@@ -208,29 +222,148 @@ class PDETrainer:
                 os.system(f"wandb sync {self.run_dir}")
             new_log_path = os.path.join(self.result_path, new_log_filename)
             shutil.copy(self.logger.filename, new_log_path)
-        return
 
     def validate(self):
-        # Predict and compute error
-        x = np.linspace(-1, 1, 100).reshape(-1, 1)
-        y_pred = self.model.predict(x)
-        if self.cfg.pde_type == 'poisson' or self.cfg.pde_type == 'poisson_new':
-            y_true = (x**2 - 1) / 2
-        elif self.cfg.pde_type == 'helmholtz' or self.cfg.pde_type == 'helmholtz_new' or self.cfg.pde_type == 'helmholtz_learnable_2':
-            y_true = np.sin(np.pi * x[:, 0:1])
-        elif self.cfg.pde_type == 'allen_cahn' or self.cfg.pde_type == 'allen_cahn_new':
-            epsilon = 0.01
-            y_true = np.tanh(x[:, 0] / np.sqrt(2 * epsilon))
+        _x, y_pred, y_true = self._predict_validation_curve()
+        if y_true is None:
+            self.logger('==> Validation skipped: analytical reference is unavailable for this PDE.')
+            return None
+
         error = np.mean((y_pred - y_true)**2)
         self.logger('==> Validation L2 error: {:.5g}'.format(error))
         if self.cfg.visualize:
             wandb.log({"val_error": error})
+        if self.cfg.vis:
+            self.vis.add_value("val error", error)
         self.best_loss = getattr(self, 'best_loss', float('inf'))
         if not self.cfg.test and not self.cfg.no_save_best and error < self.best_loss:
             self.best_loss = error
             self.saver.save_model('best.pth')
             self.logger('==> best loss: {:.5g}'.format(self.best_loss))
         return error
+
+    def _train_stage(self, stage_idx, stage_cfg):
+        opt_name = (stage_cfg.get("optimizer") or stage_cfg.get("name") or self.cfg.optimizer)
+        lr = stage_cfg.get("lr", getattr(self.cfg, "lr", None))
+        batch_size = stage_cfg.get("batch_size", self.cfg.batch_size)
+        iterations = stage_cfg.get("iterations", stage_cfg.get("iters", stage_cfg.get("epochs", None)))
+        loss_weights = stage_cfg.get("loss_weights", self.cfg.loss_weights)
+        metrics = stage_cfg.get("metrics", self.cfg.metrics)
+        optimizer_config = stage_cfg.get("optimizer_config", stage_cfg.get("config", {})) or {}
+
+        opt_lower = str(opt_name).lower()
+        if opt_lower in {"lbfgs", "l-bfgs", "l_bfgs"}:
+            dde_opt = "L-BFGS"
+            compile_kwargs = {"loss_weights": loss_weights, "metrics": metrics}
+            if optimizer_config:
+                compile_kwargs["options"] = optimizer_config
+            self.model.compile(dde_opt, **compile_kwargs)
+        else:
+            dde_opt = opt_lower
+            compile_kwargs = {"lr": lr, "loss_weights": loss_weights, "metrics": metrics}
+            self.model.compile(dde_opt, **compile_kwargs)
+
+        self.logger(
+            f"==> Stage {stage_idx}: optimizer={dde_opt}, lr={lr}, "
+            f"iters={iterations}, batch_size={batch_size}, opt_cfg={optimizer_config}"
+        )
+
+        if iterations is None and dde_opt == "L-BFGS":
+            return self.model.train(display_every=self.cfg.display_every)
+        return self.model.train(
+            iterations=int(iterations) if iterations is not None else self.cfg.epochs,
+            batch_size=batch_size,
+            display_every=self.cfg.display_every,
+        )
+
+    def _log_histories_to_wandb(self, histories):
+        for stage_idx, stage_cfg, losshistory, _train_state, offset in histories:
+            if losshistory is None:
+                continue
+            metrics_names = stage_cfg.get("metrics", self.cfg.metrics) if stage_cfg else self.cfg.metrics
+            for i in range(len(losshistory.loss_train)):
+                log_dict = {"iterations": offset + i + 1, "stage": stage_idx}
+                train_losses = losshistory.loss_train[i]
+                test_losses = losshistory.loss_test[i]
+                metrics = losshistory.metrics_test[i]
+                for j in range(len(train_losses)):
+                    log_dict[f"train_loss_{j}"] = float(train_losses[j])
+                for j in range(len(test_losses)):
+                    log_dict[f"test_loss_{j}"] = float(test_losses[j])
+                for j in range(len(metrics)):
+                    metric_name = str(metrics_names[j]).replace(' ', '_').replace('(', '').replace(')', '').replace(',', '').replace('.', '')
+                    log_dict[f"metrics_{metric_name}"] = float(metrics[j])
+                wandb.log(log_dict)
+
+    def _log_histories_to_vis(self, histories):
+        for _stage_idx, stage_cfg, losshistory, _train_state, _offset in histories:
+            if losshistory is None:
+                continue
+            metrics_names = stage_cfg.get("metrics", self.cfg.metrics) if stage_cfg else self.cfg.metrics
+            for i in range(len(losshistory.loss_train)):
+                train_losses = losshistory.loss_train[i]
+                test_losses = losshistory.loss_test[i]
+                metrics = losshistory.metrics_test[i]
+                self.vis.add_value("train total loss", float(np.sum(train_losses)))
+                self.vis.add_value("test total loss", float(np.sum(test_losses)))
+                for j in range(len(train_losses)):
+                    self.vis.add_value(f"train loss {j}", float(train_losses[j]))
+                for j in range(len(test_losses)):
+                    self.vis.add_value(f"test loss {j}", float(test_losses[j]))
+                for j in range(len(metrics)):
+                    self.vis.add_value(self._metric_vis_name(metrics_names[j]), float(metrics[j]))
+
+    def _build_vis_names(self):
+        names = {
+            "train total loss": "loss",
+            "test total loss": "loss",
+            "val error": "error",
+        }
+        for idx in range(16):
+            names[f"train loss {idx}"] = "loss component"
+            names[f"test loss {idx}"] = "loss component"
+        for metric in self.cfg.metrics:
+            names[self._metric_vis_name(metric)] = "metric"
+        return names
+
+    def _metric_vis_name(self, metric_name):
+        return f"metric {str(metric_name)}"
+
+    def _predict_validation_curve(self):
+        x = np.linspace(-1, 1, 100).reshape(-1, 1)
+        y_pred = self.model.predict(x)
+        y_true = self._reference_solution(x)
+        return x, y_pred, y_true
+
+    def _reference_solution(self, x):
+        if self.cfg.pde_type in {'poisson', 'poisson_new'}:
+            return (x**2 - 1) / 2
+        if self.cfg.pde_type in {'helmholtz', 'helmholtz_new', 'helmholtz_learnable_2'}:
+            return np.sin(np.pi * x[:, 0:1])
+        if self.cfg.pde_type in {'allen_cahn', 'allen_cahn_new'}:
+            epsilon = 0.01
+            return np.tanh(x[:, 0:1] / np.sqrt(2 * epsilon))
+        return None
+
+    def _save_solution_plot(self):
+        x, y_pred, y_true = self._predict_validation_curve()
+        if y_true is None:
+            return
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.plot(x[:, 0], y_true[:, 0], label='reference', linewidth=2)
+        ax.plot(x[:, 0], y_pred[:, 0], label='prediction', linewidth=2)
+        ax.set_title(self.cfg.pde_type)
+        ax.set_xlabel('x')
+        ax.set_ylabel('u(x)')
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+
+        fig_path = os.path.join(self.result_path, 'solution_curve.png')
+        fig.savefig(fig_path, bbox_inches='tight')
+        plt.close(fig)
+        self.logger(f'==> Saved solution curve to {fig_path}')
+
 
 if __name__ == '__main__':
     trainer = PDETrainer()

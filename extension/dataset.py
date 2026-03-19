@@ -2,6 +2,7 @@ import argparse
 import os
 import torch
 import torchvision
+import torchvision.transforms as transforms
 import torch.utils.data
 from . import utils
 from .logger import get_logger
@@ -35,12 +36,20 @@ class _config:
     _methods = ['mnist', 'fashion-mnist', 'cifar10', 'ImageNet', 'folder']
 
 
+def _use_grey():
+    if _config.dataset_cfg.get('grey') is not None:
+        return bool(_config.dataset_cfg.get('grey'))
+    if _config.dataset_cfg.get('nogrey') is not None:
+        return not bool(_config.dataset_cfg.get('nogrey'))
+    return False
+
+
 def getDatasetConfigFlag():
     flag = ''
     flag += _config.dataset
     if str.find(_config.dataset, 'cifar10')>-1 or str.find(_config.dataset, 'ImageNet')>-1:
-        if _config.dataset_cfg.get('nogrey') != None:
-            flag += '_nogrey'
+        if _use_grey():
+            flag += '_grey'
     if _config.dataset_cfg.get('random_label') != None:
         flag += '_RL'
     return flag
@@ -64,6 +73,89 @@ def make_dataset(dir, extensions):
                 images.append(path)
 
     return images
+
+
+def _is_vit_style_folder_dataset(args: argparse.Namespace):
+    return _config.dataset_cfg.get('loader') == 'vit' or (
+        hasattr(args, 'im_size') and len(getattr(args, 'im_size', [])) > 0 and args.dataset in ['ImageNet', 'folder']
+    )
+
+
+def _resolve_folder_image_size(args: argparse.Namespace):
+    if hasattr(args, 'im_size') and len(args.im_size) > 0:
+        if isinstance(args.im_size, (tuple, list)):
+            return int(args.im_size[-1])
+        return int(args.im_size)
+    return int(_config.dataset_cfg.get('image_size', 224))
+
+
+def _get_folder_normalize(args: argparse.Namespace):
+    mean = _config.dataset_cfg.get('mean', [0.485, 0.456, 0.406])
+    std = _config.dataset_cfg.get('std', [0.229, 0.224, 0.225])
+    if hasattr(args, 'in_chans') and args.in_chans == 1 and len(mean) == 3 and len(std) == 3:
+        mean = [mean[0]]
+        std = [std[0]]
+    return transforms.Normalize(mean=mean, std=std)
+
+
+def _get_folder_transforms(args: argparse.Namespace, train: bool):
+    if not _is_vit_style_folder_dataset(args):
+        grey = _use_grey()
+        if grey:
+            transform_list = [
+                transforms.Grayscale(num_output_channels=1),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+            ]
+        else:
+            transform_list = [
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            ]
+        return transforms.Compose(transform_list)
+
+    image_size = _resolve_folder_image_size(args)
+    val_resize_size = getattr(args, 'val_resize_size', _config.dataset_cfg.get('val_resize_size', int(image_size * 256 / 224)))
+    normalize = _get_folder_normalize(args)
+
+    if train:
+        transform_list = [
+            transforms.RandomResizedCrop(image_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]
+    else:
+        transform_list = [
+            transforms.Resize(val_resize_size),
+            transforms.CenterCrop(image_size),
+            transforms.ToTensor(),
+            normalize,
+        ]
+
+    if getattr(args, 'in_chans', None) == 1:
+        transform_list.insert(-2, transforms.Grayscale(num_output_channels=1))
+    return transforms.Compose(transform_list)
+
+
+def _build_folder_dataset(args: argparse.Namespace, root: str, train: bool, target_transform=None):
+    split = 'train' if train else 'val'
+    dataset_root = os.path.join(root, split)
+    dataset = torchvision.datasets.ImageFolder(
+        dataset_root,
+        _get_folder_transforms(args, train),
+        target_transform,
+    )
+
+    if _is_vit_style_folder_dataset(args):
+        args.im_size = [_resolve_folder_image_size(args)]
+    elif len(args.im_size) == 0:
+        grey = _use_grey()
+        args.im_size = (1, 256, 256) if grey else (3, 256, 256)
+
+    if getattr(args, 'dataset_classes', None) in [None, 0]:
+        args.dataset_classes = len(dataset.classes)
+    return dataset, dataset_root
 
 
 class DatasetFlatFolder(torch.utils.data.Dataset):
@@ -127,18 +219,26 @@ def get_dataset_loader(args: argparse.Namespace, target_transform=None, train=Tr
     assert os.path.exists(root), 'Please assign the correct dataset root path with --dataset-root <PATH>'
     print("Successfully find the dataset root path")
     
-    nogrey = _config.dataset_cfg.get('nogrey', False)
+    grey = _use_grey()
     random_label = _config.dataset_cfg.get('random_label', False)
     
     if args.dataset != 'folder':
         root = os.path.join(root, args.dataset)  
     if args.dataset in ['mnist', 'fashion-mnist']:
-        transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.5,), (0.5,))])
-    elif args.dataset in ['cifar10', 'ImageNet', 'folder']:
-        transform_list = [torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))]
-        if not nogrey:
-            transform_list.append(torchvision.transforms.Grayscale())
-        transforms = torchvision.transforms.Compose(transform_list)
+        transform_pipeline = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    elif args.dataset == 'cifar10':
+        if grey:
+            transform_list = [
+                transforms.Grayscale(num_output_channels=1),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+            ]
+        else:
+            transform_list = [
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)),
+            ]
+        transform_pipeline = transforms.Compose(transform_list)
     
     args.im_size = []
     #### TODO: add resize transform
@@ -147,29 +247,22 @@ def get_dataset_loader(args: argparse.Namespace, target_transform=None, train=Tr
         if len(args.im_size) == 0:
             args.im_size = (1, 28, 28)
         args.dataset_classes = 10
-        dataset = torchvision.datasets.mnist.MNIST(root, train, transforms, target_transform, download=True)
+        dataset = torchvision.datasets.mnist.MNIST(root, train, transform_pipeline, target_transform, download=True)
     elif args.dataset == 'fashion-mnist':
         if len(args.im_size) == 0:
             args.im_size = (1, 28, 28)
         args.dataset_classes = 10
-        dataset = torchvision.datasets.FashionMNIST(root, train, transforms, target_transform, download=True)
+        dataset = torchvision.datasets.FashionMNIST(root, train, transform_pipeline, target_transform, download=True)
     elif args.dataset == 'cifar10':
         if len(args.im_size) == 0:
-            if nogrey:
-                args.im_size = (3, 32, 32)
-            else:
+            if grey:
                 args.im_size = (1, 32, 32)
-        args.dataset_classes = 10
-        dataset = torchvision.datasets.CIFAR10(root, train, transforms, target_transform, download=True)
-    elif args.dataset in ['ImageNet', 'folder']:
-        if len(args.im_size) == 0:
-            if nogrey:
-                args.im_size = (3, 256, 256)
             else:
-                args.im_size = (1, 256, 256)
-        args.dataset_classes = 1000
-        root = os.path.join(root, 'train' if train else 'val')
-        dataset = torchvision.datasets.ImageFolder(root, transforms, target_transform)
+                args.im_size = (3, 32, 32)
+        args.dataset_classes = 10
+        dataset = torchvision.datasets.CIFAR10(root, train, transform_pipeline, target_transform, download=True)
+    elif args.dataset in ['ImageNet', 'folder']:
+        dataset, root = _build_folder_dataset(args, root, train, target_transform)
     else:
         raise FileNotFoundError('No such dataset')
 
@@ -189,10 +282,21 @@ def get_dataset_loader(args: argparse.Namespace, target_transform=None, train=Tr
         args.batch_size = [256, 256]
     elif len(args.batch_size) == 1:
         args.batch_size.append(args.batch_size[0])
-    dataset_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size[not train], shuffle=train,
-                                                 drop_last=train, **loader_kwargs)
+    batch_size = args.batch_size[not train]
+    if not train and hasattr(args, 'val_batch_size') and args.val_batch_size:
+        batch_size = args.val_batch_size
+    shuffle = train and not getattr(args, 'disable_train_shuffle', False)
+    drop_last = train
+    if args.dataset in ['ImageNet', 'folder'] and _is_vit_style_folder_dataset(args):
+        drop_last = bool(_config.dataset_cfg.get('drop_last_train', True)) if train else False
+    dataset_loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        drop_last=drop_last,
+        **loader_kwargs,
+    )
     print("Successfully load dataset!")
     LOG = get_logger()
     LOG('==> Dataset: {}'.format(dataset))
     return dataset_loader
-

@@ -1,3 +1,8 @@
+import sys
+
+sys.path.append("../")
+import extension as ext
+
 from . import vision_transformer as vits
 
 
@@ -14,4 +19,6 @@ def get_model(cfg):
         num_classes=num_classes,
         drop_rate=getattr(cfg, "dropout", 0.0),
         drop_path_rate=getattr(cfg, "drop_path_rate", 0.0),
+        norm_layer=ext.normalization.Norm,
+        act_layer=ext.activation.Activation,
     )

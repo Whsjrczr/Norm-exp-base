@@ -148,6 +148,52 @@ def get_stages(cfg: argparse.Namespace):
     return None
 
 
+def infer_total_epochs(stages):
+    """Infer total epoch budget from stage specs.
+
+    Returns None when any stage lacks an explicit epoch boundary.
+    """
+    if not stages:
+        return None
+
+    total = 0
+    for stage in stages:
+        if not isinstance(stage, dict):
+            return None
+        if 'end_epoch' in stage:
+            total = int(stage['end_epoch'])
+        elif 'epochs' in stage:
+            total += int(stage['epochs'])
+        elif 'epoch' in stage:
+            total += int(stage['epoch'])
+        else:
+            return None
+    return total
+
+
+def infer_total_iterations(stages):
+    """Infer total iteration budget from stage specs for DeepXDE/PDE training.
+
+    Returns None when any stage lacks an explicit iteration count.
+    """
+    if not stages:
+        return None
+
+    total = 0
+    for stage in stages:
+        if not isinstance(stage, dict):
+            return None
+        if 'iterations' in stage:
+            total += int(stage['iterations'])
+        elif 'iters' in stage:
+            total += int(stage['iters'])
+        elif 'epochs' in stage:
+            total += int(stage['epochs'])
+        else:
+            return None
+    return total
+
+
 def build_optimizer(
     model: torch.nn.Module,
     optimizer_name: str,

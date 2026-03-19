@@ -1,0 +1,66 @@
+==> args: Namespace(arch='KAN', layers_hidden=[3, 32, 32, 32, 1], input_dim=3, output_dim=1, width=32, depth=3, batch_size=[8, 8], num_samples=32, train_ratio=0.7, val_ratio=0.15, function='default', error=0.05, curve_points=200, curve_min=-3.0, curve_max=3.0, grid_size=5, spline_order=3, scale_noise=0.01, scale_base=1.0, scale_spline=1.0, grid_eps=0.02, grid_range=[-1, 1], update_grid=False, weight_norm=False, kan_regularization=0.0, kan_init='origin', no_base_branch=False, offline=False, epochs=1, start_epoch=-1, output='e:\\norm-exp\\tmp-kan-results', test=False, seed=-1, gpu=None, lr_method='fix', lr=0.001, lr_step=30, lr_gamma=0.1, lr_steps=[], optimizer='adam', optimizer_config={}, optimizer_stages=None, weight_decay=0.0, log_suffix='', print_f=1, resume='', load='', load_no_strict=True, norm='No', norm_cfg={}, activation='relu', activation_cfg={}, visualize=False, wandb_project='test', taiyi=False, vis=False, vis_port=6006, vis_env=None, im_size=[3], dataset_classes=1)
+==> the results path: e:\norm-exp\tmp-kan-results
+==> PyTorch version: 2.5.1, cudnn version: 90100
+==> git version: 
+==> seed: 1773908987
+==> use 1 GPUs
+==> model [KAN_KAN_default_h3-32-32-32-1_No_relu_lr0.001_bs8_wd0.0_noise0.05_seed-1]: KAN_norm(
+  (layers): ModuleList(
+    (0): KANLinear(
+      (base_activation): ReLU()
+    )
+    (1): Identity()
+    (2): KANLinear(
+      (base_activation): ReLU()
+    )
+    (3): Identity()
+    (4): KANLinear(
+      (base_activation): ReLU()
+    )
+    (5): Identity()
+    (6): KANLinear(
+      (base_activation): ReLU()
+    )
+  )
+)
+==> Optimizer Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    capturable: False
+    differentiable: False
+    eps: 1e-08
+    foreach: None
+    fused: None
+    lr: 0.001
+    maximize: False
+    weight_decay: 0.0
+)
+==> Scheduler: <torch.optim.lr_scheduler.StepLR object at 0x0000015CDFFE00A0>
+==> seed: 1773908987
+==> Optimizer Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    capturable: False
+    differentiable: False
+    eps: 1e-08
+    foreach: None
+    fused: None
+    lr: 0.001
+    maximize: False
+    weight_decay: 0.0
+)
+==> Scheduler: <torch.optim.lr_scheduler.StepLR object at 0x0000015CDFF6A980>
+==> Stage 1: optimizer=adam, lr=0.001, wd=0.0, epochs=[0,1)
+
+Epoch: 0, lr: 0.0001, weight decay: 0 on model KAN_KAN_default_h3-32-32-32-1_No_relu_lr0.001_bs8_wd0.0_noise0.05_seed-1
+Train on epoch 0: average loss=39.211, r2=-0.1213
+Validate on epoch 0: loss=210.41, r2=-1.0804, true_loss=209.41, true_r2=-1.0835
+Saving model to e:\norm-exp\tmp-kan-results\KAN_KAN_default_h3-32-32-32-1_No_relu_lr0.001_bs8_wd0.0_noise0.05_seed-1\best.pth
+==> best true r2: -1.0835
+Saving checkpoint to e:\norm-exp\tmp-kan-results\KAN_KAN_default_h3-32-32-32-1_No_relu_lr0.001_bs8_wd0.0_noise0.05_seed-1\checkpoint.pth
+Test: loss=82.03, r2=-0.4924, true_loss=80.566, true_r2=-0.4946
+==> Saved prediction plot to e:\norm-exp\tmp-kan-results\KAN_KAN_default_h3-32-32-32-1_No_relu_lr0.001_bs8_wd0.0_noise0.05_seed-1\prediction_curve.png
+==> end time: 26-03-19_16-29-50
+==> Network training completed. Copy log file to KAN_KAN_default_h3-32-32-32-1_No_relu_lr0.001_bs8_wd0.0_noise0.05_seed-1_26-03-19_16-29-50.txt
