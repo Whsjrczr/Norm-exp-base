@@ -4,7 +4,7 @@ from .my_modules import *
 from .progress_bar import ProgressBar
 from .trainer import *
 from . import scheduler, optimizer, vis_taiyi
-from . import logger, visdom, tracking, taiyi, visualization, visualize, checkpoint
+from . import logger, visdom, tracking, taiyi, checkpoint
 from . import dataset, trainer, activation
 from . import normalization
 from .activation import *

@@ -1,8 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-set -euo pipefail
 
-dir_name=exp_vit_cifar10
+dir_name=exp2
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 gen_dir="${script_dir}/${dir_name}"
 mkdir -p "${gen_dir}"
@@ -18,7 +17,7 @@ activations=(relu gelu silu)
 seeds=(0)
 epochs=200
 display_every=1
-optimizers=(adamw sgd)
+optimizers=(sgd)
 momentum=0.9
 weightdecay=0.1
 dropouts=(0.0)
@@ -29,11 +28,12 @@ lrs_else=(1e-4)
 lr_method=cos
 lrstep=30
 lrgamma=0.1
-dataset_root="./dataset"
-output_root="./ViT/results/${dir_name}"
-python_bin="$/home/dlth/miniconda3/envs/norm-base/bin/python"
+subjectname="ViT-new-task"
+dataset_root="/home/dlth/norm-exp-code/dataset"
+output_root="/home/dlth/norm-exp-code/Norm-exp-base/ViT/results/${dir_name}"
+python_bin="/home/dlth/miniconda3/envs/norm-base/bin/python"
 
-CUDA_VISIBLE_DEVICES=0
+CUDA_VISIBLE_DEVICES=1
 
 launch_cnt=0
 num_once=2
@@ -65,13 +65,15 @@ do
 
   optimizer_extra_args=""
   if [ "${optimizer}" = "sgd" ]; then
-    optimizer_extra_args="  --optimizer-config=momentum=${momentum} \\\\"
+    optimizer_extra_args="
+  --optimizer-config=momentum=${momentum} \\"
   fi
 
   scheduler_extra_args=""
   if [ "${lr_method}" = "step" ]; then
-    scheduler_extra_args="  --lr-step=${lrstep} \\\\
-  --lr-gamma=${lrgamma} \\\\"
+    scheduler_extra_args="
+  --lr-step=${lrstep} \\
+  --lr-gamma=${lrgamma} \\"
   fi
 
   t=${#lrs[@]}
@@ -134,9 +136,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} ${python_bin} /home/dlth/norm-exp-c
   --epochs=${epochs} \\
   --lr=${lrs[$p]} \\
   --lr-method=${lr_method} \\
-  --optimizer=${optimizer} \\
-${scheduler_extra_args}
-${optimizer_extra_args}
+  --optimizer=${optimizer} \\${scheduler_extra_args}${optimizer_extra_args}
   --weight-decay=${weightdecay} \\
   --dropout=${dropout} \\
   --drop-path-rate=${droppath} \\
@@ -145,7 +145,9 @@ ${optimizer_extra_args}
   --activation=${activation} \\
   --seed=${seeds[$q]} \\
   --print-f=${display_every} \\
-  --output=${output_root}
+  --output=${output_root}\\
+  --visualize \\
+  --wandb_project="${subjectname}" \\
 EOF
                           echo "nohup bash ${fileName} > output_${baseString}.out 2>&1 &" >> "${gen_dir}/z_bash_execute.sh"
                           launch_cnt=$((launch_cnt + 1))
@@ -177,9 +179,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} ${python_bin} /home/dlth/norm-exp-c
   --epochs=${epochs} \\
   --lr=${lrs[$p]} \\
   --lr-method=${lr_method} \\
-  --optimizer=${optimizer} \\
-${scheduler_extra_args}
-${optimizer_extra_args}
+  --optimizer=${optimizer} \\${scheduler_extra_args}${optimizer_extra_args}
   --weight-decay=${weightdecay} \\
   --dropout=${dropout} \\
   --drop-path-rate=${droppath} \\
@@ -187,7 +187,9 @@ ${optimizer_extra_args}
   --activation=${activation} \\
   --seed=${seeds[$q]} \\
   --print-f=${display_every} \\
-  --output=${output_root}
+  --output=${output_root}\\
+  --visualize \\
+  --wandb_project="${subjectname}" \\
 EOF
                         echo "nohup bash ${fileName} > output_${baseString}.out 2>&1 &" >> "${gen_dir}/z_bash_execute.sh"
                         launch_cnt=$((launch_cnt + 1))

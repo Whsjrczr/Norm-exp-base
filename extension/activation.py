@@ -26,10 +26,16 @@ def _PointwiseGroupNorm(num_feature, num_groups=32, eps=1e-5, affine=True, *args
 def _sinarctan(num_features, *args, **kwargs):
     return SinArctan(num_features=num_features)
 
+def _silu(num_features, *args, **kwargs):
+    return nn.SiLU()
+
+def _gelu(num_features, *args, **kwargs):
+    return nn.GELU()
+
 class _config:
     activation = 'relu'
     activation_cfg = {}
-    _methods = {'relu': _ReLU, 'sigmoid': _sigmoid, 'tanh': _tanh,'gn': _GroupNorm,'pgn': _PointwiseGroupNorm, 'sinarctan': _sinarctan, 'no': torch.nn.Identity}
+    _methods = {'relu': _ReLU, 'sigmoid': _sigmoid, 'tanh': _tanh,'gn': _GroupNorm,'pgn': _PointwiseGroupNorm, 'sinarctan': _sinarctan, 'no': torch.nn.Identity, 'silu': _silu, 'gelu': _gelu}
 
 def add_arguments(parser: argparse.ArgumentParser):
     group = parser.add_argument_group('Activation Option:')

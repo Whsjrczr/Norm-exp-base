@@ -136,7 +136,6 @@ class ViTTrainer:
         parser.add_argument("--disable-train-shuffle", action="store_true")
         parser.add_argument("--offline", "-offline", action="store_true", help="offline mode")
         parser.add_argument("--val-batch-size", dest="val_batch_size", type=int, default=None)
-
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=100)
         ext.dataset.add_arguments(parser)

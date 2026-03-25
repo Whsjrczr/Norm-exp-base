@@ -9,7 +9,7 @@ def add_arguments(parser: argparse.ArgumentParser):
     group = parser.add_argument_group("Visualization Options")
     group.add_argument("--wandb", action="store_true", help="enable Weights & Biases logging")
     group.add_argument("--visualize", action="store_true", help="legacy alias of --wandb")
-    group.add_argument("--wandb-project", type=str, default="test", help="wandb project name")
+    group.add_argument("--wandb_project", type=str, default="test", help="wandb project name")
     group.add_argument("--visdom", action="store_true", help="enable Visdom visualization")
     group.add_argument("--vis", action="store_true", help="legacy alias of --visdom")
     group.add_argument("--visdom-port", "--vis-port", dest="vis_port", default=6006, type=int, help="Visdom port")

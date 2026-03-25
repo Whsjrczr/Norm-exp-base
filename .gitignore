@@ -26,6 +26,8 @@ results/
 PDE/results/
 PDE/test/
 PDE/exp*
+ViT/test/
+ViT/exp*
 
 # wandb related
 wandb/
@@ -37,3 +39,5 @@ MLP/exp/
 tmp-kan-results*/
 
 test.py
+
+cifar10/
