@@ -116,8 +116,9 @@ class PDETaiyiTrainer:
         ext.trainer.set_seed(self.cfg)
 
         taiyi_config = {
-            'Linear': [['WeightGradRange', f'linear({self.cfg.taiyi_track_every},0)']],
+            'Linear': [['WeightGradRange', f'linear({self.cfg.taiyi_track_every},0)'], ['WeightGradNorm', f'linear({self.cfg.taiyi_track_every},0)'], ['OutputGradSndNorm', f'linear({self.cfg.taiyi_track_every},0)'], ['OutputGradRange', f'linear({self.cfg.taiyi_track_every},0)']],
         }
+        
         wandb_kwargs = dict(
             project=self.cfg.subject_name,
             entity="whsjrc-buaa",
