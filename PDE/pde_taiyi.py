@@ -161,6 +161,7 @@ class PDETaiyiTrainer:
             self.logger("==> taiyi config: {}".format(taiyi_config))
 
     def add_arguments(self):
+        raw_argv = sys.argv[1:]
         parser = argparse.ArgumentParser('PDE Solving with Taiyi Gradient Range Tracking')
         add_model_arguments(parser, task='pde')
         parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'helmholtz_2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'poisson_new', 'allen_cahn_new'], help='PDE type')
@@ -188,6 +189,17 @@ class PDETaiyiTrainer:
             args.pde_type = 'helmholtz_2d'
         if args.resume:
             args = parser.parse_args(namespace=ext.checkpoint.Checkpoint.load_config(args.resume))
+
+        if not self._has_cli_flag(raw_argv, '--optimizer', '-oo'):
+            args.optimizer = 'adam'
+        if not self._has_cli_flag(raw_argv, '--lr'):
+            args.lr = 1e-3
+        if args.pde_type in {'helmholtz2d', 'helmholtz_2d'}:
+            if not self._has_cli_flag(raw_argv, '--loss-weights'):
+                args.loss_weights = [1.0, 10.0]
+            if not self._has_cli_flag(raw_argv, '--float64'):
+                args.float64 = True
+
         stages = getattr(ext.optimizer, "get_stages", lambda _cfg: None)(args)
         stage_total_iterations = getattr(ext.optimizer, "infer_total_iterations", lambda _stages: None)(stages)
         if stage_total_iterations is not None:
@@ -198,6 +210,15 @@ class PDETaiyiTrainer:
             args.wandb = True
             args.visualize = True
         return ext.tracking.normalize_config(args)
+
+    def _has_cli_flag(self, argv, *flags):
+        for flag in flags:
+            if flag in argv:
+                return True
+            prefix = flag + '='
+            if any(arg.startswith(prefix) for arg in argv):
+                return True
+        return False
 
     def train(self):
         if self.cfg.test:
@@ -255,13 +276,22 @@ class PDETaiyiTrainer:
             shutil.copy(self.logger.filename, new_log_path)
 
     def validate(self):
-        if self.cfg.pde_type not in {'poisson', 'poisson_new', 'helmholtz', 'helmholtz_new', 'helmholtz_learnable_2', 'allen_cahn', 'allen_cahn_new'}:
-            self.logger('==> Validation skipped: analytical curve is only defined for 1D stationary PDEs.')
+        if self._supports_curve_validation():
+            _x, y_pred, y_true = self._predict_validation_curve()
+            error = np.mean((y_pred - y_true)**2)
+            self.logger('==> Validation L2 error: {:.5g}'.format(error))
+        elif self._supports_grid_validation():
+            _xy, y_pred, y_true, _xx, _yy = self._predict_validation_grid()
+            error = np.mean((y_pred - y_true)**2)
+            self.logger('==> Validation grid MSE: {:.5g}'.format(error))
+        else:
+            self.logger('==> Validation skipped: analytical reference is unavailable for this PDE.')
             return None
 
-        _x, y_pred, y_true = self._predict_validation_curve()
-        error = np.mean((y_pred - y_true)**2)
-        self.logger('==> Validation L2 error: {:.5g}'.format(error))
+        if not np.isfinite(error):
+            self.logger('==> Validation produced non-finite error; skip val logging and best-checkpoint update.')
+            return None
+
         self.visualizer.log({"val_error": error})
         self.visualizer.add_value("val error", error)
         self.best_loss = getattr(self, 'best_loss', float('inf'))
@@ -317,13 +347,20 @@ class PDETaiyiTrainer:
                 test_losses = losshistory.loss_test[i]
                 metrics = losshistory.metrics_test[i]
                 for j in range(len(train_losses)):
-                    log_dict[f"train_loss_{j}"] = float(train_losses[j])
+                    value = float(train_losses[j])
+                    if np.isfinite(value):
+                        log_dict[f"train_loss_{j}"] = value
                 for j in range(len(test_losses)):
-                    log_dict[f"test_loss_{j}"] = float(test_losses[j])
+                    value = float(test_losses[j])
+                    if np.isfinite(value):
+                        log_dict[f"test_loss_{j}"] = value
                 for j in range(len(metrics)):
                     metric_name = str(metrics_names[j]).replace(' ', '_').replace('(', '').replace(')', '').replace(',', '').replace('.', '')
-                    log_dict[f"metrics_{metric_name}"] = float(metrics[j])
-                self.visualizer.log(log_dict)
+                    value = float(metrics[j])
+                    if np.isfinite(value):
+                        log_dict[f"metrics_{metric_name}"] = value
+                if len(log_dict) > 2:
+                    self.visualizer.log(log_dict)
 
     def _log_histories_to_vis(self, histories):
         for _stage_idx, stage_cfg, losshistory, _train_state, _offset in histories:
@@ -334,14 +371,24 @@ class PDETaiyiTrainer:
                 train_losses = losshistory.loss_train[i]
                 test_losses = losshistory.loss_test[i]
                 metrics = losshistory.metrics_test[i]
-                self.visualizer.add_value("train total loss", float(np.sum(train_losses)))
-                self.visualizer.add_value("test total loss", float(np.sum(test_losses)))
+                train_total = float(np.sum(train_losses))
+                test_total = float(np.sum(test_losses))
+                if np.isfinite(train_total):
+                    self.visualizer.add_value("train total loss", train_total)
+                if np.isfinite(test_total):
+                    self.visualizer.add_value("test total loss", test_total)
                 for j in range(len(train_losses)):
-                    self.visualizer.add_value(f"train loss {j}", float(train_losses[j]))
+                    value = float(train_losses[j])
+                    if np.isfinite(value):
+                        self.visualizer.add_value(f"train loss {j}", value)
                 for j in range(len(test_losses)):
-                    self.visualizer.add_value(f"test loss {j}", float(test_losses[j]))
+                    value = float(test_losses[j])
+                    if np.isfinite(value):
+                        self.visualizer.add_value(f"test loss {j}", value)
                 for j in range(len(metrics)):
-                    self.visualizer.add_value(self._metric_vis_name(metrics_names[j]), float(metrics[j]))
+                    value = float(metrics[j])
+                    if np.isfinite(value):
+                        self.visualizer.add_value(self._metric_vis_name(metrics_names[j]), value)
 
     def _build_vis_names(self):
         names = {
@@ -365,34 +412,95 @@ class PDETaiyiTrainer:
         y_true = self._reference_solution(x)
         return x, y_pred, y_true
 
+    def _predict_validation_grid(self):
+        grid_size = 101
+        axis = np.linspace(-1, 1, grid_size)
+        xx, yy = np.meshgrid(axis, axis)
+        xy = np.stack([xx.reshape(-1), yy.reshape(-1)], axis=1)
+        y_pred = self.model.predict(xy)
+        y_true = self._reference_solution(xy)
+        return xy, y_pred, y_true, xx, yy
+
+    def _supports_curve_validation(self):
+        return self.cfg.pde_type in {
+            'poisson',
+            'poisson_new',
+            'helmholtz',
+            'helmholtz_new',
+            'helmholtz_learnable_2',
+            'allen_cahn',
+            'allen_cahn_new',
+        }
+
+    def _supports_grid_validation(self):
+        return self.cfg.pde_type in {
+            'helmholtz2d',
+            'helmholtz_2d',
+        }
+
     def _reference_solution(self, x):
         if self.cfg.pde_type in {'poisson', 'poisson_new'}:
             return (x**2 - 1) / 2
         if self.cfg.pde_type in {'helmholtz', 'helmholtz_new', 'helmholtz_learnable_2'}:
             return np.sin(np.pi * x[:, 0:1])
+        if self.cfg.pde_type in {'helmholtz2d', 'helmholtz_2d'}:
+            return np.sin(np.pi * x[:, 0:1]) * np.sin(4 * np.pi * x[:, 1:2])
         if self.cfg.pde_type in {'allen_cahn', 'allen_cahn_new'}:
             epsilon = 0.01
             return np.tanh(x[:, 0:1] / np.sqrt(2 * epsilon))
         return None
 
     def _save_solution_plot(self):
-        x, y_pred, y_true = self._predict_validation_curve()
-        if y_true is None:
+        if self._supports_curve_validation():
+            x, y_pred, y_true = self._predict_validation_curve()
+            if y_true is None:
+                return
+
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.plot(x[:, 0], y_true[:, 0], label='reference', linewidth=2)
+            ax.plot(x[:, 0], y_pred[:, 0], label='prediction', linewidth=2)
+            ax.set_title(self.cfg.pde_type)
+            ax.set_xlabel('x')
+            ax.set_ylabel('u(x)')
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+
+            fig_path = os.path.join(self.result_path, 'solution_curve.png')
+            fig.savefig(fig_path, bbox_inches='tight')
+            plt.close(fig)
+            self.logger(f'==> Saved solution curve to {fig_path}')
             return
 
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.plot(x[:, 0], y_true[:, 0], label='reference', linewidth=2)
-        ax.plot(x[:, 0], y_pred[:, 0], label='prediction', linewidth=2)
-        ax.set_title(self.cfg.pde_type)
-        ax.set_xlabel('x')
-        ax.set_ylabel('u(x)')
-        ax.grid(True, alpha=0.3)
-        ax.legend()
+        if self._supports_grid_validation():
+            _xy, y_pred, y_true, xx, yy = self._predict_validation_grid()
+            if y_true is None:
+                return
 
-        fig_path = os.path.join(self.result_path, 'solution_curve.png')
-        fig.savefig(fig_path, bbox_inches='tight')
-        plt.close(fig)
-        self.logger(f'==> Saved solution curve to {fig_path}')
+            pred_grid = y_pred.reshape(xx.shape)
+            true_grid = y_true.reshape(xx.shape)
+            err_grid = np.abs(pred_grid - true_grid)
+
+            fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+            images = [
+                axes[0].imshow(true_grid, extent=[-1, 1, -1, 1], origin='lower', aspect='auto'),
+                axes[1].imshow(pred_grid, extent=[-1, 1, -1, 1], origin='lower', aspect='auto'),
+                axes[2].imshow(err_grid, extent=[-1, 1, -1, 1], origin='lower', aspect='auto'),
+            ]
+            titles = ['reference', 'prediction', 'absolute error']
+            for ax, image, title in zip(axes, images, titles):
+                ax.set_title(title)
+                ax.set_xlabel('x')
+                ax.set_ylabel('y')
+                fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+
+            fig.suptitle(self.cfg.pde_type)
+            fig_path = os.path.join(self.result_path, 'solution_grid.png')
+            fig.savefig(fig_path, bbox_inches='tight')
+            plt.close(fig)
+            self.logger(f'==> Saved solution grid to {fig_path}')
+            return
+
+        self.logger('==> Solution plot skipped: analytical reference is unavailable for this PDE.')
 
 
 if __name__ == '__main__':
