@@ -3,26 +3,6 @@ import deepxde as dde
 import torch
 
 
-class GradInputWrapper(torch.nn.Module):
-    """Ensure PDE inputs participate in autograd for residual derivatives."""
-
-    def __init__(self, net):
-        super().__init__()
-        self.net = net
-        self.regularizer = getattr(net, "regularizer", None)
-
-    def forward(self, x):
-        if torch.is_tensor(x) and not x.requires_grad:
-            x = x.requires_grad_()
-        return self.net(x)
-
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError:
-            return getattr(self.net, name)
-
-
 class PDEBuilder:
     def __init__(self, cfg, model, optimizer):
         self.cfg = cfg
@@ -65,9 +45,6 @@ class PDEBuilder:
     def _is_torch(self, x):
         return torch.is_tensor(x)
 
-    def _wrap_net(self):
-        self.net = GradInputWrapper(self.model)
-
 
     def define_poisson(self):
         def pde(x, y):
@@ -90,7 +67,7 @@ class PDEBuilder:
         bc = dde.DirichletBC(geom, func, boundary)
         self.data = dde.data.PDE(geom, pde, bc, num_domain=1000, num_boundary=200, solution=func)
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
 
@@ -115,7 +92,7 @@ class PDEBuilder:
         bc = dde.DirichletBC(geom, func, boundary)
         self.data = dde.data.PDE(geom, pde, bc, num_domain=1000, num_boundary=50, solution=func)
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], self.cfg.loss_weights[1]])
 
@@ -139,7 +116,7 @@ class PDEBuilder:
         bc = dde.DirichletBC(geom, func, boundary)
         self.data = dde.data.PDE(geom, pde, bc, num_domain=5000, num_boundary=500, solution=func)
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
 
@@ -163,7 +140,7 @@ class PDEBuilder:
         bc = dde.DirichletBC(geom, func, boundary)
         self.data = dde.data.PDE(geom, pde, bc, num_domain=5000, num_boundary=500, solution=func)
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], self.cfg.loss_weights[1]])
 
@@ -187,7 +164,7 @@ class PDEBuilder:
         bc = dde.DirichletBC(geom, func, boundary)
         self.data = dde.data.PDE(geom, pde, bc, num_domain=5000, num_boundary=100, solution=func)
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], self.cfg.loss_weights[1]])
 
@@ -213,7 +190,7 @@ class PDEBuilder:
         bc = dde.DirichletBC(geom, func, boundary)
         self.data = dde.data.PDE(geom, pde, bc, num_domain=10000, num_boundary=500, solution=func)
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics)
 
@@ -239,7 +216,7 @@ class PDEBuilder:
         bc = dde.DirichletBC(geom, func, boundary)
         self.data = dde.data.PDE(geom, pde, bc, num_domain=12000, num_boundary=200, solution=func)
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=[self.cfg.loss_weights[0], self.cfg.loss_weights[1]])
 
@@ -270,7 +247,7 @@ class PDEBuilder:
         loss_weights = [1.0, 10.0]
 
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=loss_weights)
 
@@ -317,7 +294,7 @@ class PDEBuilder:
         loss_weights = [1.0, 100.0, 100.0, 100.0, 100.0]
 
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=loss_weights)
 
@@ -365,7 +342,7 @@ class PDEBuilder:
         loss_weights = [1.0, 50.0, 50.0, 50.0, 50.0]
 
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=loss_weights)
 
@@ -414,7 +391,7 @@ class PDEBuilder:
         loss_weights = [1.0, 10.0, 10.0]
 
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=loss_weights)
 
@@ -503,6 +480,6 @@ class PDEBuilder:
         loss_weights = [0.1, 0.1, 0.1] + [2.0] * 8 + [4.0] * 3
 
         self.model.regularizer = None
-        self._wrap_net()
+        self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=loss_weights)
