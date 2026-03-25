@@ -118,7 +118,7 @@ class PDETaiyiTrainer:
         taiyi_config = {
             'Linear': [['WeightGradRange', f'linear({self.cfg.taiyi_track_every},0)'], ['WeightGradNorm', f'linear({self.cfg.taiyi_track_every},0)'], ['OutputGradSndNorm', f'linear({self.cfg.taiyi_track_every},0)'], ['OutputGradRange', f'linear({self.cfg.taiyi_track_every},0)']],
         }
-        
+
         wandb_kwargs = dict(
             project=self.cfg.subject_name,
             entity="whsjrc-buaa",
@@ -255,7 +255,7 @@ class PDETaiyiTrainer:
             self._log_histories_to_vis(all_histories)
 
         self.validate()
-        self._save_solution_plot()
+        # self._save_solution_plot()
 
         if not self.cfg.no_save_best:
             self.model.save(os.path.join(self.result_path, 'model'))

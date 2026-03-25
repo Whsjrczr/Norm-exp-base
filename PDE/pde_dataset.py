@@ -9,11 +9,18 @@ class GradInputWrapper(torch.nn.Module):
     def __init__(self, net):
         super().__init__()
         self.net = net
+        self.regularizer = getattr(net, "regularizer", None)
 
     def forward(self, x):
         if torch.is_tensor(x) and not x.requires_grad:
             x = x.requires_grad_()
         return self.net(x)
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.net, name)
 
 
 class PDEBuilder:
