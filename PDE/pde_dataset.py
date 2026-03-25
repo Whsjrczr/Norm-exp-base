@@ -24,7 +24,7 @@ class PDEBuilder:
             self.define_allen_cahn()
         elif self.cfg.pde_type == 'allen_cahn_new':
             self.define_allen_cahn_new()
-        elif self.cfg.pde_type == 'helmholtz2d':
+        elif self.cfg.pde_type in {'helmholtz2d', 'helmholtz_2d'}:
             self.define_helmholtz2d()
         elif self.cfg.pde_type == 'wave':
             self.define_wave()
@@ -483,4 +483,3 @@ class PDEBuilder:
         self.net = self.model
         self.model = dde.Model(self.data, self.net)
         self.model.compile(optimizer=self.optimizer, metrics=self.cfg.metrics, loss_weights=loss_weights)
-
