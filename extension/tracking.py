@@ -177,10 +177,20 @@ class Visualizer:
         self.visdom.close()
 
     def finish(self, sync_offline=False):
-        info = {"synced": False}
+        info = {"synced": False, "wandb_finished": False}
         self.close()
-        if sync_offline and self.wandb_enabled and self.run_dir:
-            os.system(f"wandb sync {self.run_dir}")
+        wandb_enabled = self.wandb_enabled
+        run_dir = self.run_dir
+        if wandb_enabled:
+            try:
+                self.wandb.finish()
+                info["wandb_finished"] = True
+            except Exception as exc:
+                print(f"WandB finish failed: {exc}")
+            finally:
+                self.wandb = None
+        if sync_offline and wandb_enabled and run_dir:
+            os.system(f"wandb sync {run_dir}")
             info["synced"] = True
         return info
 

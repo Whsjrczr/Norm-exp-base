@@ -1,5 +1,6 @@
 # python setting
 .conda/
+.codex/
 .vscode/
 __pycache__/
 
