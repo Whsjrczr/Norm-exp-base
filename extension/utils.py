@@ -114,7 +114,7 @@ def str2dict(s) -> dict:
     for ss in s:
         if ss == '':
             continue
-        ss = ss.split('=')
+        ss = ss.split('=', 1)
         assert len(ss) == 2
         key = ss[0].strip()
         value = str2num(ss[1])

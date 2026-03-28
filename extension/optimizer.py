@@ -14,6 +14,50 @@ _methods = {
     'lbfgs': torch.optim.LBFGS,
 }
 
+_STAGE_KEYS = {
+    'optimizer', 'name', 'lr', 'weight_decay',
+    'epochs', 'epoch', 'end_epoch', 'iterations', 'iters',
+    'batch_size', 'loss_weights', 'metrics',
+    'optimizer_config', 'config',
+    'lr_method', 'lr_step', 'lr_gamma',
+}
+
+
+def _parse_stage_dict(spec: str) -> dict:
+    tokens = [token.strip() for token in spec.split(',') if token.strip()]
+    stage = {}
+    idx = 0
+    while idx < len(tokens):
+        token = tokens[idx]
+        if '=' not in token:
+            raise ValueError(f"Invalid stage token: {token}")
+
+        key, value = token.split('=', 1)
+        key = key.strip()
+        value = value.strip()
+
+        if key in {'optimizer_config', 'config'}:
+            nested_tokens = [value] if value else []
+            idx += 1
+            while idx < len(tokens):
+                next_token = tokens[idx]
+                if '=' not in next_token:
+                    nested_tokens.append(next_token)
+                    idx += 1
+                    continue
+                next_key, _ = next_token.split('=', 1)
+                if next_key.strip() in _STAGE_KEYS:
+                    break
+                nested_tokens.append(next_token)
+                idx += 1
+            stage[key] = str2dict(','.join(nested_tokens))
+            continue
+
+        stage[key] = str2num(value)
+        idx += 1
+
+    return stage
+
 
 
 def _str2stages(x):
@@ -84,7 +128,7 @@ def _str2stages(x):
             opt = opt.strip()
             rest = rest.strip()
             if rest:
-                stage.update(str2dict(rest))
+                stage.update(_parse_stage_dict(rest))
             stage.setdefault('optimizer', opt)
 
         else:
@@ -94,10 +138,10 @@ def _str2stages(x):
                 stage.setdefault('optimizer', toks[0])
                 rest = ','.join(toks[1:])
                 if rest:
-                    stage.update(str2dict(rest))
+                    stage.update(_parse_stage_dict(rest))
             else:
                 # Form: "optimizer=adam,lr=...,epochs=..."
-                stage.update(str2dict(part))
+                stage.update(_parse_stage_dict(part))
 
         if 'optimizer_config' in stage and isinstance(stage['optimizer_config'], str):
             stage['optimizer_config'] = str2dict(stage['optimizer_config'])

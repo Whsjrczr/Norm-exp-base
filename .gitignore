@@ -27,6 +27,7 @@ results/
 PDE/results/
 PDE/test/
 PDE/exp*
+PDE/*generate.sh
 ViT/test/
 ViT/exp*
 
