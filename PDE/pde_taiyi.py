@@ -4,6 +4,7 @@ os.environ['DDE_BACKEND'] = 'pytorch'
 import time
 import shutil
 import argparse
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -116,14 +117,28 @@ class PDETaiyiTrainer:
         ext.trainer.set_seed(self.cfg)
 
         taiyi_config = {
-            'Linear': [['WeightGradRange', f'linear({self.cfg.taiyi_track_every},0)'], ['WeightGradNorm', f'linear({self.cfg.taiyi_track_every},0)'], ['OutputGradSndNorm', f'linear({self.cfg.taiyi_track_every},0)'], ['OutputGradRange', f'linear({self.cfg.taiyi_track_every},0)']],
+            'Linear': [
+                ['InputCovStableRank', f'linear({self.cfg.taiyi_track_every},0)'],
+                ['InputCovCondition50', f'linear({self.cfg.taiyi_track_every},0)'],
+                ['InputCovMaxEig', f'linear({self.cfg.taiyi_track_every},0)'],
+                ['InputSndNorm', f'linear({self.cfg.taiyi_track_every},0)'],
+                ['OutputGradSndNorm', f'linear({self.cfg.taiyi_track_every},0)'],
+                ['WeightNorm', f'linear({self.cfg.taiyi_track_every},0)'],
+                ['WeightGradNorm', f'linear({self.cfg.taiyi_track_every},0)'],
+                ['LinearDeadNeuronNum', f'linear({self.cfg.taiyi_track_every},0)'],
+            ],
+        }
+        taiyi_modules = list(taiyi_config.keys())
+        taiyi_quantities = {
+            module_name: [item[0] if isinstance(item, (list, tuple)) else item for item in module_cfg]
+            for module_name, module_cfg in taiyi_config.items()
         }
 
         wandb_kwargs = dict(
             project=self.cfg.subject_name,
             entity="whsjrc-buaa",
             name=self.model_name,
-            notes=str(self.cfg) + " ---- " + str(taiyi_config),
+            notes=str(self.cfg) + " ---- " + json.dumps(taiyi_config, ensure_ascii=False),
             config={
                 "pde_type": self.cfg.pde_type,
                 "arch": self.cfg.arch,
@@ -140,6 +155,9 @@ class PDETaiyiTrainer:
                 "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
                 "loss_weights": self.cfg.loss_weights,
                 "taiyi_track_every": self.cfg.taiyi_track_every,
+                "taiyi_modules": taiyi_modules,
+                "taiyi_quantities": taiyi_quantities,
+                "taiyi_config": taiyi_config,
             },
         )
         if self.cfg.resume and hasattr(self, 'wandb_id'):
@@ -163,7 +181,7 @@ class PDETaiyiTrainer:
 
     def add_arguments(self):
         raw_argv = sys.argv[1:]
-        parser = argparse.ArgumentParser('PDE Solving with Taiyi Gradient Range Tracking')
+        parser = argparse.ArgumentParser('PDE Solving with Taiyi Layer Dynamics Tracking')
         add_model_arguments(parser, task='pde')
         parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'helmholtz_2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'poisson_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
@@ -174,7 +192,7 @@ class PDETaiyiTrainer:
         parser.add_argument('--batch_size', type=int, default=128)
         parser.add_argument('--float64', action='store_true', help='train with float64 precision')
         parser.add_argument('--subject_name', type=str, default='default_subject', help='subject name for logging')
-        parser.add_argument('--taiyi_track_every', type=int, default=1000, help='track per-layer gradient range every N iterations')
+        parser.add_argument('--taiyi_track_every', type=int, default=1000, help='track Taiyi layer dynamics every N iterations')
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=10000)
         ext.logger.add_arguments(parser)
