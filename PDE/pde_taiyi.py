@@ -332,9 +332,8 @@ class PDETaiyiTrainer:
         opt_lower = str(opt_name).lower()
         if opt_lower in {"lbfgs", "l-bfgs", "l_bfgs"}:
             dde_opt = "L-BFGS"
+            ext.optimizer.configure_dde_lbfgs(optimizer_config, logger=self.logger)
             compile_kwargs = {"loss_weights": loss_weights, "metrics": metrics}
-            if optimizer_config:
-                compile_kwargs["options"] = optimizer_config
             self.model.compile(dde_opt, **compile_kwargs)
         else:
             dde_opt = opt_lower

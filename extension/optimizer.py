@@ -1,5 +1,6 @@
 import argparse
 import ast
+import inspect
 import re
 import torch
 from .utils import str2dict, str2num
@@ -20,6 +21,14 @@ _STAGE_KEYS = {
     'batch_size', 'loss_weights', 'metrics',
     'optimizer_config', 'config',
     'lr_method', 'lr_step', 'lr_gamma',
+}
+
+_DDE_LBFGS_KEY_ALIASES = {
+    'max_iter': 'maxiter',
+    'max_iters': 'maxiter',
+    'max_eval': 'maxfun',
+    'max_evals': 'maxfun',
+    'history_size': 'maxcor',
 }
 
 
@@ -236,6 +245,46 @@ def infer_total_iterations(stages):
         else:
             return None
     return total
+
+
+def configure_dde_lbfgs(optimizer_config: dict | None = None, logger=None):
+    """Apply DeepXDE L-BFGS options in a version-tolerant way.
+
+    DeepXDE configures L-BFGS through ``dde.optimizers.set_LBFGS_options(...)``
+    instead of ``Model.compile(..., options=...)``. This helper normalizes a few
+    common aliases used by this repo and drops unsupported keys safely.
+    """
+    if not optimizer_config:
+        return {}
+
+    if logger is None:
+        logger = get_logger()
+
+    try:
+        import deepxde as dde
+    except ImportError:
+        logger("==> DeepXDE is not available; skip L-BFGS option configuration.")
+        return {}
+
+    set_lbfgs_options = getattr(getattr(dde, 'optimizers', None), 'set_LBFGS_options', None)
+    if not callable(set_lbfgs_options):
+        logger("==> DeepXDE does not expose set_LBFGS_options; skip L-BFGS option configuration.")
+        return {}
+
+    normalized = {}
+    for key, value in dict(optimizer_config).items():
+        normalized[_DDE_LBFGS_KEY_ALIASES.get(key, key)] = value
+
+    accepted_keys = set(inspect.signature(set_lbfgs_options).parameters.keys())
+    applied = {key: value for key, value in normalized.items() if key in accepted_keys}
+    ignored = {key: value for key, value in normalized.items() if key not in accepted_keys}
+
+    if ignored:
+        logger(f"==> Ignoring unsupported DeepXDE L-BFGS options: {ignored}")
+    if applied:
+        set_lbfgs_options(**applied)
+        logger(f"==> Applied DeepXDE L-BFGS options: {applied}")
+    return applied
 
 
 def build_optimizer(
