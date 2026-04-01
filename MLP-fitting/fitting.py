@@ -235,7 +235,7 @@ class Fitting:
 
         self.vis_wandb.close()
         self.monitor.get_output()
-        self.logger("==> Wandb successfully get output.")
+        self.logger("==> Taiyi monitor collected output.")
 
         new_log_filename = "{}_{}_loss{:.6f}.txt".format(
             self.model_name, now_date, self.best_loss

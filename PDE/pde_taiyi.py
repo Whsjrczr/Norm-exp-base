@@ -284,7 +284,7 @@ class PDETaiyiTrainer:
         taiyi_info = self.taiyi.finish()
         finish_info = self.visualizer.finish(sync_offline=self.cfg.offline)
         if taiyi_info["taiyi_output"]:
-            self.logger("==> Taiyi output exported.")
+            self.logger("==> Taiyi monitor collected output.")
         if finish_info["synced"]:
             self.logger("==> WandB offline run synced.")
 

@@ -260,7 +260,7 @@ class MNIST:
         taiyi_info = self.taiyi.finish()
         finish_info = self.visualizer.finish(sync_offline=self.cfg.offline)
         if taiyi_info["taiyi_output"]:
-            self.logger("==> Wandb successfully get output.")
+            self.logger("==> Taiyi monitor collected output.")
 
         new_log_filename = r'{}_{}_{:5.2f}%%.txt'.format(self.model_name, now_date, self.best_acc)
         self.logger('==> Network training completed. Copy log file to {}'.format(new_log_filename))
