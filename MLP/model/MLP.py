@@ -4,16 +4,18 @@ import torch.nn as nn
 import extension as ext
 
 
+NORM_2D = ext.make_norm_factory(dim=2)
+
 
 class MLP(nn.Module):
     def __init__(self, depth=4, width=100, input_size=28*28, output_size=10, dropout_prob=0, **kwargs):
         super(MLP, self).__init__()
-        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Norm(width, affine=False), ext.Activation(width)]
+        layers = [ext.View(input_size), nn.Linear(input_size, width), NORM_2D(width, affine=False), ext.Activation(width)]
         for index in range(depth-1):
             layers.append(nn.Linear(width, width))
             if dropout_prob > 0:
                 layers.append(nn.Dropout(dropout_prob))  # dropout
-            layers.append(ext.Norm(width, affine=False))
+            layers.append(NORM_2D(width, affine=False))
             layers.append(ext.Activation(width))
         layers.append(nn.Linear(width, output_size))
         self.net = nn.Sequential(*layers)
@@ -25,13 +27,13 @@ class MLP(nn.Module):
 class PreNormMLP(nn.Module):
     def __init__(self, depth=4, width=100, input_size=28*28, output_size=10, dropout_prob=0, **kwargs):
         super(PreNormMLP, self).__init__()
-        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width)]
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), NORM_2D(width)]
         for index in range(depth-1):
             layers.append(nn.Linear(width, width))
             layers.append(ext.Activation(width))
             if dropout_prob > 0:
                 layers.append(nn.Dropout(dropout_prob))  # dropout
-            layers.append(ext.Norm(width))
+            layers.append(NORM_2D(width))
         layers.append(nn.Linear(width, output_size))
         self.net = nn.Sequential(*layers)
 
@@ -43,10 +45,10 @@ class CenDropScalingMLP(nn.Module):
     # LNCentering -> Dropout -> Scaling -> Activation
     def __init__(self, depth=4, width=100, input_size=28 * 28, output_size=10, dropout_prob=0, **kwargs):
         super(CenDropScalingMLP, self).__init__()
-        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width,dropout_prob=dropout_prob, affine=False)]
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), NORM_2D(width,dropout_prob=dropout_prob, affine=False)]
         for index in range(depth - 1):
             layers.append(nn.Linear(width, width))
-            layers.append(ext.Norm(width, dropout_prob=dropout_prob, affine=False))
+            layers.append(NORM_2D(width, dropout_prob=dropout_prob, affine=False))
             # layers.append(LayerNormCentering(width, elementwise_affine=False))  # centering
             # if (dropout_prob > 0):
             #     layers.append(nn.Dropout(dropout_prob))  # dropout
@@ -63,11 +65,11 @@ class CenDropScalingPreNormMLP(nn.Module):
     # Activation -> LNCentering -> Dropout -> Scaling 
     def __init__(self, depth=4, width=100, input_size=28 * 28, output_size=10, dropout_prob=0, **kwargs):
         super(CenDropScalingPreNormMLP, self).__init__()
-        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width, dropout_prob=dropout_prob, affine=False)]
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), NORM_2D(width, dropout_prob=dropout_prob, affine=False)]
         for index in range(depth - 1):
             layers.append(nn.Linear(width, width))
             layers.append(ext.Activation(width))
-            layers.append(ext.Norm(width,dropout_prob=dropout_prob, affine=False))
+            layers.append(NORM_2D(width,dropout_prob=dropout_prob, affine=False))
             # layers.append(LayerNormCentering(width, elementwise_affine=True))  # centering
             # if (dropout_prob > 0):
             #     layers.append(nn.Dropout(dropout_prob))  # dropout
@@ -116,7 +118,7 @@ class ResBlockDropout(nn.Module):
 class ResCenDropScalingMLP(nn.Module):
     def __init__(self, depth=4, width=100, input_size=28*28, output_size=10, dropout_prob=0,  **kwargs):
         super(ResCenDropScalingMLP, self).__init__()
-        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width, dropout_prob=dropout_prob, affine=False)]
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), NORM_2D(width, dropout_prob=dropout_prob, affine=False)]
         for index in range(depth - 1):
             layers.append(ResBlockDropout(width,dropout_prob=dropout_prob))
         layers.append(nn.Linear(width, output_size))
@@ -132,7 +134,7 @@ class ResBlock(nn.Module):
         super(ResBlock, self).__init__()
         self.fc1 = nn.Linear(width, width)
         self.activation = nn.ReLU()
-        self.norm = ext.Norm(width)
+        self.norm = NORM_2D(width)
 
     def forward(self, x):
         identity = x
@@ -154,7 +156,7 @@ class ResBlock(nn.Module):
 class ResMLP(nn.Module):
     def __init__(self, depth=4, width=100, input_size=28*28, output_size=10, **kwargs):
         super(ResMLP, self).__init__()
-        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), ext.Norm(width)]
+        layers = [ext.View(input_size), nn.Linear(input_size, width), ext.Activation(width), NORM_2D(width)]
         for index in range(depth - 1):
             layers.append(ResBlock(width))
         layers.append(nn.Linear(width, output_size))

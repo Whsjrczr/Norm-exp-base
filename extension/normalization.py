@@ -1,4 +1,5 @@
 import argparse
+from functools import partial
 import torch.nn as nn
 
 from .my_modules.ln_modules import *
@@ -10,16 +11,68 @@ from .my_modules.pln import ParallelLN
 from .utils import str2dict
 
 
+class _LayoutAdapter(nn.Module):
+    def __init__(self, module, dim, layout):
+        super().__init__()
+        self.module = module
+        self.dim = dim
+        self.layout = layout
+
+    def forward(self, x):
+        if self.dim == 2:
+            return self.module(x.unsqueeze(-1)).squeeze(-1)
+
+        if self.dim == 3 and self.layout == "last":
+            return self.module(x.transpose(1, 2)).transpose(1, 2)
+
+        if self.dim == 4 and self.layout == "last":
+            return self.module(x.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
+
+        return self.module(x)
+
+
+def _normalize_layout(dim, layout):
+    if dim not in (2, 3, 4):
+        raise ValueError(f"Unsupported norm dim: {dim}. Expected one of 2, 3, 4.")
+
+    if layout is None:
+        if dim == 2:
+            return "last"
+        return "first"
+
+    if layout not in ("first", "last"):
+        raise ValueError(f"Unsupported norm layout: {layout}. Expected 'first' or 'last'.")
+    return layout
+
+
+def _wrap_layout(module, dim, layout):
+    if dim == 2:
+        return _LayoutAdapter(module, dim=2, layout="last")
+    if layout == "last":
+        return _LayoutAdapter(module, dim=dim, layout=layout)
+    return module
+
+
+def make_norm_factory(**bound_kwargs):
+    return partial(Norm, **bound_kwargs)
+
+
 
 # GN
-def _GroupNorm(num_features, num_groups=32, eps=1e-5, affine=True, *args, **kwargs):
-    return nn.GroupNorm(num_groups, num_features, eps=eps, affine=affine)
+def _GroupNorm(num_features, num_groups=32, eps=1e-5, affine=True, dim=4, layout=None, *args, **kwargs):
+    layout = _normalize_layout(dim, layout)
+    module = nn.GroupNorm(num_groups, num_features, eps=eps, affine=affine)
+    return _wrap_layout(module, dim=dim, layout=layout)
 
-def _GroupNormCentering(num_features, num_groups=32, eps=1e-5, affine=True, *args, **kwargs):
-    return GroupNormCentering(num_groups, num_features,affine=affine)
+def _GroupNormCentering(num_features, num_groups=32, eps=1e-5, affine=True, dim=4, layout=None, *args, **kwargs):
+    layout = _normalize_layout(dim, layout)
+    module = GroupNormCentering(num_groups, num_features, affine=affine)
+    return _wrap_layout(module, dim=dim, layout=layout)
 
-def _GroupNormScaling(num_features, num_groups=32, eps=1e-5, affine=True, *args, **kwargs):
-    return GroupNormScaling(num_groups, num_features, eps=eps, affine=affine)
+def _GroupNormScaling(num_features, num_groups=32, eps=1e-5, affine=True, dim=4, layout=None, *args, **kwargs):
+    layout = _normalize_layout(dim, layout)
+    module = GroupNormScaling(num_groups, num_features, eps=eps, affine=affine)
+    return _wrap_layout(module, dim=dim, layout=layout)
 
 # LN
 def _LayerNorm(normalized_shape, eps=1e-5, affine=True, *args, **kwargs):
@@ -71,24 +124,33 @@ def _bCRMSNorm(num_features, eps=1e-5, affine=True, *args, **kwargs):
 
 
 # BN
-def _BatchNorm(num_features, dim=4, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
-    return (nn.BatchNorm2d if dim == 4 else nn.BatchNorm1d)(num_features, eps=eps, momentum=momentum, affine=affine,
-                                                            track_running_stats=track_running_stats)
+def _BatchNorm(num_features, dim=4, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_layout(dim, layout)
+    module_cls = nn.BatchNorm2d if dim == 4 else nn.BatchNorm1d
+    module = module_cls(num_features, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
+    return _wrap_layout(module, dim=dim, layout=layout)
 
-def _BatchNormCentering(num_features, dim=4, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
-    return (BatchNorm2dCentering if dim == 4 else BatchNorm1dCentering)(num_features, momentum=momentum, affine=affine,
-                                                            track_running_stats=track_running_stats)
+def _BatchNormCentering(num_features, dim=4, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_layout(dim, layout)
+    module_cls = BatchNorm2dCentering if dim == 4 else BatchNorm1dCentering
+    module = module_cls(num_features, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
+    return _wrap_layout(module, dim=dim, layout=layout)
 
-def _BatchNormScaling(num_features, dim=4, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
-    return (BatchNorm2dScaling if dim == 4 else BatchNorm1dScaling)(num_features, eps=eps, momentum=momentum, affine=affine,
-                                                            track_running_stats=track_running_stats)
+def _BatchNormScaling(num_features, dim=4, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_layout(dim, layout)
+    module_cls = BatchNorm2dScaling if dim == 4 else BatchNorm1dScaling
+    module = module_cls(num_features, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
+    return _wrap_layout(module, dim=dim, layout=layout)
 
 # IN
-def _InstanceNorm(num_features, dim=4, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False, *args,
+def _InstanceNorm(num_features, dim=4, layout=None, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False, *args,
                   **kwargs):
-    return (nn.InstanceNorm2d if dim == 4 else nn.InstanceNorm1d)(num_features, eps=eps, momentum=momentum,
-                                                                  affine=affine,
-                                                                  track_running_stats=track_running_stats)
+    layout = _normalize_layout(dim, layout)
+    if dim == 2:
+        raise ValueError("InstanceNorm does not support dim=2 inputs without a spatial axis. Use LN/RMS/BN/GN instead.")
+    module_cls = nn.InstanceNorm2d if dim == 4 else nn.InstanceNorm1d
+    module = module_cls(num_features, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
+    return _wrap_layout(module, dim=dim, layout=layout)
 
 
 def _Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, *args, **kwargs):
@@ -107,11 +169,13 @@ def _Identity_fn(x, *args, **kwargs):
     """return first input"""
     return x
 
-def _ParallelLayerNorm(num_features, num_per_group=8, eps=1e-5, centering=True, *args, **kwargs):
-    return ParallelLN(num_features, num_per_group=num_per_group, eps=eps, centering=centering, *args, **kwargs)
+def _ParallelLayerNorm(num_features, num_per_group=8, eps=1e-5, centering=True, dim=4, layout=None, *args, **kwargs):
+    layout = _normalize_layout(dim, layout)
+    return ParallelLN(num_features, num_per_group=num_per_group, eps=eps, centering=centering, dim=dim, layout=layout, *args, **kwargs)
 
-def _ParallelLayerScaling(num_features, num_per_group=8, eps=1e-5, centering=False, *args, **kwargs):
-    return ParallelLN(num_features, num_per_group=num_per_group, eps=eps, centering=centering, *args, **kwargs)
+def _ParallelLayerScaling(num_features, num_per_group=8, eps=1e-5, centering=False, dim=4, layout=None, *args, **kwargs):
+    layout = _normalize_layout(dim, layout)
+    return ParallelLN(num_features, num_per_group=num_per_group, eps=eps, centering=centering, dim=dim, layout=layout, *args, **kwargs)
 
 
 
@@ -197,4 +261,3 @@ def Norm(*args, **kwargs):
     if _config.norm == 'None':
         return None
     return _config.norm_methods[_config.norm](*args, **kwargs)
-

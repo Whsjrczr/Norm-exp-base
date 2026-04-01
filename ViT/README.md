@@ -167,3 +167,35 @@ results/
       checkpoint.pth
       best.pth
 ```
+
+## 2026-04 Normalization Update
+
+ViT now binds normalization through:
+
+```python
+norm_layer = ext.make_norm_factory(dim=3, layout="last")
+```
+
+This matches ViT token tensors shaped `(B, N, C)`.
+
+### What this enables
+
+The following norm families can now be used directly in ViT without custom patching:
+
+- `LN`, `LNc`, `LNs`, `RMS`
+- `BN`, `BNc`, `BNs`
+- `GN`, `GNc`, `GNs`
+- `IN`
+- `PLN`, `PLS`
+- `bCLN`, `bCRMS`
+
+For `BN/GN/IN`, the factory automatically adapts token-last `(B, N, C)` to the underlying channel-first implementation and then restores the original layout.
+
+### Recommended CLI examples
+
+```bash
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm BN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm GN --norm-cfg "num_groups=6"
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm PLN --norm-cfg "num_per_group=8"
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm bCRMS
+```

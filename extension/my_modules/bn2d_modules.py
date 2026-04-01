@@ -80,7 +80,8 @@ class BatchNorm2dCentering(nn.Module):
 
         if bn_training:
             mean = torch.mean(input, dim=(0,2,3), keepdim=True)
-            self.running_mean =((1 - exponential_average_factor) * self.running_mean + exponential_average_factor * mean)
+            running_mean = mean.reshape(self.num_features)
+            self.running_mean.mul_(1 - exponential_average_factor).add_(running_mean, alpha=exponential_average_factor)
         else:
             mean = self.running_mean.view(1, self.num_features, 1, 1)
         output = input - mean
@@ -135,7 +136,7 @@ class BatchNorm2dScaling(nn.Module):
             self.register_parameter("bias", None)
         if self.track_running_stats:
             self.register_buffer(
-                "running_var", torch.zeros([1, num_features, 1, 1], **factory_kwargs)
+                "running_var", torch.ones(num_features, **factory_kwargs)
             )
             self.running_var: Tensor | None
             self.register_buffer(
@@ -186,16 +187,9 @@ class BatchNorm2dScaling(nn.Module):
 
         if bn_training:
             var = torch.var(input, dim=(0,2,3), unbiased=False, keepdim=True)
-            # print(f'var1:{var.shape}')
-            # # print(var)
-            self.running_var =((1 - exponential_average_factor) * self.running_var + exponential_average_factor * var)
-            # var.view(1, self.num_features, 1, 1)
-            # print(f'var2:{var.shape}')
-            # print(var)
-            # print(f'runvar:{self.running_var.shape}')
-            # print(self.running_var)
+            running_var = var.reshape(self.num_features)
+            self.running_var.mul_(1 - exponential_average_factor).add_(running_var, alpha=exponential_average_factor)
         else:
-            # print(f'run_var:{self.running_var.shape}')
             var = self.running_var.view(1, self.num_features, 1, 1)
         output = input / torch.sqrt(var + self.eps)
         if self.affine:
@@ -292,7 +286,8 @@ class BatchNorm2dScalingRMS(nn.Module):
 
         if bn_training:
             norm = torch.norm(input, p=2, dim=(0,2,3), keepdim=True)
-            self.running_norm =((1 - exponential_average_factor) * self.running_norm + exponential_average_factor * norm)
+            running_norm = norm.reshape(self.num_features)
+            self.running_norm.mul_(1 - exponential_average_factor).add_(running_norm, alpha=exponential_average_factor)
         else:
             norm = self.running_norm.view(1, self.num_features, 1, 1)
         output = input / (norm / (frac ** (1/2)) + self.eps)

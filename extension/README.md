@@ -1133,3 +1133,62 @@ python ViT/vit.py \
 - 作用：启用 Taiyi 监控桥接
 - 当前行为：Taiyi 开关已和 WandB / Visdom 分离，但仍通过 `tracking.py` 统一接入
 - 后续方向：可以继续把 Taiyi 抽成 `extension` 下的独立工具模块
+
+## 2026-04 Normalization Update
+
+### Explicit dim/layout in `ext.normalization.Norm`
+
+`Norm` now supports explicit tensor layout control and should no longer rely on the old implicit CNN-only assumption.
+
+Recommended usage:
+
+```python
+ext.Norm(num_features, dim=2)
+ext.Norm(num_features, dim=3, layout="last")
+ext.Norm(num_features, dim=4)
+```
+
+Meaning:
+
+- `dim=2`: `(N, C)`, used by MLP/KAN fully-connected paths.
+- `dim=3, layout="last"`: `(B, N, C)`, used by ViT token sequences.
+- `dim=3, layout="first"`: `(B, C, L)`.
+- `dim=4`: `(N, C, H, W)`, used by CNN paths.
+
+For channel-first norm families such as `BN`, `BNc`, `BNs`, `GN`, `GNc`, `GNs`, and `IN`, the factory now automatically adapts token-last inputs when `layout="last"` is given.
+
+### `make_norm_factory`
+
+Preferred wiring pattern:
+
+```python
+norm_2d = ext.make_norm_factory(dim=2)
+norm_vit = ext.make_norm_factory(dim=3, layout="last")
+norm_4d = ext.make_norm_factory(dim=4)
+```
+
+### Notes
+
+- `InstanceNorm` is intentionally rejected for `dim=2` because pure `(N, C)` tensors have no spatial axis for instance statistics.
+- `bCLN`, `bCRMS`, `PLN`, and `PLS` now work on both 2D MLP inputs and 3D ViT token inputs.
+- `BN/GN/IN` can now be used on ViT through `dim=3, layout="last"`.
+
+### CLI examples
+
+```bash
+# MLP / KAN
+--norm BN
+--norm-cfg "dim=2"
+
+# ViT
+--norm GN
+--norm-cfg "num_groups=6,dim=3,layout=last"
+
+# CNN
+--norm BN
+--norm-cfg "dim=4"
+
+# ViT with PLN
+--norm PLN
+--norm-cfg "num_per_group=8,dim=3,layout=last"
+```

@@ -214,13 +214,10 @@ class ViTTrainer:
             )
 
             for epoch in range(epoch_begin, epoch_end):
-                if self.cfg.lr_method != "auto":
-                    self.scheduler.step()
-
                 self.train_epoch(epoch)
                 self.visualizer.log(
                     {
-                        "learning_rate": self.scheduler.get_last_lr()[0],
+                        "learning_rate": self.optimizer.param_groups[0]["lr"],
                         "steps": self.step,
                         "stage": stage_idx,
                         "epochs": epoch,
@@ -241,6 +238,8 @@ class ViTTrainer:
                     self.saver.save_checkpoint(epoch=epoch, best_acc1=self.best_acc1, step=self.step, seed=self.cfg.seed, acc5=accuracy5)
                 if self.cfg.lr_method == "auto":
                     self.scheduler.step(val_loss)
+                else:
+                    self.scheduler.step()
 
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger("==> end time: {}".format(now_date))

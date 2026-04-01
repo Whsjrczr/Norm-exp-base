@@ -9,6 +9,10 @@ from typing import List, Optional, Tuple, Union
 
 _shape_t = Union[int, List[int], Size]
 
+
+def _channel_affine_view(param: Tensor, input_dim: int):
+    return param.view(1, param.shape[0], *([1] * (input_dim - 2)))
+
 class PointwiseGroupNorm(nn.Module):
     __constants__ = ["num_groups", "num_channels", "eps", "affine"]
     num_groups: int
@@ -59,7 +63,9 @@ class PointwiseGroupNorm(nn.Module):
         # print(mean.shape)
         
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = _channel_affine_view(self.weight, output.dim())
+            bias = _channel_affine_view(self.bias, output.dim())
+            output = output * weight + bias
         return output
     
     def extra_repr(self) -> str:
@@ -118,7 +124,9 @@ class PointwiseGroupNormCentering(nn.Module):
         output = output.view(*size)
         
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = _channel_affine_view(self.weight, output.dim())
+            bias = _channel_affine_view(self.bias, output.dim())
+            output = output * weight + bias
         return output
     
     def extra_repr(self) -> str:
@@ -177,7 +185,9 @@ class PointwiseGroupNormScaling(nn.Module):
         output = output.view(*size)
         
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = _channel_affine_view(self.weight, output.dim())
+            bias = _channel_affine_view(self.bias, output.dim())
+            output = output * weight + bias
         return output
 
     def extra_repr(self) -> str:
@@ -236,7 +246,9 @@ class PointwiseGroupNormScalingRMS(nn.Module):
         output = output.view(*size)
         
         if self.affine:
-            output = output * self.weight + self.bias
+            weight = _channel_affine_view(self.weight, output.dim())
+            bias = _channel_affine_view(self.bias, output.dim())
+            output = output * weight + bias
         return output
 
     def extra_repr(self) -> str:

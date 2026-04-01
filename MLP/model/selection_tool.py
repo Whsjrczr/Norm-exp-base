@@ -1,6 +1,6 @@
 import argparse
 
-from model import *
+from . import *
 
 
 CLASSIFICATION_MODEL_NAMES = [

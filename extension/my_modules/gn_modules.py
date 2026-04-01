@@ -100,7 +100,7 @@ class GroupNormScaling(nn.Module):
             self.weight = Parameter(torch.empty(num_channels, **factory_kwargs))
             if self.affine_bias:
                 self.bias = Parameter(
-                    torch.empty(self.normalized_shape, **factory_kwargs)
+                    torch.empty(num_channels, **factory_kwargs)
                 )
             else:
                 self.register_parameter("bias", None)

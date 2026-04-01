@@ -254,3 +254,33 @@ results/
 - 仓库根目录中的包名实际为 `KAN`，因此 README 和命令统一使用大写目录名。
 - 当前任务是合成回归任务，不直接复用 `extension.dataset` 中的图像数据加载流程。
 - 如果后续需要把 `KAN` 接入 `PDE` 或其他任务，只需要在对应 `selection_tool` 中接入 `KAN/model/select_kan.py` 的 `get_model(cfg)` 即可。
+
+## 2026-04 Normalization Update
+
+KAN and the comparison MLP path now bind normalization as 2D feature normalization:
+
+```python
+norm_2d = ext.make_norm_factory(dim=2)
+```
+
+This means hidden activations are treated as `(N, C)` tensors instead of falling back to the old implicit `dim=4` behavior.
+
+### Current effect
+
+The following norm families can now be used on KAN/MLP fully-connected paths:
+
+- `BN`, `BNc`, `BNs`
+- `GN`, `GNc`, `GNs`
+- `LN`, `LNc`, `LNs`, `RMS`
+- `PLN`, `PLS`
+- `bCLN`, `bCRMS`
+
+`InstanceNorm` is still not supported for pure 2D `(N, C)` activations.
+
+### Recommended CLI examples
+
+```bash
+python KAN/KAN.py --arch KAN --layers-hidden 3,32,32,1 --norm BN --norm-cfg "dim=2"
+python KAN/KAN.py --arch MLP --layers-hidden 3,32,32,1 --norm GN --norm-cfg "dim=2,num_groups=8"
+python KAN/KAN.py --arch KAN --layers-hidden 3,32,32,1 --norm PLN --norm-cfg "dim=2,num_per_group=8"
+```

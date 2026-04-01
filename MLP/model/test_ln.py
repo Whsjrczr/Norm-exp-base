@@ -4,12 +4,14 @@ import torch.nn as nn
 import extension as ext
 from extension.normalization import *
 
+NORM_4D = ext.make_norm_factory(dim=4)
+
 class ConvLN(nn.Module):
     def __init__(self, depth=3, width=64, input_size=32*32*3, output_size=10, num_classes=10):
         super(ConvLN, self).__init__()
         norm_width = 32
         layers = [nn.Conv2d(in_channels=3, out_channels=width, kernel_size=3, stride=1, padding=1),
-                  ext.Norm(norm_width), ext.Activation(width)]
+                  NORM_4D(norm_width), ext.Activation(width)]
                 #   nn.BatchNorm2d(width), nn.ReLU()]
 
         if depth > 3:
@@ -17,7 +19,7 @@ class ConvLN(nn.Module):
                 layers.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=3, stride=1, padding=1))
                 # layers.append(nn.BatchNorm2d(width))
                 # layers.append(nn.ReLU())
-                layers.append(ext.Norm(int(norm_width/(2**index))))
+                layers.append(NORM_4D(int(norm_width/(2**index))))
                 layers.append(ext.Activation(width))
                 layers.append(nn.AvgPool2d(kernel_size=2, stride=2))
             
@@ -25,7 +27,7 @@ class ConvLN(nn.Module):
                 layers.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=3, stride=1, padding=1))
                 # layers.append(nn.BatchNorm2d(width))
                 # layers.append(nn.ReLU())
-                layers.append(ext.Norm(int(norm_width/4)))
+                layers.append(NORM_4D(int(norm_width/4)))
                 layers.append(ext.Activation(width))
 
             self.net = nn.Sequential(*layers)
@@ -36,7 +38,7 @@ class ConvLN(nn.Module):
                 layers.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=3, stride=1, padding=1))
                 # layers.append(nn.BatchNorm2d(width))
                 # layers.append(nn.ReLU())
-                layers.append(ext.Norm(int(norm_width/(2**index))))
+                layers.append(NORM_4D(int(norm_width/(2**index))))
                 layers.append(ext.Activation(width))
                 layers.append(nn.AvgPool2d(kernel_size=2, stride=2))
             
@@ -65,7 +67,7 @@ class ConvLNPre(nn.Module):
         if depth > 3:
             for index in range(2):
                 # layers.append(nn.BatchNorm2d(width))
-                layers.append(ext.Norm(int(norm_width/(2**index))))
+                layers.append(NORM_4D(int(norm_width/(2**index))))
                 layers.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=3, stride=1, padding=1))
                 # layers.append(nn.ReLU())
                 layers.append(ext.Activation(width))
@@ -73,7 +75,7 @@ class ConvLNPre(nn.Module):
             
             for index in range(depth-3):
                 # layers.append(nn.BatchNorm2d(width))
-                layers.append(ext.Norm(int(norm_width/4)))
+                layers.append(NORM_4D(int(norm_width/4)))
                 layers.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=3, stride=1, padding=1))
                 # layers.append(nn.ReLU())
                 layers.append(ext.Activation(width))
@@ -84,7 +86,7 @@ class ConvLNPre(nn.Module):
         else:
             for index in range(depth-1):
             #     layers.append(nn.BatchNorm2d(width))
-                layers.append(ext.Norm(int(norm_width/(2**index))))
+                layers.append(NORM_4D(int(norm_width/(2**index))))
                 layers.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=3, stride=1, padding=1))
                 # layers.append(nn.ReLU())
                 layers.append(ext.Activation(width))
@@ -110,7 +112,7 @@ class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels,norm_width):
         super(ResidualBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.norm1 = ext.Norm(norm_width)
+        self.norm1 = NORM_4D(norm_width)
         self.act1 = ext.Activation(out_channels)
         # self.norm1 = nn.BatchNorm2d(out_channels)
         # self.act1 = nn.ReLU()
@@ -134,7 +136,7 @@ class ConvLNRes(nn.Module):
         super(ConvLNRes, self).__init__()
         norm_width = 32
         layers = [nn.Conv2d(in_channels=3, out_channels=width, kernel_size=3, stride=1, padding=1),
-                  ext.Norm(norm_width), ext.Activation(width)]
+                  NORM_4D(norm_width), ext.Activation(width)]
                 #   nn.BatchNorm2d(width), nn.ReLU()]
 
 
@@ -176,7 +178,7 @@ class ResidualBlockPre(nn.Module):
     def __init__(self, in_channels, out_channels, norm_width):
         super(ResidualBlockPre, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.norm1 = ext.Norm(norm_width)
+        self.norm1 = NORM_4D(norm_width)
         self.act1 = ext.Activation(out_channels)
         # self.norm1 = nn.BatchNorm2d(out_channels)
         # self.act1 = nn.ReLU()

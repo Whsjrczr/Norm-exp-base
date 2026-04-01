@@ -115,6 +115,7 @@ def get_model(cfg):
     model_name = getattr(cfg, "arch", "KAN")
     layers_hidden = _resolve_layers_hidden(cfg)
     disable_residual_branch = bool(getattr(cfg, "disable_residual_branch", False))
+    norm_2d = ext.make_norm_factory(dim=2)
 
     if model_name == "KAN":
         return KAN_norm(
@@ -127,7 +128,7 @@ def get_model(cfg):
             base_activation=_resolve_base_activation(cfg),
             grid_eps=getattr(cfg, "grid_eps", 0.02),
             grid_range=getattr(cfg, "grid_range", [-1, 1]),
-            norm=ext.normalization.Norm,
+            norm=norm_2d,
             upgrade_grid=getattr(cfg, "update_grid", False),
             weight_norm=getattr(cfg, "weight_norm", False),
             init=getattr(cfg, "kan_init", "origin"),
@@ -136,6 +137,6 @@ def get_model(cfg):
         )
 
     if model_name == "MLP":
-        return MLP(layers_hidden, norm=ext.normalization.Norm, activation=_activation_name_to_module(str(getattr(cfg, "activation", "relu")).lower()))
+        return MLP(layers_hidden, norm=norm_2d, activation=_activation_name_to_module(str(getattr(cfg, "activation", "relu")).lower()))
 
     raise ValueError(f"Invalid model name: {model_name}. Choose 'KAN' or 'MLP'.")

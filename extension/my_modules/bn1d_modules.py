@@ -5,6 +5,30 @@ import torch.nn as nn
 from torch.nn import init as init
 from torch.nn.parameter import Parameter
 
+
+def _resolve_1d_feature_layout(input: Tensor, num_features: int):
+    assert input.dim() in (2, 3)
+    if input.dim() == 2:
+        return 1, 0, [1, num_features], input.shape[0]
+
+    if input.shape[1] == num_features:
+        feature_dim = 1
+        reduce_dims = (0, 2)
+        view_shape = [1, num_features, 1]
+        sample_count = input.shape[0] * input.shape[2]
+    elif input.shape[2] == num_features:
+        feature_dim = 2
+        reduce_dims = (0, 1)
+        view_shape = [1, 1, num_features]
+        sample_count = input.shape[0] * input.shape[1]
+    else:
+        raise RuntimeError(
+            f"Expected 3D input with num_features={num_features} on dim 1 or 2, "
+            f"but got shape {tuple(input.shape)}."
+        )
+
+    return feature_dim, reduce_dims, view_shape, sample_count
+
 class BatchNorm1dCentering(nn.Module):
     _version = 2
     __constants__ = ["track_running_stats", "momentum", "num_features", "affine"]
@@ -78,17 +102,12 @@ class BatchNorm1dCentering(nn.Module):
         else:
             bn_training = (self.running_mean is None)
 
-        assert input.dim() in (2, 3)
-        if input.dim() == 2:
-            cal_dim = 0
-            shape = [1, self.num_features]
-        elif input.dim() == 3:
-            cal_dim = [0,2]
-            shape = [1, self.num_features, 1]
+        _, cal_dim, shape, _ = _resolve_1d_feature_layout(input, self.num_features)
 
         if bn_training:
             mean = torch.mean(input, dim=cal_dim, keepdim=True)
-            self.running_mean =((1 - exponential_average_factor) * self.running_mean + exponential_average_factor * mean)
+            running_mean = mean.reshape(self.num_features)
+            self.running_mean.mul_(1 - exponential_average_factor).add_(running_mean, alpha=exponential_average_factor)
         else:
             mean = self.running_mean.view(*shape)
         output = input - mean
@@ -191,17 +210,12 @@ class BatchNorm1dScaling(nn.Module):
         else:
             bn_training = (self.running_var is None)
 
-        assert input.dim() in (2, 3)
-        if input.dim() == 2:
-            cal_dim = 0
-            shape = [1, self.num_features]
-        elif input.dim() == 3:
-            cal_dim = [0,2]
-            shape = [1, self.num_features, 1]
+        _, cal_dim, shape, _ = _resolve_1d_feature_layout(input, self.num_features)
 
         if bn_training:
             var = torch.var(input, dim=cal_dim, unbiased=False, keepdim=True)
-            self.running_var =((1 - exponential_average_factor) * self.running_var + exponential_average_factor * var)
+            running_var = var.reshape(self.num_features)
+            self.running_var.mul_(1 - exponential_average_factor).add_(running_var, alpha=exponential_average_factor)
         else:
             var = self.running_var.view(*shape)
         output = input / torch.sqrt(var + self.eps)
@@ -297,19 +311,12 @@ class BatchNorm1dScalingRMS(nn.Module):
         else:
             bn_training = (self.running_norm is None)
 
-        assert input.dim() in (2, 3)            
-        if input.dim() == 2:
-            cal_dim = 0
-            frac = input.shape[0]
-            shape = [1, self.num_features]
-        elif input.dim() == 3:
-            cal_dim = [0,2]
-            frac = input.shape[0]*input.shape[2]
-            shape = [1, self.num_features, 1]
+        _, cal_dim, shape, frac = _resolve_1d_feature_layout(input, self.num_features)
 
         if bn_training:
             norm = torch.norm(input,p=2, dim=cal_dim, keepdim=True)
-            self.running_norm =((1 - exponential_average_factor) * self.running_norm + exponential_average_factor * norm)
+            running_norm = norm.reshape(self.num_features)
+            self.running_norm.mul_(1 - exponential_average_factor).add_(running_norm, alpha=exponential_average_factor)
         else:
             norm = self.running_norm.view(*shape)
         output = input / (norm / (frac ** (1/2)) + self.eps)

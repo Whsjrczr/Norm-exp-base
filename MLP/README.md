@@ -220,3 +220,33 @@ results/
 - 颜色开关语义已更新为“默认保留 RGB，只有 `grey=True` 时才灰度化”
 - `nogrey` 仅保留兼容，不建议继续使用；`nogrey=True` 等价于 `grey=False`
 - `--batch-size 128` 会自动扩成 train/val 都使用 `128`
+
+## 2026-04 Normalization Update
+
+This directory now binds normalization layout explicitly instead of relying on `ext.Norm(...)` defaults.
+
+### Current conventions
+
+- Fully-connected MLP paths use `dim=2`, i.e. tensors shaped `(N, C)`.
+- Convolutional test models use `dim=4`, i.e. tensors shaped `(N, C, H, W)`.
+- If you add a new model, bind a factory first:
+
+```python
+norm_2d = ext.make_norm_factory(dim=2)
+norm_4d = ext.make_norm_factory(dim=4)
+```
+
+### Practical consequences
+
+- `BN`, `BNc`, `BNs`, `GN`, `GNc`, `GNs`, `PLN`, `PLS`, `bCLN`, and `bCRMS` now work on the standard 2D MLP path.
+- `InstanceNorm` is still not valid for pure `(N, C)` MLP activations.
+- Conv-style models should continue using 4D normalization.
+
+### Recommended CLI examples
+
+```bash
+python MLP/cifar10.py -a MLP --norm BN --norm-cfg "dim=2"
+python MLP/cifar10.py -a MLP --norm GN --norm-cfg "dim=2,num_groups=8"
+python MLP/cifar10.py -a ConvBN --norm BN --norm-cfg "dim=4"
+python MLP/cifar10.py -a ConvLN --norm LN --norm-cfg "dim=4"
+```

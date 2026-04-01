@@ -34,6 +34,7 @@ def get_model(cfg):
         raise ValueError(f"Unknown ViT architecture: {model_name}")
 
     num_classes = cfg.dataset_classes if getattr(cfg, "dataset_classes", None) is not None else cfg.num_classes
+    norm_layer = ext.make_norm_factory(dim=3, layout="last")
     return vits.__dict__[model_name](
         img_size=getattr(cfg, "im_size", [getattr(cfg, "image_size", 224)]),
         patch_size=getattr(cfg, "patch_size", 16),
@@ -41,6 +42,6 @@ def get_model(cfg):
         num_classes=num_classes,
         drop_rate=getattr(cfg, "dropout", 0.0),
         drop_path_rate=getattr(cfg, "drop_path_rate", 0.0),
-        norm_layer=ext.normalization.Norm,
+        norm_layer=norm_layer,
         act_layer=ext.activation.Activation,
     )
