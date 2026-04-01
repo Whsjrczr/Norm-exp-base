@@ -8,6 +8,7 @@ class PQNorm(nn.Module):
     def __init__(
         self,
         num_features,
+        num_per_group=None,
         p=2,
         q=2,
         eps=1e-5,
@@ -21,11 +22,14 @@ class PQNorm(nn.Module):
             raise ValueError(f"PQNorm expects p >= 1 and q >= 1, but got p={p}, q={q}.")
 
         self.num_features = num_features
+        self.num_per_group = num_per_group if num_per_group is not None else num_features
         self.p = p
         self.q = q
         self.eps = eps
         self.affine = affine
         self.dim = dim
+        if self.num_features % self.num_per_group != 0:
+            raise ValueError("num_features must be divisible by num_per_group")
 
         if self.affine:
             if self.dim == 4:
@@ -70,10 +74,13 @@ class PQNorm(nn.Module):
             elif runtime_dim == 3:
                 x = x.permute(0, 2, 1)
 
+        size = x.shape
+        x = x.reshape(-1, self.num_features // self.num_per_group, self.num_per_group)
         ratio = self.p / self.q
         numerator = torch.sign(x) * torch.abs(x).pow(ratio)
         denominator = torch.mean(torch.abs(x).pow(self.p), dim=-1, keepdim=True)
         y = numerator / (denominator + self.eps).pow(1.0 / self.q)
+        y = y.reshape(size)
 
         if channel_first:
             if runtime_dim == 4:
@@ -95,6 +102,6 @@ class PQNorm(nn.Module):
         return y
 
     def extra_repr(self):
-        return "num_features={}, p={}, q={}, eps={}, affine={}".format(
-            self.num_features, self.p, self.q, self.eps, self.affine
+        return "num_features={}, num_per_group={}, p={}, q={}, eps={}, affine={}".format(
+            self.num_features, self.num_per_group, self.p, self.q, self.eps, self.affine
         )

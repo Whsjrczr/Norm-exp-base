@@ -209,7 +209,9 @@ python KAN/KAN.py \
 - `--norm`
 - `--norm-cfg`
 - `--activation`
+  ????? `pqact`
 - `--activation-cfg`
+  `pqact` ?? `p=4,q=2`
 
 ### 可视化
 
@@ -272,7 +274,7 @@ The following norm families can now be used on KAN/MLP fully-connected paths:
 - `BN`, `BNc`, `BNs`
 - `GN`, `GNc`, `GNs`
 - `LN`, `LNc`, `LNs`, `RMS`
-- `PLN`, `PLS`
+- `PLN`, `PLS`, `PQN`
 - `bCLN`, `bCRMS`
 
 `InstanceNorm` is still not supported for pure 2D `(N, C)` activations.
@@ -283,4 +285,6 @@ The following norm families can now be used on KAN/MLP fully-connected paths:
 python KAN/KAN.py --arch KAN --layers-hidden 3,32,32,1 --norm BN --norm-cfg "dim=2"
 python KAN/KAN.py --arch MLP --layers-hidden 3,32,32,1 --norm GN --norm-cfg "dim=2,num_groups=8"
 python KAN/KAN.py --arch KAN --layers-hidden 3,32,32,1 --norm PLN --norm-cfg "dim=2,num_per_group=8"
+python KAN/KAN.py --arch KAN --layers-hidden 3,32,32,1 --norm PQN --norm-cfg "dim=2,p=4,q=2"
+python KAN/KAN.py --arch KAN --layers-hidden 3,32,32,1 --activation pqact --activation-cfg "p=4,q=2"
 ```

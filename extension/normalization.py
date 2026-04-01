@@ -178,9 +178,19 @@ def _ParallelLayerScaling(num_features, num_per_group=8, eps=1e-5, centering=Fal
     layout = _normalize_layout(dim, layout)
     return ParallelLN(num_features, num_per_group=num_per_group, eps=eps, centering=centering, dim=dim, layout=layout, *args, **kwargs)
 
-def _PQNorm(num_features, p=2, q=2, eps=1e-5, affine=True, dim=4, layout=None, *args, **kwargs):
+def _PQNorm(num_features, num_per_group=None, p=2, q=2, eps=1e-5, affine=True, dim=4, layout=None, *args, **kwargs):
     layout = _normalize_layout(dim, layout)
-    module = PQNorm(num_features, p=p, q=q, eps=eps, affine=affine, dim=dim, *args, **kwargs)
+    module = PQNorm(
+        num_features,
+        num_per_group=num_per_group,
+        p=p,
+        q=q,
+        eps=eps,
+        affine=affine,
+        dim=dim,
+        *args,
+        **kwargs,
+    )
     return _wrap_layout(module, dim=dim, layout=layout)
 
 
@@ -248,6 +258,8 @@ def getNormConfigFlag():
             flag += "P" + str(_config.norm_cfg.get("norm_p"))
 
     if _config.norm == "PQN":
+        if _config.norm_cfg.get("num_per_group") is not None:
+            flag += "_NPG" + str(_config.norm_cfg.get("num_per_group"))
         if _config.norm_cfg.get("p") is not None:
             flag += "_P" + str(_config.norm_cfg.get("p"))
         if _config.norm_cfg.get("q") is not None:

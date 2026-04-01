@@ -93,7 +93,7 @@ python MLP/cifar10.py \
 
 ### 归一化与激活
 
-- `--norm`：`BN`、`GN`、`LN`、`IN`、`LNc`、`LNs`、`RMS`、`CDS`、`BNc`、`BNs`、`bCDS`、`bClCDS`、`bCLN`、`bCRMS`、`GNc`、`GNs`、`PLN`、`PLS`、`No`、`no`
+- `--norm`?`BN`?`GN`?`LN`?`IN`?`LNc`?`LNs`?`RMS`?`CDS`?`BNc`?`BNs`?`bCDS`?`bClCDS`?`bCLN`?`bCRMS`?`GNc`?`GNs`?`PLN`?`PLS`?`PQN`?`No`?`no`
 - `--norm-cfg`：归一化层附加参数
 - `--activation`：`relu`、`sigmoid`、`tanh`、`gn`、`pgn`、`sinarctan`、`no`
 - `--activation-cfg`：激活附加参数
@@ -132,6 +132,8 @@ python MLP/cifar10.py \
 --dataset-cfg "grey=True"
 --norm-cfg "num_groups=8,dim=4"
 --activation-cfg "inplace=True"
+--activation pqact
+--activation-cfg "p=4,q=2"
 --optimizer-config "momentum=0.9"
 ```
 
@@ -238,7 +240,7 @@ norm_4d = ext.make_norm_factory(dim=4)
 
 ### Practical consequences
 
-- `BN`, `BNc`, `BNs`, `GN`, `GNc`, `GNs`, `PLN`, `PLS`, `bCLN`, and `bCRMS` now work on the standard 2D MLP path.
+- `BN`, `BNc`, `BNs`, `GN`, `GNc`, `GNs`, `PLN`, `PLS`, `PQN`, `bCLN`, and `bCRMS` now work on the standard 2D MLP path.
 - `InstanceNorm` is still not valid for pure `(N, C)` MLP activations.
 - Conv-style models should continue using 4D normalization.
 
@@ -247,6 +249,7 @@ norm_4d = ext.make_norm_factory(dim=4)
 ```bash
 python MLP/cifar10.py -a MLP --norm BN --norm-cfg "dim=2"
 python MLP/cifar10.py -a MLP --norm GN --norm-cfg "dim=2,num_groups=8"
+python MLP/cifar10.py -a MLP --norm PQN --norm-cfg "dim=2,p=4,q=2"
 python MLP/cifar10.py -a ConvBN --norm BN --norm-cfg "dim=4"
 python MLP/cifar10.py -a ConvLN --norm LN --norm-cfg "dim=4"
 ```

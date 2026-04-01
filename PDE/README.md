@@ -106,7 +106,7 @@ python PDE/pde.py \
 
 ### 归一化与激活
 
-- `--norm`：`BN`、`GN`、`LN`、`IN`、`LNc`、`LNs`、`RMS`、`CDS`、`BNc`、`BNs`、`bCDS`、`bClCDS`、`bCLN`、`bCRMS`、`GNc`、`GNs`、`PLN`、`PLS`、`No`、`no`
+- `--norm`?`BN`?`GN`?`LN`?`IN`?`LNc`?`LNs`?`RMS`?`CDS`?`BNc`?`BNs`?`bCDS`?`bClCDS`?`bCLN`?`bCRMS`?`GNc`?`GNs`?`PLN`?`PLS`?`PQN`?`No`?`no`
 - `--norm-cfg`：归一化配置
 - `--activation`：`relu`、`sigmoid`、`tanh`、`gn`、`pgn`、`sinarctan`、`no`
 - `--activation-cfg`：激活附加配置
@@ -148,7 +148,10 @@ python PDE/pde.py \
 
 ```bash
 --norm-cfg "num_per_group=8,dim=2"
+--norm-cfg "p=4,q=2,dim=2"
 --activation-cfg "inplace=True"
+--activation pqact
+--activation-cfg "p=4,q=2"
 --optimizer-config "momentum=0.9"
 ```
 

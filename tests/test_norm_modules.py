@@ -19,7 +19,9 @@ from extension.my_modules.pgn_modules import (
     PointwiseGroupNormScalingRMS,
 )
 from extension.my_modules.pln import ParallelLN
+from extension.my_modules.pq_activation import PQActivation
 from extension.my_modules.pq_norm import PQNorm
+from extension.my_modules.sinarctan import SinArctan
 from extension.normalization import _ParallelLayerNorm, _ParallelLayerScaling
 
 
@@ -111,6 +113,22 @@ def test_pq_norm_matches_definition_5_1_constraint():
     assert torch.allclose(q_moment, torch.ones_like(q_moment), atol=1e-4, rtol=1e-4)
 
 
+def test_grouped_pq_norm_matches_parallel_ln_scaling_when_p_equals_q_equals_2():
+    x = torch.randn(3, 8, 5)
+    pqn = PQNorm(8, num_per_group=4, p=2, q=2, affine=False)
+    pln = ParallelLN(8, num_per_group=4, centering=False, affine=False)
+    y_pqn = pqn(x)
+    y_pln = pln(x)
+    assert torch.allclose(y_pqn, y_pln, atol=1e-6, rtol=1e-6)
+
+
+def test_pq_activation_matches_sinarctan_when_p_equals_q_equals_2():
+    x = torch.randn(4, 7)
+    y_pq = PQActivation(p=2, q=2)(x)
+    y_sat = SinArctan(num_features=7)(x)
+    assert torch.allclose(y_pq, y_sat, atol=1e-6, rtol=1e-6)
+
+
 def test_norm_factory_supports_mlp_2d_for_bn_and_gn():
     x = torch.randn(2, 8)
     cases = [
@@ -121,6 +139,7 @@ def test_norm_factory_supports_mlp_2d_for_bn_and_gn():
         ("GNc", {"dim": 2, "num_groups": 4}),
         ("GNs", {"dim": 2, "num_groups": 4}),
         ("PQN", {"dim": 2, "p": 4, "q": 2}),
+        ("PQN", {"dim": 2, "num_per_group": 4, "p": 2, "q": 2}),
     ]
 
     for norm_name, kwargs in cases:
@@ -152,6 +171,7 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
         ("GNc", {"dim": 3, "layout": "last", "num_groups": 4}),
         ("GNs", {"dim": 3, "layout": "last", "num_groups": 4}),
         ("PQN", {"dim": 3, "layout": "last", "p": 4, "q": 2}),
+        ("PQN", {"dim": 3, "layout": "last", "num_per_group": 4, "p": 2, "q": 2}),
     ]
 
     for norm_name, kwargs in cases:

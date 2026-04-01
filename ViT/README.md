@@ -30,6 +30,18 @@ python ViT/vit.py \
   --weight-decay 0.1 \
   --norm LN \
   --activation relu
+
+# pq activation example
+python ViT/vit.py \
+  --arch vit_small \
+  --dataset folder \
+  --dataset-root ./dataset/ImageNet \
+  --im-size 224,224 \
+  --patch-size 16 \
+  --norm PQN \
+  --norm-cfg "num_per_group=8,p=4,q=2,dim=3,layout=last" \
+  --activation pqact \
+  --activation-cfg "p=4,q=2"
 ```
 
 如果数据目录本身就是：
@@ -186,7 +198,7 @@ The following norm families can now be used directly in ViT without custom patch
 - `BN`, `BNc`, `BNs`
 - `GN`, `GNc`, `GNs`
 - `IN`
-- `PLN`, `PLS`
+- `PLN`, `PLS`, `PQN`
 - `bCLN`, `bCRMS`
 
 For `BN/GN/IN`, the factory automatically adapts token-last `(B, N, C)` to the underlying channel-first implementation and then restores the original layout.
@@ -197,5 +209,7 @@ For `BN/GN/IN`, the factory automatically adapts token-last `(B, N, C)` to the u
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm BN
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm GN --norm-cfg "num_groups=6"
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm PLN --norm-cfg "num_per_group=8"
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm PQN --norm-cfg "num_per_group=8,p=4,q=2,dim=3,layout=last"
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm bCRMS
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --activation pqact --activation-cfg "p=4,q=2"
 ```

@@ -767,7 +767,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 - 默认值：`No`
 - 作用：选择归一化层类型
 - 可选值：
-  `BN`、`GN`、`LN`、`IN`、`LNc`、`LNs`、`RMS`、`CDS`、`BNc`、`BNs`、`bCDS`、`bClCDS`、`bCLN`、`bCRMS`、`GNc`、`GNs`、`PLN`、`PLS`、`No`、`no`
+  `BN`?`GN`?`LN`?`IN`?`LNc`?`LNs`?`RMS`?`CDS`?`BNc`?`BNs`?`bCDS`?`bClCDS`?`bCLN`?`bCRMS`?`GNc`?`GNs`?`PLN`?`PLS`?`PQN`?`No`?`no`
 
 具体含义：
 
@@ -843,6 +843,12 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - Parallel LayerScaling，默认 `centering=False`
 
+`PQN`
+
+- `(p, q)-normalization`????? Definition 5.1
+- ??????????? `sign(x) * |x|^(p/q) / (mean(|x|^p) + eps)^(1/q)`
+- ? `affine=True` ?????????
+
 `No` / `no`
 
 - 恒等映射，不做归一化
@@ -865,6 +871,16 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - 用于 `PLN`、`PLS`
 - 表示每组特征数
+`p` / `q`
+
+- ?? `PQN`
+- ?? `p=4,q=2`
+
+
+`p` / `q`
+
+- ?? `pqact`
+- ?? `p=4,q=2`
 
 `eps`
 
@@ -898,6 +914,12 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 --norm PLN
 --norm-cfg "num_per_group=8,affine=False"
+
+--norm PQN
+--norm-cfg "p=4,q=2,affine=False"
+
+--norm PQN
+--norm-cfg "num_per_group=8,p=4,q=2,affine=False"
 ```
 
 ## `activation.py`
@@ -908,7 +930,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - 类型：`str`
 - 默认值：`relu`
-- 可选值：`relu`、`sigmoid`、`tanh`、`gn`、`pgn`、`sinarctan`、`no`
+- ????`relu`?`sigmoid`?`tanh`?`gn`?`pgn`?`sinarctan`?`pqact`?`no`
 - 作用：指定激活函数或激活式模块
 
 具体含义：
@@ -936,6 +958,12 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 `sinarctan`
 
 - 自定义 `SinArctan`
+
+`pqact`
+
+- ???? `(p, q)` activation
+- ???`sign(x) * |x|^(p/q) / (|x|^p + 1)^(1/q)`
+- ? `p=q=2` ???? `sinarctan`
 
 `no`
 
@@ -970,6 +998,9 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 --activation pgn
 --activation-cfg "num_groups=16"
+
+--activation pqact
+--activation-cfg "p=4,q=2"
 ```
 
 ## `logger` / `checkpoint` / `scheduler` 的典型组合
@@ -1170,7 +1201,7 @@ norm_4d = ext.make_norm_factory(dim=4)
 ### Notes
 
 - `InstanceNorm` is intentionally rejected for `dim=2` because pure `(N, C)` tensors have no spatial axis for instance statistics.
-- `bCLN`, `bCRMS`, `PLN`, and `PLS` now work on both 2D MLP inputs and 3D ViT token inputs.
+- `bCLN`, `bCRMS`, `PLN`, `PLS`, and `PQN` now work on both 2D MLP inputs and 3D ViT token inputs.
 - `BN/GN/IN` can now be used on ViT through `dim=3, layout="last"`.
 
 ### CLI examples
@@ -1191,4 +1222,8 @@ norm_4d = ext.make_norm_factory(dim=4)
 # ViT with PLN
 --norm PLN
 --norm-cfg "num_per_group=8,dim=3,layout=last"
+
+# ViT with PQN
+--norm PQN
+--norm-cfg "p=4,q=2,dim=3,layout=last"
 ```

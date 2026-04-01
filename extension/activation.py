@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from .utils import str2dict
 from .my_modules.pgn_modules import PointwiseGroupNorm
+from .my_modules.pq_activation import PQActivation
 from .my_modules.sinarctan import SinArctan
 
 def _ReLU(num_features, inplace=False, *args, **kwargs):
@@ -26,6 +27,9 @@ def _PointwiseGroupNorm(num_feature, num_groups=32, eps=1e-5, affine=True, *args
 def _sinarctan(num_features, *args, **kwargs):
     return SinArctan(num_features=num_features)
 
+def _pqact(num_features, p=2, q=2, *args, **kwargs):
+    return PQActivation(num_features=num_features, p=p, q=q)
+
 def _silu(num_features, *args, **kwargs):
     return nn.SiLU()
 
@@ -35,7 +39,18 @@ def _gelu(num_features, *args, **kwargs):
 class _config:
     activation = 'relu'
     activation_cfg = {}
-    _methods = {'relu': _ReLU, 'sigmoid': _sigmoid, 'tanh': _tanh,'gn': _GroupNorm,'pgn': _PointwiseGroupNorm, 'sinarctan': _sinarctan, 'no': torch.nn.Identity, 'silu': _silu, 'gelu': _gelu}
+    _methods = {
+        'relu': _ReLU,
+        'sigmoid': _sigmoid,
+        'tanh': _tanh,
+        'gn': _GroupNorm,
+        'pgn': _PointwiseGroupNorm,
+        'sinarctan': _sinarctan,
+        'pqact': _pqact,
+        'no': torch.nn.Identity,
+        'silu': _silu,
+        'gelu': _gelu,
+    }
 
 def add_arguments(parser: argparse.ArgumentParser):
     group = parser.add_argument_group('Activation Option:')
@@ -71,6 +86,11 @@ def getActivationConfigFlag():
     if str.find(_config.activation, 'relu')>-1:
         if _config.activation_cfg.get('inplace')==True:
             flag += '_InP'
+    if _config.activation == 'pqact':
+        if _config.activation_cfg.get('p') is not None:
+            flag += '_P' + str(_config.activation_cfg.get('p'))
+        if _config.activation_cfg.get('q') is not None:
+            flag += '_Q' + str(_config.activation_cfg.get('q'))
     return flag
 
 
