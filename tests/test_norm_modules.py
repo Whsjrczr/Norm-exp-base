@@ -19,6 +19,7 @@ from extension.my_modules.pgn_modules import (
     PointwiseGroupNormScalingRMS,
 )
 from extension.my_modules.pln import ParallelLN
+from extension.my_modules.pq_norm import PQNorm
 from extension.normalization import _ParallelLayerNorm, _ParallelLayerScaling
 
 
@@ -89,6 +90,27 @@ def test_parallel_ln_factories_work_for_vit_layout():
         assert y.shape == x.shape
 
 
+def test_pq_norm_supports_common_layouts():
+    cases = [
+        torch.randn(2, 5, 8),
+        torch.randn(2, 8, 5),
+        torch.randn(2, 8, 4, 4),
+        torch.randn(2, 4, 4, 8),
+    ]
+
+    module = PQNorm(8, p=4, q=2)
+    for x in cases:
+        y = module(x)
+        assert y.shape == x.shape
+
+
+def test_pq_norm_matches_definition_5_1_constraint():
+    x = torch.randn(4, 6)
+    y = PQNorm(6, p=4, q=2, affine=False)(x)
+    q_moment = torch.mean(torch.abs(y).pow(2), dim=-1)
+    assert torch.allclose(q_moment, torch.ones_like(q_moment), atol=1e-4, rtol=1e-4)
+
+
 def test_norm_factory_supports_mlp_2d_for_bn_and_gn():
     x = torch.randn(2, 8)
     cases = [
@@ -98,6 +120,7 @@ def test_norm_factory_supports_mlp_2d_for_bn_and_gn():
         ("GN", {"dim": 2, "num_groups": 4}),
         ("GNc", {"dim": 2, "num_groups": 4}),
         ("GNs", {"dim": 2, "num_groups": 4}),
+        ("PQN", {"dim": 2, "p": 4, "q": 2}),
     ]
 
     for norm_name, kwargs in cases:
@@ -128,6 +151,7 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
         ("GN", {"dim": 3, "layout": "last", "num_groups": 4}),
         ("GNc", {"dim": 3, "layout": "last", "num_groups": 4}),
         ("GNs", {"dim": 3, "layout": "last", "num_groups": 4}),
+        ("PQN", {"dim": 3, "layout": "last", "p": 4, "q": 2}),
     ]
 
     for norm_name, kwargs in cases:

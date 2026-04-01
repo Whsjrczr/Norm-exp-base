@@ -1,0 +1,2426 @@
+Parallel Layer Normalization for Universal Approximation
+
+Yunhao Ni 1 Yuxin Guo 2 Yuhe Liu 2 Wenxin Sun 1 Jie Luo 1 Wenjun Wu 2 3 Lei Huang 2 3
+
+Abstract
+
+Linear
+
+This paper studies the approximation capabilities
+of neural networks that combine layer normalization (LN) with linear layers. We prove that networks consisting of two linear layers with parallel layer normalizations (PLNs) inserted between
+them (referred to as PLN-Nets) achieve universal approximation, whereas architectures that use
+only standard LN exhibit strictly limited expressive power. We further analyze approximation
+rates of shallow and deep PLN-Nets under the
+L∞ norm as well as in Sobolev norms. Our analysis extends beyond LN to RMSNorm, and from
+standard MLPs to position-wise feed-forward networks, the core building blocks used in RNNs
+and Transformers. Finally, we provide empirical
+experiments to explore other possible potentials
+of PLN-Nets.
+
+Linear
+
+LN
+Linear
+
+LN LN LN ······ LN
+
+LN
+Linear
+
+Linear
+
+(a) Sequential LNs
+(b) Parallel LNs.
+Figure 1. (a) shows the substructures in LN-Nets, and (b) shows
+the substructures in PLN-Nets.
+
+together with linear transformations. In particular, we focus
+on Layer Normalization (LN) (Ba et al., 2016), whose intrinsic nonlinearity was recently highlighted in (Ni et al., 2024).
+Ni et al. introduced a network formed by the layer-wise
+composition of linear transformations and LN, referred to
+as an LN-Net (see Figure 1a), and established its universal
+classification capacity when the depth is sufficiently large.
+In contrast, our perspective shifts from deep classification
+networks to wide networks for function approximation.
+
+1. Introduction
+
+We show that shallow LN-Nets possess limited representation capacity (Theorem 4.1). However, when multiple
+LNs are applied in parallel between two linear layers (as
+illustrated in Figure 1b), the resulting architecture exhibits
+significantly stronger expressive power. We formalize this
+structure as Parallel Layer Normalization (PLN) (Definition
+3.2) and refer to the corresponding models as PLN-Nets.
+We prove that shallow PLN-Nets can universally approximate L-Lipschitz continuous univariate functions under the
+L∞ norm (Theorem 4.2) when the width is large enough,
+and we further extend this result to multivariate functions
+in Sobolev spaces (Theorem 5.1). Our analysis also covers
+deep PLN-Nets (Theorems 5.2 and 5.3).
+
+Universal approximation theorems (UATs) constitute a cornerstone of the theoretical understanding of deep learning.
+They provide formal justification for the expressive power
+of deep neural networks (DNNs) and partially explain their
+widespread empirical success. Over the past decade, normalization techniques (Ba et al., 2016; Ioffe & Szegedy, 2015)
+have become ubiquitous components in modern DNN architectures, originally introduced to stabilize and accelerate
+training. Such techniques are now standard in convolutional
+neural networks (CNNs) (He et al., 2016) and Transformers
+(Vaswani et al., 2017a). However, to the best of our knowledge, existing UAT analyses do not explicitly account for
+the presence of normalization layers. This omission creates a gap between classical approximation theory and the
+architectures used in practice.
+
+In addition, we present preliminary results on derivative
+approximation (Theorem 5.5) under generalized normalization schemes. Moreover, we discuss how our theoretical
+framework can be extended from multilayer perceptrons
+(MLPs) to position-wise feed-forward networks in recurrent
+neural networks (RNNs) and Transformers (Vaswani et al.,
+2017b) (Theorem 5.4), and from LN to RMSNorm (Zhang
+& Sennrich, 2019) (Lemma 4.4). Finally, we conduct experiments to empirically explore the training performance of
+PLN-Nets.
+
+To bridge this gap, we study the fundamental approximation properties of networks that incorporate normalization
+1
+TODO 2 SKLSDE, School of Artificial Intelligence, Beihang
+University, Beijing, China 3 Hangzhou International Innovation
+Institute, Beihang University, Hangzhou, China. Correspondence
+to: Lei Huang <huangleiAI@buaa.edu.cn>.
+
+Preprint. February 9, 2026.
+
+1
+
+Parallel Layer Normalization for Universal Approximation
+
+2. Related Work
+
+tion and showed that LN-Nets with only three neurons per
+layer and O(m) LN layers can shatter any set of m labeled
+samples. Nevertheless, these results focus on classification
+capacity and depth scaling, leaving open the question of
+function approximation under width constraints.
+
+The universal approximation property of neural networks
+has been extensively studied over the past three decades.
+Early results by Cybenko established that single-hiddenlayer networks with infinite width and sigmoidal activations
+are universal approximators. This result was later generalized to networks with arbitrary bounded and nonconstant
+activation functions (Hornik, 1991). Building on these density arguments, Barron further characterized approximation
+rates for superpositions of sigmoidal functions. Subsequent
+works investigated how architectural constraints affect approximation power, including arbitrary depth (Gripenberg,
+2003), bounded depth and width (Maiorov & Pinkus, 1999),
+and minimal width requirements for universal approximation (Park et al., 2020; Shin et al., 2025). Beyond classical
+UAT results, the expressive power of neural networks has
+also been analyzed through alternative complexity measures,
+such as the number of linear regions (Montufar et al., 2014)
+and VC dimension (Bartlett et al., 2019). These approximation analyses have further been extended from multilayer
+perceptrons (MLPs) to structured architectures, including
+CNNs (Oono & Suzuki, 2023), RNNs (Li et al., 2022), and
+Transformers (Yun et al., 2020).
+
+3. Preliminary and Notations
+We use a lowercase letter x ∈ R to denote a scalar, a boldface lowercase letter x ∈ Rn to denote a vector, and a
+boldface uppercase letter X ∈ Rd×n to denote a matrix.
+Here, R denotes the set of real numbers, and d, n are positive integers. For indexing, we use xi or [x]i to denote the
+i-th entry of a vector, while xi denotes the i-th vector in a
+sequence of vectors.
+Linear Layers. Let x ∈ Rd be an input vector of dimension d. We say φ denotes a linear layer mapping Rd to Rm ,
+if
+φ(x) = W x + b,
+(1)
+for all x ∈ Rd , where W ∈ Rm×d and b ∈ Rm are learnable parameters.
+Neural Networks. We consider feed-forward neural networks that implement mappings from an input space Rdx
+to an output space Rdy . Such a network is defined as a
+composition of linear layers and intermediate operators.
+
+A common feature of many UAT proofs is their reliance
+on carefully constructed weight configurations that exploit
+specific properties of the activation function. For instance,
+ReLU networks benefit from their piecewise linear structure,
+which allows approximation arguments to be localized to selected regions of the input space while enforcing zero output
+elsewhere. Such constructions play a crucial role in approximation rate analyses (Yarotsky, 2017; Yun et al., 2020). In
+contrast, smooth activations such as tanh produce nonzero
+outputs almost everywhere, making it more difficult to control approximation errors outside target regions (De Ryck
+et al., 2021). Because normalization layers may introduce
+additional nonlinear transformations (Ni et al., 2024), that
+may interfere with these structural properties most existing theoretical studies on representation and approximation
+in deep neural networks (Oono & Suzuki, 2023; Li et al.,
+2022; Yun et al., 2020) omit normalization for analytical
+tractability.
+
+Definition 3.1 (ϕ-networks). A ϕ-network (or ϕ-Net) of
+depth L is a function f : Rdx → Rdy of the form
+f = φL+1 ◦ ϕL ◦ φL ◦ · · · ◦ ϕ1 ◦ φ1 ,
+
+(2)
+
+where φ1 : Rdx → Rd1 , φℓ : Rdℓ−1 → Rdℓ for ℓ =
+2, . . . , L, and φL+1 : RdL → Rdy are linear layers. ϕℓ :
+Rdℓ → Rdℓ for ℓ = 1, . . . , L denote the same class of
+operators ϕ, e.g., ReLU.
+Remark 3.1. Each ϕℓ may represent any operator mapping
+Rdℓ to Rdℓ , including normalization layers, softmax layers, attention mechanisms, and other linear and nonlinear
+transformations. When ϕℓ is an activation function acting
+on R, it is applied element-wise to vectors in Rdℓ . Unless
+otherwise specified, all ϕℓ in a ϕ-Net are assumed to belong
+to the same class of operators.
+
+Normalization itself has been widely studied from an optimization perspective. Existing theoretical works primarily
+attribute its effectiveness to scale-invariance properties that
+stabilize training dynamics (Arora et al., 2019; Ba et al.,
+2016; Huang et al., 2023) and to improvements in the conditioning of the optimization problem (Cai et al., 2019;
+Daneshmand et al., 2020; Ghorbani et al., 2019; Karakida
+et al., 2019; Lyu et al., 2022; Santurkar et al., 2018). In
+contrast, its influence on representation and approximation
+capacity remains far less understood. A recent study by Ni
+et al. revealed the intrinsic nonlinearity of Layer Normaliza-
+
+Depth and Width. For the ϕ-Net defined in Eqn.2, we
+define the depth as L and the width as max{d1 , . . . , dL },
+counting only hidden layers. For simplicity, we denote by
+F(ϕ; L, N ) the class of all ϕ-networks with depth L and
+width N . A function f ∈ F (ϕ; L, N ) is called a shallow
+ϕ-network if L = 1, and a deep ϕ-network if L > 1.
+Layer Normalization. Layer Normalization (LN) is a
+fundamental component in modern deep neural networks,
+2
+
+Parallel Layer Normalization for Universal Approximation
+
+4. Approximations of Univariate Functions
+
+originally introduced to stabilize the training process. Given
+a single hidden representation h = [h1 , h2 , · · · , hd ]⊤ ∈ Rd
+with d neurons, LN standardizes h across its coordinates
+as1
+ĥj = [LN(h)]j =
+
+hj − µ
+,
+σ
+
+j = 1, 2, · · · , d,
+
+In this section, we study the approximation capabilities of
+networks composed of linear layers and LN layers. We show
+that shallow LN-Nets possess intrinsically limited representation power (Theorem 4.1). To achieve stronger approximation ability, we introduce the parallel LN (PLN) structure
+and establish its universal approximation property (Theorem 4.2). We also extend our analysis to RMSNorm (Zhang
+& Sennrich, 2019) in Section 4.3.
+
+(3)
+
+Pd
+Pd
+where µ = d1 j=1 hj and σ 2 = d1 j=1 (hj − µ)2 denote
+the mean and variance of the sample, respectively.
+Remark 3.2. To ensure that Eqn.3 is well-defined on Rd , one
+may either (i) add a small constant δ > 0 to the denominator,
+or (ii) explicitly define LN(h) when σ = 0 (for example,
+LN(h) = 0). Throughout this paper, we adopt the second
+convention as default.
+
+We focus primarily on relationships between different function classes and analyze basic univariate function approximation in this section. More complex settings will be discussed
+in Section 5.
+
+Building on LN, we introduce Parallel Layer Normalization
+(PLN). PLN partitions the hidden neurons into multiple
+groups and applies LN independently within each group.
+The formal definition is given below.
+
+4.1. The Representation Capacity of Shallow LN-Nets
+We first show that shallow LN-Nets can represent certain
+shallow ϕ-Nets of width 1, where ϕ is a specific elementwise activation function. This serves as a building block for
+the universal approximation property of shallow PLN-Nets.
+Nevertheless, shallow LN-Nets still exhibit fundamentally
+limited representation capacity.
+
+Definition 3.2 (Parallel Layer Normalization). Given a single input sample h ∈ Rd , Parallel Layer Normalization
+(PLN) operates by partitioning h into m groups {hi }m
+i=1
+and applying LN to each group separately. Assume
+⊤
+⊤ ⊤
+[h⊤
+1 , h2 , · · · , hm ] = h,
+
+the output of PLN is then defined as
+
+⊤
+ĥ = PLN(h) = LN(h1 )⊤ , · · · , LN(hm )⊤ .
+
+Shallow LN-Nets
+
+(4)
+
+A shallow LN-Net has the form
+
+f = Linear ◦ LN ◦ Linear ∈ F(LN(ns ); 1, ns ),
+
+(6)
+
+where ns denotes both the width of the LN-Net and the
+norm size of LN. We use LN(ns ) or PLN(ns ) to denote an
+LN or PLN layer with norm size ns . Unlike LN-Nets, the
+width of a PLN-Net can be a multiple of the norm size.
+
+(5)
+
+For simplicity, we may assume each group has the same
+size ns , which we call the norm size.
+Remark 3.3. Under the simplification in Definition 3.2, PLN
+has a structure similar to LN-G (Ni et al., 2024), which can
+be viewed as a generalized form of Group Normalization
+(GN) (Wu & He, 2018) derived from LN (Ba et al., 2016).
+LN-G and GN typically emphasize flexible group counts
+with fixed channel widths, whereas PLN emphasizes flexible widths with a fixed norm size.
+Take image models as instance, LN treats all channels of
+an image as a single normalization group, while GN partitions channels within each image into several groups. In
+contrast, PLN groups together ns neurons that originate
+from different channels but the same position. Analogous
+to how activation functions treat each neuron as a basic unit,
+PLN treats each group of size ns as a basic unit. As the
+network width increases, the number of such units grows
+proportionally.
+
+Before turning to PLN-Nets, we first show that shallow LNNets can simulate simple activation functions, which forms
+the foundation of our universal approximation results for
+PLN-Nets. To begin, we show that a shallow LN-Net with
+width ns ≥ 2 can represent2 a shallow sign-Net of width 1,
+as stated in Lemma 4.1.
+Lemma 4.1. Given any fˆ ∈ F(sign; 1, 1) with fˆ : R → R,
+there exists f ∈ F(LN(ns ); 1, ns ) with ns ≥ 2 such that
+f = fˆ. In short3 ,
+F(sign; 1, 1) ⊆ F(LN(ns ); 1, ns ),
+
+(7)
+
+where sign(x) is the element-wise sign function taking values 1 if x > 0, 0 if x = 0, and −1 if x < 0.
+The proof is given in Appendix A.1. For the special case
+ns = 2, we provide an intuitive illustration in Figure 2a.
+
+With the above notation and definitions, we next conduct
+our analyses and present the results on the representation
+capacity of LN-Nets and PLN-Nets.
+
+2
+In this paper, we use “represent” to mean exact realization
+(zero approximation error), and “approximate” when small error is
+allowed.
+3
+Throughout this paper, when comparing two function classes
+F1 and F2 as sets, we assume by default that they share the same
+input and output spaces.
+
+1
+
+LN typically includes additional learnable scale and shift parameters (Ioffe & Szegedy, 2015). We omit them here for simplicity, since they constitute an affine transformation.
+
+3
+
+Parallel Layer Normalization for Universal Approximation
+
+Linear
+
+LN
+
+Linear
+
+Linear
+
+Linear
+
+LS
+
+LN
+
+PLN
+
+Linear
+
+LN
+
+Linear
+
+Linear
+
+Linear
+
+(a) An intuitive proof of Lemma (b) An intuitive proof of Lemma
+4.1 of the case ns = 2.
+4.2 of the case ns = 3.
+
+(a) An intuitive observation of (b) An intuitive observation of
+LN-Nets in a PLN-Net.
+an element-wise ϕ-Net.
+
+Figure 2. We can choose suitable weights in the linear layers in an
+LN-Net or LS-Net, then obatin the form of the target functions. (a)
+shows the weight construction in an LN-Net to obtain a sign-Net,
+while (b) the weight construction in an LS-Net to obtain a ϕ-Net.
+
+Figure 3. (a) intuitively shows that such PLN-Net (the whole
+network) is equivalent to the sum of two LN-Nets (half of the network). Similarly, (b) shows that such ϕ-Net width 2 is equivalent
+to the sum of two ϕ-Nets of width 1.
+
+The requirement ns ≥ 2 arises from the two constraints
+imposed by LN on hidden representations, namely zero
+mean and unit variance. Increasing the width further enables
+smoother
+effective activation functions, such as ϕ(x) =
+√
+x/ x2 + 1. We next show that a shallow LN-Net with
+width ns ≥ 3 can represent a shallow ϕ-Net of width 1.
+Lemma 4.2. Given any fˆ ∈ F (ϕ; 1, 1) with fˆ : R → R,
+there exists f ∈ F(LN(ns ); 1, ns ) with ns ≥ 3 such that
+f = fˆ. In short,
+
+Theorem 4.1 shows that shallow LN-Nets are not universal
+approximators, even if their width tends to infinity. To significantly enhance representation power, one must increase
+the number of LN operations—either by increasing depth or
+by adopting the PLN structure. We mainly study PLN-Nets
+in this paper.
+
+F(ϕ; 1, 1) ⊆ F (LN(ns ); 1, ns ),
+√
+where ϕ(x) = x/ x2 + 1.
+
+4.2. Universal Approximation by Shallow PLN-Nets
+Since PLN consists of multiple LN operations applied in
+parallel and connected by linear layers, a PLN-Net can
+be viewed as a sum of several LN-Nets, as formalized in
+Lemma 4.3.
+Lemma 4.3. Given N shallow LN-Nets fˆi
+∈
+F(LN(ns ); 1, ns ) with fˆi : R → R for 1 ≤ i ≤ N ,
+there exists a shallow PLN-Net f ∈ F(PLN(ns ); 1, ns N )
+such that
+N
+X
+f (x) =
+fˆi (x), ∀x ∈ R.
+(11)
+
+(8)
+
+The proof is provided in Appendix A.4. If we use
+Lemma 4.4 in advance, we can simplify the proof—the
+argument can be reduced to proving
+F(ϕ; 1, 1) ⊆ F (LS(ns − 1); 1, ns − 1).
+
+(9)
+
+i=1
+
+For the special case ns = 3, we also provide an intuitive
+illustration in Figure 2b.
+
+Conversely, any such PLN-Net can be decomposed into a
+sum of N shallow LN-Nets.
+
+Despite these expressivity results, the overall representation
+capacity of shallow LN-Nets remains limited. In particular,
+any univariate function represented by a shallow LN-Net
+has at most one stationary point. Otherwise, the function
+reduces to a sign-Net, which has at most one discontinuity and two constant regions. A formal proof is given in
+Appendix A.5.
+
+We provide an illustration in Figure 3a, and please refer to
+the formal proof in Appendix A.2.
+Similarly,
+a shallow ϕ-Net of width N can be written as
+PN
+v
+ϕ(w
+i x + bi ) + c, which is a sum of N width-1 ϕi=1 i
+Nets. This together with Lemma 4.3 leads to the following
+corollary.
+
+Theorem 4.1 (Weak representation capacity of shallow
+LN-Nets). There exists a continuous function fˆ on Ω ⊂ R,
+such that for any shallow LN-Net f ∈ F(LN(ns ); 1, ns )
+with ns ≥ 2,
+|f − fˆ|L∞ (Ω) ≥ 1.
+(10)
+
+Corollary 4.1. Suppose there exists g ∈ F(LN(ns ); 1, ns )
+that can represent any ĝ ∈ F(ϕ; 1, 1). Then for any fˆ ∈
+F(ϕ; 1, N ) with fˆ : R → R, there exists a shallow PLN-Net
+f ∈ F (PLN(ns ); 1, ns N ) such that f = fˆ. In short,
+F(ϕ; 1, N ) ⊆ F (PLN(ns ); 1, ns N ).
+
+The counterexample used in the proof is the smooth elementary function fˆ(x) = cos(πx), indicating that the limitation
+stems from the normalization structure rather than function
+complexity. Please see Appendix A.5 for the detailed proof.
+
+(12)
+
+Please refer to the proof and its extension to Rd → Rm
+(Corollary A.4) in Appendix A.6.
+4
+
+Parallel Layer Normalization for Universal Approximation
+
+We now state the universal approximation theorem for shallow PLN-Nets.
+
+representation capacity, especially for large widths. This
+equivalence also simplifies several arguments by allowing
+us to ignore the centering operation in LN. For instance,
+Lemma 4.4 together with Figure 2b provides an intuitive
+proof of Lemma 4.2 in the case ns = 3.
+
+Theorem 4.2 (Universal approximation of univariate Lipschitz functions by shallow PLN-Nets). Given any LLipschitz continuous function fˆ ∈ C([0, 1]), there exists
+a shallow PLN-Net f ∈ F (PLN(ns ); 1, ns N ) with ns ≥ 2
+and N = ⌊L/(2ϵ)⌋ + 1 such that
+|f − fˆ|L∞ < ϵ.
+
+Summary In this section, we established the limited representation capacity of shallow LN-Nets and the universal
+approximation property of shallow PLN-Nets for univariate
+functions. We also present the equivalent representation
+capacity between PLN-Nes and PLS-Nets. We extend these
+results to more general and higher-dimensional settings in
+the next section.
+
+(13)
+
+Proof Sketch. The proof consists of three steps. Step 1:
+Construct f¯ ∈ F (sign; 1, N ) such that |f¯− fˆ|L∞ < ϵ. Step
+2: Use Lemma 4.1 and Corollary 4.1 to represent f¯ exactly
+by a PLN-Net f . Step 3: Combine the two bounds to obtain
+|f − fˆ|L∞ < ϵ.
+
+5. Approximations by Deep Neural Networks
+
+Please refer to the complete proof in Appendix A.7.
+Remark 4.1. There are two common conventions for defining LN when σ = 0. The proof above adopts the default
+convention in Remark 3.2. We also provide a proof under the alternative convention (adding a small constant δ to
+the denominator) in Appendix A.8. That argument further
+extends to √
+S-shaped activation functions such as tanh or
+ϕ(x) = x/ x2 + 1.
+
+We now extend the previous analysis to more general approximation settings, including: (i) multivariate inputs, (ii) target
+functions in Sobolev spaces W s,∞ (Ω), (iii) deep architectures (depth ≥ 2), (iv) position-wise feed-forward networks
+(FFNs) in recurrent and Transformer-based models, and (v)
+approximation of derivatives.
+We begin with multivariate approximation in Sobolev spaces
+W s,∞ (Ω)4 , which provides a standard framework for measuring smoothness via bounded higher-order derivatives up
+to order s.
+
+4.3. Extension to RMSNorm
+RMSNorm (Zhang & Sennrich, 2019) can be viewed as a
+variant of Layer Normalization that removes the centering
+operation. For simplicity, we use LS (Layer Scaling) to
+denote RMSNorm in this paper.
+
+As in the previous section, we use ϕ-networks as an intermediate class to transfer approximation results to PLN-Nets.
+We extend Corollary 4.1 to deep architectures and vectorvalued functions fˆ : Rd → Rm .
+Lemma 5.1. Given any fˆ ∈ F(ϕ; L, N ) and fˆ : Rd → Rm ,
+there exists a PLN-Net f ∈ F (PLN(ns ); L, ns N ), such
+that f = fˆ. In other words, we have
+
+Layer Scaling. Given a hidden representation h =
+[h1 , . . . , hd ]⊤ ∈ Rd , Layer Scaling (LS) normalizes h as
+ĥj = [LS(h)]j =
+where σ 2 = d1
+
+hj
+,
+σ
+
+j = 1, 2, · · · , d,
+
+(14)
+F(ϕ; L, N ) ⊆ F (PLN(ns ); L, ns N ),
+
+Pd
+
+2
+j=1 hj is the second moment of the sam-
+
+√
+where ϕ(x) = x/ x2 + 1 is an activation function.
+
+ple.
+Analogously to LN-Nets and PLN-Nets, we can define LSNets and PLS-Nets. We show that PLN-Nets and PLS-Nets
+have essentially equivalent representation capacity.
+
+Lemma 5.1 follows by stacking the shallow constructions
+layer by layer. A deep ϕ-Net can be expressed as a composition of shallow ϕ-Nets, each of which can be represented
+by a shallow PLN-Net. The detailed proof is given in Appendix B.1.
+
+Lemma 4.4. Shallow LN-Nets with width ns and shallow
+LS-Nets with width ns − 1 can represent each other:
+F(LN(ns ); 1, ns ) = F (LS(ns − 1); 1, ns − 1),
+
+(17)
+
+Based on Lemma 5.1, we can transfer classical approximation results for ϕ-networks to PLN-Nets. In particular,
+combining our structural equivalence with existing Sobolev
+approximation theory yields the following rate.
+Theorem 5.1. Let fˆ ∈ W s,∞ (B d ) and ∥fˆ∥W s,∞ ≤ 1,
+where B d = {x ∈ Rd : ∥x∥ ≤ 1}, there exists a shallow
+
+(15)
+
+for ns ≥ 2. Furthermore,
+F(PLN(ns ); 1, ns N ) = F(PLS(ns − 1); 1, (ns − 1)N ).
+(16)
+Please refer to Appendix A.3 for the proof. Lemma 4.4
+shows that PLN-Nets and PLS-Nets have nearly identical
+
+4
+The classical Sobolev space is W s,p (Ω); we restrict to p = ∞
+for simplicity. Please see Appendix B.2 for the detailed definition.
+
+5
+
+Parallel Layer Normalization for Universal Approximation
+
+PLN-Net f ∈ F (PLN(ns ); 1, ns N ), such that
+∥f − fˆ∥L∞ (B d ) ≤ CN −s/d ,
+
+One possible choice of the constant is
+(18)
+
+1
+0≤ℓ≤s (s − ℓ)!
+
+Cd,s,f = max
+
+for some C independent of N .
+Here
+
+Theorem 5.1 builds upon Lemma 5.1 and Theorem 6.8 in
+(Pinkus, 1999). This theorem establishes the universal approximation capability of shallow PLN-Nets for functions
+in W s,∞ over bounded domains. Please refer to Appendix
+B.2 for the detailed proof.
+
+|Pn,d | =
+
+s−ℓ
+
+∥fˆ∥W s,∞ ([0,1]d ) . (21)
+
+
+
+n+d−1
+.
+n
+
+(22)
+
+By Theorems 5.2 and 5.3, we conclude that PLN-Nets possess strong universal approximation capabilities across both
+piecewise-linear and smooth function classes. We now extend to position-wise feed-froward networks (FFNs).
+
+5.1. Approximations by Deep PLN-Nets
+ReLU is one of the most widely used activation functions
+in modern neural networks. If PLN-Nets are capable of
+representing ReLU-Nets, then many existing approximation
+results established for ReLU architectures can be transferred
+to PLN-Nets.
+
+5.2. Approximations of Position-Wise FFNs
+The results above are established for standard MLP architectures. We now extend the representation results to sequence
+models such as Transformers (Vaswani et al., 2017b) and
+RNNs, focusing on their position-wise feed-forward sublayers. The key structural difference lies in parameter sharing
+across sequence positions rather than in the nonlinear transformation itself.
+
+Theorem 5.2 (Approximation of ReLU Networks by
+PLN-Nets). Let fˆ ∈ F (ReLU; L, N ), f : [0, 1]d →
+Rn and let ϵ > 0. Then there exists a PLN-Net f ∈
+F(PLN(ns ); 2L, 3ns N ) such that
+(19)
+
+Sequence Linear Layers. Let X ∈ Rs×d denote a sequence input with length s and token dimension d. A sequence linear layer mapping token dimension d → m is
+defined as
+φ(X) = XW + 1s b⊤ ,
+(23)
+
+Theorem 5.2 follows from Theorem 1 in (Zhang et al., 2024).
+The detailed proof is provided in Appendix B.3.
+While Theorem 5.2 allows us to derive many approximation
+results for PLN-Nets via ReLU-Nets as an intermediate representation, ReLU is inherently piecewise linear and therefore does not naturally capture higher-order smoothness,
+which is important in applications such as physics-informed
+learning (Raissi et al., 2019) and operator approximation.
+To address this limitation, we instead build on approximation results for smooth activations such as tanh (De Ryck
+et al., 2021), and extend them to PLN-Nets, as stated in
+Theorem 5.3.
+
+for all X ∈ Rs×d , where W ∈ Rd×m and b ∈ Rm are the
+learnable parameters.
+Theorem 5.4 (Represent Position-Wise FFNs by PLN-Nets).
+Let φ̂1 and φ̂2 be two sequence linear layers mapping token
+dimensions√dx → N and N → dy , respectively, and let
+ϕ(x) = x/ x2 + 1. Define the position-wise FFN mapping
+fˆ = φ̂2 ◦ ϕ ◦ φ̂1 . Then there exist sequence linear layers
+φ1 and φ2 mapping token dimensions dx → ns N and
+ns N → dy , respectively, such that
+
+Theorem 5.3 (Approximation of Sobolev Functions by
+PLN-Nets). Let d, s ∈ N, δ > 0, and fˆ ∈ W s,∞ ([0, 1]d ).
+Then there exists a constant Cd,s,f such that for every
+N ∈ N with N > 3d/2, there exists a two-hiddenlayer PLN-Net f with norm
+  size ns ≥ 3, whose layer
+widths are at most ns 3 2s |Ps−1,d+1 | + d(N − 1) and
+
+
+3ns d+2
+|Pd+1,d+1 |N d , respectively, such that
+2
+Cd,s,f
+∥f − fˆ∥L∞ ([0,1]d ) ≤ (1 + δ)
+.
+Ns
+
+3d
+2
+
+Remark 5.1. The proof follows the framework of (De Ryck
+et al., 2021); see Appendix B.4 for details. Note that Theorem 5.3 does not directly yield approximation guarantees
+for higher-order derivatives. This limitation stems from
+structural differences between PLN and the tanh activations
+considered in (De Ryck et al., 2021). We revisit this issue
+in Section 5.3.
+
+In the following, we broaden this analysis in several directions. Section 5.1 investigates approximation properties of
+deep PLN-Nets. Extensions to position-wise feed-forward
+networks in sequence models (RNNs and Transformers) are
+discussed in Section 5.2. Finally, Section 5.3 provides a preliminary study of approximation guarantees for derivatives.
+
+∥f − fˆ∥L∞ ([0,1]d ) < ϵ.
+
+
+
+f = φ2 ◦ PLN(ns ) ◦ φ1
+
+(24)
+
+exactly represents fˆ for all sequence inputs.
+Theorem 5.4 is a parameter-sharing extension of the MLP
+representation result (Corollary A.4) and applies to the
+position-wise feed-forward modules in Transformers and
+RNNs. A detailed proof is provided in Appendix B.5.
+
+(20)
+6
+
+Parallel Layer Normalization for Universal Approximation
+
+where the constants C and C1 are independent of δ and N .
+
+Remark 5.2. In sequence models, Layer Normalization operates at the token level, while PLN groups ns neurons within
+each token. This grouping ensures that each PLN block corresponds to one activation ϕ in the equivalent feed-forward
+representation.
+Remark 5.3. The same argument applies to 1 × 1 convolution layers, which preserve spatial resolution similarly to
+how sequence linear layers preserve sequence length. However, extending the result to larger convolution kernels is
+nontrivial and remains an open problem for future work.
+
+Remark 5.4. We provide additional details for Theorem
+5.5. The threshold N0 (d) is defined as N0 = 3d/2 if fˆ ∈
+C s ([0, 1]d ), and N0 = 5d otherwise.
+The network widths are bounded by
+
+p + 1 ls − 1 − rm
+p
++r+1 |Ps−1,d+1 |+d(N −1) (29)
+2
+p
+for the first hidden layer, and by
+
+p + 1 ld + 1 − rm
+p
++ r + 1 |Pd+1,d+1 |
+2
+p
+
+5.3. Approximation of Derivatives
+In this section, we present a preliminary study on derivative
+approximation. To facilitate the analysis, we first generalize
+our framework to a broader class of normalization schemes;
+the necessity of this generalization will be discussed later.
+
+for the second hidden layer, where |Ps,d | is defined in
+Eqn.22. Explicit expressions for C and C1 are given in
+Appendix C. Also see the proof of Theorem 5.5 there.
+Remark 5.5. The convergence rate differs from the classical
+N s−k rate. We provide some intuition: (i) Compared with
+(De Ryck et al., 2021), the key difference lies in the decay
+behavior of derivatives. While derivatives of tanh decay
+exponentially, those of ϕp,q exhibit only polynomial decay.
+As a result, logarithmic factors in the original analysis are
+replaced here by polynomial terms, leading to the factor
+N (s+d+k)k/r . (ii) The present bound may not be tight. The
+dominant error term originates from Lemma C.9. Refining
+this step could potentially improve the convergence rate,
+which we leave for future work.
+Remark 5.6. When p = q, the normalization reduces to
+standard Lp normalization. However, in this case the righthand side of Eqn.28 does not necessarily converge to zero
+for k ≥ 1. This explains why derivative approximation was
+not included in Theorem 5.3.
+
+Definition 5.1 ((p, q)-normalization). Given a hidden representation h = [h1 , h2 , · · · , hd ]⊤ ∈ Rd of a single sample
+with d neurons, let p ≥ q ≥ 1. The (p, q)-normalization
+transforms h into ĥ across neurons as
+p
+
+1
+
+q
+p q
+ĥi = [ϕnorm
+p,q (h)]i = hi /|h | ,
+
+for i = 1, 2, . . . , d, where |hp | = d1
+sample-wise mean of |hi |p .
+
+(25)
+
+Pd
+
+p
+i=1 |hi | denotes the
+
+The (p, q)-normalization applies a power transformation
+before normalization and enforces the constraint ∥ĥ∥qq = d.
+Similar to Lemma 4.2, we can derive the corresponding
+(p, q)-activation function ϕp,q :
+ϕp,q (x) =
+
+xp/q
+(|x|p + 1)
+
+1/q
+
+.
+
+(26)
+
+By definition, ϕp,q (+∞) = 1. We further require ϕp,q to be
+an odd function; therefore, throughout the paper we assume
+p, q ∈ N and √
+that p/q is an odd integer. As a special case,
+ϕ2,2 (x) = x/ x2 + 1 corresponds to the activation used in
+our previous universal approximation results. For general
+ϕp,q , we extend the approximation theory to Sobolev norms.
+
+Summary In this section, we extend our theory to deeper
+PLN-Nets and broaden the representation results from MLPs
+to position-wise FFNs in RNNs and Transformers. We
+also provide a preliminary theoretical analysis of derivative approximation for deep PLN-Nets with parallel (p, q)normalizations.
+
+Theorem 5.5 (Approximation in Sobolev spaces by ϕp,q
+networks). Let p ≥ q ≥ 1 be even integers such that r :=
+p/q is an odd integer. Let d, s ∈ N, k ∈ N0 with r >
+k(s+d+k)
+, δ > 0, and let fˆ ∈ W s,∞ ([0, 1]d ). Then there
+s−k
+exist constants C1 and C > 0 such that for every N ∈
+N with N > N0 (d), there exists a two-hidden-layer ϕp,q
+neural network f satisfying
+C1
+∥f − fˆ∥L∞ ([0,1]d ) ≤ (1 + δ) s ,
+N
+
+(30)
+
+6. Experiments Observation
+We have proved that PLN-Nets possess strong representation capacity, yet they are not widely used in current neural
+network architectures. Therefore, we include a set of preliminary experiments to explore the practical potential of
+PLN-Nets.
+
+(27)
+
+We first compare PLN-Nets with four types of ϕ-Nets. The
+activation functions ϕ considered here include ReLU : x →
+max(0, x), SiLU : x → x/(1 + e−x ), Tanh : x →
+(ex√− e−x )/(ex + e−x ), and SAT : x → sin(arctan x) =
+x/ x2 + 1.
+
+and for 1 ≤ k < s,
+1+δ
+∥f − fˆ∥W k,∞ ([0,1]d ) ≤ C k/r s−k−(s+d+k)k/r , (28)
+δ N
+7
+
+Parallel Layer Normalization for Universal Approximation
+
+LN
+
+PLN(4)
+
+SAT
+
+Tanh
+
+ReLU
+
+128
+256
+
+0.000035
+0.000036
+
+0.000104
+0.000052
+
+0.000250
+0.000188
+
+0.993593
+0.998485
+
+SAT
+
+SiLU
+
+4
+2
+1
+0.5
+0.25
+
+PLN(8)
+
+ReLU
+
+Tanh
+
+BLEU (mean ± std)
+
+Width
+
+100
+80
+60
+40
+20
+0
+
+Accuracy(%)
+
+Initialization Scale
+
+Table 1. We record the best relative L2 error of MLP with different
+activation layers and width under different experiment settings on
+solving Helmholtz equation. The best result is marked in bold.
+
+0.001
+
+1 0.001
+
+1 0.001
+
+1 0.001
+
+Learning Rate
+
+1 0.001
+
+1
+
+42.5
+40.0
+37.5
+35.0
+32.5
+30.0
+
+ReLU
+
+SAT
+
+PLN
+
+SiLU
+
+Activation Layers
+
+Tanh
+
+Figure 5. BLEU scores (the higher is the better) for different
+combinations of normalization layers and activation functions in
+the Multi30k task.
+
+Figure 4. We record the average validation accuracy (higher if the
+green color is darker) of different activation layers under different
+initializations and learning rates. For each subfigure, the learning
+rate increase from 0.001 (the left) to 1 (the right). Besides, we
+adopt He initialization (He et al., 2015) as the baseline (the middle
+row), and scale the weights by factors from 1/4 (the bottom) to 4
+(the top) relative to this baseline.
+
+Machine Translation with Transformers Motivated by
+Theorem 4.1 and Theorem 4.2, we explore replacing the
+LN in Transformers with PLN to examine potential performance improvements. We conduct machine translation
+experiments on the Multi30k dataset (Elliott et al., 2016)
+using Transformers (Vaswani et al., 2017a) with different
+activation layers. We compare PLN with LN as normalization methods and report the mean and standard deviation
+of BLEU scores over three random seeds in Figure 5. We
+observe that replacing LN with PLN indeed improved translation performance in this setting. More details can be found
+in Appendix D.3.
+
+Differential Equation Solving with PINNs. We first investigate the performance of PLN in MLPs. We employ
+a physics-informed neural network (PINN) (Raissi et al.,
+2019) to solve the Helmholtz equation, which requires accurate function values as well as smoothness. All experiments
+are conducted using MLPs without normalization layers.
+For each activation layer, we perform independent runs
+with five different random seeds among different depths,
+loss weights, and optimizers. We use the relative L2 error
+(Raissi et al., 2019) to evaluate the overall fitting accuracy
+of the model. In Table 1, we report the best result among
+all configurations for the MLP width 128 and 256. We observe that PLN(4) achieves the best performance among all
+configurations, which preliminarily indicates the potential
+of PLN in PINNs. The detailed experimental settings are
+provided in Appendix D.1.
+
+7. Conclusion
+Conclusions. We studied the approximation properties of
+neural networks that combine linear layers with Layer Normalization (LN) and Parallel Layer Normalization (PLN).
+We showed that sufficiently wide PLN-Nets possess universal approximation capability, whereas LN-only architectures
+have substantially more limited expressivity. We also established approximation rates under the L∞ norm. Our
+representation results further extend from LN to RMSNorm
+and from MLPs to position-wise FFNs in Transformers and
+RNNs. We additionally provided a preliminary analysis of
+derivative approximation. Limited empirical results offer
+supporting evidence for the practical potential of PLN-Nets.
+
+CIFAR-10 Classification with VGGs We next move to
+a CNN architecture to investigate the performance of PLN.
+We conduct image classification experiments on the CIFAR10 dataset (Krizhevsky et al., 2009) using VGG-16 (Simonyan & Zisserman, 2014) with different activation layers.
+We sweep different learning rates, and initialization methods
+to investigate the training stability. For each hyperparameter
+configuration, we perform three independent runs with different random seeds and report the mean validation accuracy
+in Figure 4. We observe that PLN is relatively less sensitive
+to initialization compared with other activation layers in
+VGG-16, which suggests its potential under rough initialization conditions. More details are provided in Appendix D.2.
+
+Limitations and Future Work. Our analysis focuses on
+architectures composed of linear layers and LN/PLN-type
+normalizations. Their interaction with standard nonlinear activations in conventional networks remains open. Extending
+the theory to convolutional layers with larger kernels also
+requires further work. The derivative approximation results
+are still preliminary and may be sharpened in future studies.
+Finally, our limited experiments only reveal the potential of
+PLN-Nets but have not widely verified its performances.
+8
+
+Parallel Layer Normalization for Universal Approximation
+
+Impact Statement
+
+He, K., Zhang, X., Ren, S., and Sun, J. Delving deep
+into rectifiers: Surpassing human-level performance on
+imagenet classification. In Proceedings of the IEEE international conference on computer vision, pp. 1026–1034,
+2015.
+
+This paper presents work whose goal is to advance the field
+of Machine Learning. There are many potential social consequences of our work, none which feel must be specifically
+highlighted here.
+
+References
+
+He, K., Zhang, X., Ren, S., and Sun, J. Deep residual
+learning for image recognition. In CVPR, 2016.
+
+Amari, S.-i. Backpropagation and stochastic gradient descent method. Neurocomputing, 5(4-5):185–196, 1993.
+
+Hornik, K. Approximation capabilities of multilayer feedforward networks. Neural networks, 4(2):251–257, 1991.
+
+Arora, S., Li, Z., and Lyu, K. Theoretical analysis of auto
+rate-tuning by batch normalization. In ICLR, 2019.
+
+Huang, L., Qin, J., Zhou, Y., Zhu, F., Liu, L., and Shao, L.
+Normalization techniques in training dnns: Methodology,
+analysis and application. IEEE Transactions on Pattern
+Analysis and Machine Intelligence, 2023.
+
+Ba, J. L., Kiros, J. R., and Hinton, G. E. Layer normalization,
+2016.
+
+Ioffe, S. and Szegedy, C. Batch normalization: Accelerating
+deep network training by reducing internal covariate shift.
+In ICML, 2015.
+
+Barron, A. R. Universal approximation bounds for superpositions of a sigmoidal function. IEEE Transactions on
+Information theory, 39(3):930–945, 1993.
+
+Karakida, R., Akaho, S., and Amari, S.-i. The normalization
+method for alleviating pathological sharpness in wide
+neural networks. In NeurIPS, 2019.
+
+Bartlett, P. L., Harvey, N., Liaw, C., and Mehrabian, A.
+Nearly-tight vc-dimension and pseudodimension bounds
+for piecewise linear neural networks. Journal of Machine
+Learning Research, 20(63):1–17, 2019.
+
+Krizhevsky, A., Hinton, G., et al. Learning multiple layers
+of features from tiny images. 2009.
+
+Cai, Y., Li, Q., and Shen, Z. A quantitative analysis of
+the effect of batch normalization on gradient descent. In
+ICML, 2019.
+
+Li, Z., Han, J., Li, Q., et al. Approximation and optimization theory for linear continuous-time recurrent neural
+networks. Journal of Machine Learning Research, 23
+(42):1–85, 2022.
+
+Cybenko, G. Approximation by superpositions of a sigmoidal function. Mathematics of control, signals and
+systems, 2(4):303–314, 1989.
+
+Lyu, K., Li, Z., and Arora, S. Understanding the generalization benefit of normalization layers: Sharpness reduction.
+In NeurIPS, 2022.
+
+Daneshmand, H., Kohler, J. M., Bach, F. R., Hofmann, T.,
+and Lucchi, A. Batch normalization provably avoids
+ranks collapse for randomly initialised deep networks. In
+NeurIPS, 2020.
+
+Maiorov, V. and Pinkus, A. Lower bounds for approximation
+by mlp neural networks. Neurocomputing, 25(1-3):81–91,
+1999.
+
+De Ryck, T., Lanthaler, S., and Mishra, S. On the approximation of functions by tanh neural networks. Neural
+Networks, 143:732–750, 2021.
+
+Montufar, G. F., Pascanu, R., Cho, K., and Bengio, Y. On
+the number of linear regions of deep neural networks.
+Advances in neural information processing systems, 27,
+2014.
+
+Elliott, D., Frank, S., Sima’an, K., and Specia, L. Multi30k:
+Multilingual english-german image descriptions. In Proceedings of the 5th Workshop on Vision and Language,
+pp. 70–74, 2016.
+
+Ni, Y., Guo, Y., Jia, J., and Huang, L. On the nonlinearity
+of layer normalization. arXiv preprint arXiv:2406.01255,
+2024.
+
+Ghorbani, B., Krishnan, S., and Xiao, Y. An investigation into neural net optimization via hessian eigenvalue
+density. In ICML, 2019.
+
+Oono, K. and Suzuki, T. Approximation and nonparametric estimation of resnet-type convolutional neural
+networks, 2023. URL https://arxiv.org/abs/
+1903.10047.
+
+Gripenberg, G. Approximation by neural networks with
+a bounded number of nodes at each level. Journal of
+approximation theory, 122(2):260–266, 2003.
+
+Park, S., Yun, C., Lee, J., and Shin, J. Minimum
+width for universal approximation. arXiv preprint
+arXiv:2006.08859, 2020.
+9
+
+Parallel Layer Normalization for Universal Approximation
+
+Pinkus, A. Approximation theory of the mlp model in neural
+networks. Acta numerica, 8:143–195, 1999.
+Raissi, M., Perdikaris, P., and Karniadakis, G. E. Physicsinformed neural networks: A deep learning framework for
+solving forward and inverse problems involving nonlinear
+partial differential equations. Journal of Computational
+Physics, 378:686–707, 2019. doi: 10.1016/j.jcp.2018.10.
+045.
+Santurkar, S., Tsipras, D., Ilyas, A., and Madry, A. How
+does batch normalization help optimization? In NeurIPS,
+2018.
+Shin, J., Kim, N., Hwang, G., and Park, S. Minimum width
+for universal approximation using squashable activation
+functions, 2025. URL https://arxiv.org/abs/
+2504.07371.
+Simonyan, K. and Zisserman, A. Very deep convolutional networks for large-scale image recognition. arXiv
+preprint arXiv:1409.1556, 2014.
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones,
+L., Gomez, A. N., Kaiser, Ł., and Polosukhin, I. Attention is all you need. Advances in neural information
+processing systems, 30, 2017a.
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones,
+L., Gomez, A. N., Kaiser, L. u., and Polosukhin, I. Attention is all you need. In NeurIPS, 2017b.
+Wu, Y. and He, K. Group normalization. In ECCV, 2018.
+Yarotsky, D. Error bounds for approximations with deep
+relu networks, 2017. URL https://arxiv.org/
+abs/1610.01145.
+Yun, C., Bhojanapalli, S., Rawat, A. S., Reddi, S. J., and
+Kumar, S. Are transformers universal approximators of
+sequence-to-sequence functions?, 2020. URL https:
+//arxiv.org/abs/1912.10077.
+Zhang, B. and Sennrich, R. Root mean square layer normalization. In NeurIPS, 2019.
+Zhang, S., Lu, J., and Zhao, H. Deep network approximation: Beyond relu to diverse activation functions. Journal
+of Machine Learning Research, 25(35):1–39, 2024.
+
+10
+
+Parallel Layer Normalization for Universal Approximation
+
+A. Mathematical Proofs in Section 4
+A.1. Proof of Lemma 4.1
+Lemma 4.1 Given any fˆ ∈ F (sign; 1, 1) with fˆ : R → R, there exists f ∈ F (LN(ns ); 1, ns ) with ns ≥ 2 such that
+f = fˆ. In short,
+F(sign; 1, 1) ⊆ F(LN(ns ); 1, ns ),
+(31)
+where sign(x) is the element-wise sign function taking values 1 if x > 0, 0 if x = 0, and −1 if x < 0.
+Proof. For any fˆ ∈ F (sign; 1, 1) and fˆ : R → R, we have fˆ(x) = w2 sign(w1 x + b1 ) + b2 .
+For f ∈ F (LN(ns ); 1, ns ) with ns ≥ 2, we construct f (x) = v2⊤ LN(v1 x + c1 ) + c2 , where v1 , c1 , v2 ∈ Rns and c2 ∈ R.
+Let
+
+
+
+
+p
+
+w1
+b1
+2/ns w2
+ , c2 = b2 .
+v1 =  −w1  , c1 =  −b1  , v2 = 
+0
+0ns −2
+0ns −2
+0ns −2
+
+
+We can identify that the first element of LN(v1 x + c1 ) is
+r
+r
+w1 x + b 1
+ns w 1 x + b 1
+ns
+p
+=
+=
+sign(w1 x + b1 ),
+2 |w1 x + b1 |
+2
+2(w1 x + b1 )2 /ns
+
+(32)
+
+(33)
+
+if w1 x + b1 ̸= 0.
+For the case w1 x + b1 = 0, we have σ 2 = 2(w1 x + b1 )2 /ns = 0, then LN(v1 x + c1 ) = 0 by its definition.
+r
+ns
+Therefore, the first element of LN(v1 x + c1 ) is equal to
+sign(w1 x + b1 ), thus
+2
+f (x) = v2⊤ LN(v1 x + c1 ) + c2
+r
+p
+ns
+sign(w1 x + b1 ) + c2
+= 2/ns w2 ·
+2
+= w2 sign(w1 x + b1 ) + b2 = fˆ(x).
+
+(34)
+
+This completes the proof.
+We can extend Lemma 4.1 to the version fˆ : Rd → Rm .
+Corollary A.1. Given any fˆ ∈ F(sign; 1, 1) with fˆ : Rd → Rm , there exists f ∈ F(LN(ns ); 1, ns ) with ns ≥ 2, such that
+f = fˆ. In short,
+F(sign; 1, 1) ⊆ F(LN(ns ); 1, ns ),
+(35)
+where sign(x) is the element-wise sign function, which takes 1 if x > 0, 0 if x = 0, and −1 if x < 0.
+Proof. For any fˆ ∈ F (sign; 1, 1) and fˆ : Rd → Rm , we have fˆ(x) = w2 sign(w1⊤ x + b1 ) + b2 , where
+w1 ∈ Rd , b1 ∈ R, w2 , b2 ∈ Rm .
+We can just adjust the construction as
+
+
+
+
+p
+
+w1⊤
+b1
+2/ns w2⊤
+V1 =  −w1⊤  ∈ Rns ×d , c1 =  −b1  ∈ Rn2 , V2 =  O1×d  ∈ Rns ×m , c2 = b2 ∈ Rm ,
+0ns −2
+O(ns −2)×d
+O(ns −2)×m
+and f (x) = V2⊤ LN(V1 x + c1 ) + c2 .
+The following proof is almost the same as that in the proof of Lemma 4.1.
+11
+
+(36)
+
+(37)
+
+Parallel Layer Normalization for Universal Approximation
+
+A.2. Proof of Lemma 4.3
+Lemma 4.3 Given N shallow LN-Nets fˆi ∈ F(LN(ns ); 1, ns ) with fˆi : R → R for 1 ≤ i ≤ N , there exists a shallow
+PLN-Net f ∈ F (PLN(ns ); 1, ns N ) such that
+f (x) =
+
+N
+X
+
+fˆi (x),
+
+∀x ∈ R.
+
+(38)
+
+i=1
+
+Conversely, any such PLN-Net can be decomposed into a sum of N shallow LN-Nets.
+⊤
+Proof. Given N shallow LN-Nets fˆi ∈ F(LN(ns ); 1, ns ) for 1 ≤ i ≤ N , set fˆi (x) = wi2
+LN(wi1 x + bi1 ) + bi2 .
+
+For f ∈ F (PLN(ns ); 1, ns N ), set f (x) = w2⊤ PLN(w1 x + b1 ) + b2 , where w1 , w2 , b1 ∈ Rns N .
+Let
+
+
+
+
+
+
+
+
+w11
+b11
+w12
+N
+ w21 
+ b21 
+ w22 
+X
+
+
+
+
+
+
+w1 =  .  , b1 =  .  , w2 =  .  , b2 =
+bi2 .
+ .. 
+ .. 
+ .. 
+
+(39)
+
+i=1
+
+wN 1
+
+wN 2
+
+bN 1
+
+By Definition 3.2, under the setting that P is identity and fixing each size of the groups as the same ns , we have the input of
+PLN is
+
+
+w11 x + b11
+ w21 x + b21 
+
+
+h = w1 x = 
+(40)
+.
+..
+
+
+.
+wN 1 x + bN 1
+Since each wi1 x + bi1 ∈ Rns , we have hi = wi1 x + bi1 ∈ Rns . Therefore, we obtain
+
+ 
+
+LN(h1 )
+LN(w11 x + b11 )
+ LN(h2 )   LN(w21 x + b21 ) 
+
+ 
+
+PLN(h) = 
+=
+.
+..
+..
+
+ 
+
+.
+.
+LN(hN )
+Furthermore, we obtain that
+
+(41)
+
+LN(wN 1 x + bN 1 )
+
+f (x) = w2⊤ PLN(w1 x + b1 ) + b2
+=
+
+N
+X
+
+⊤
+wi2
+LN(wi1 x + bi1 ) +
+
+i=1
+
+=
+
+N
+X
+
+N
+X
+i=1
+
+bi2
+
+(42)
+
+fˆ(x).
+
+i=1
+
+Conversely, given f ∈ F(PLN(ns ); 1, ns N ), set f (x) = w2⊤ PLN(w1 x+b1 )+b2 , where w1 , w2 , b1 ∈ Rns N , we separate
+the parameters by Eqn.39. Furthermore, we can construct N shallow LN-Nets fˆi ∈ F(LN(ns ); 1, ns ) for 1 ≤ i ≤ N ,
+whose sum is equal to f .
+This completes the proof.
+We can also extend to the high-dimension version.
+Corollary A.2. Given any N shallow LN-Nets fˆi ∈ F(LN(ns ); 1, ns ) and fˆi : Rd → Rm , for 1 ≤ i ≤ N , there exists a
+shallow PLN-Net f ∈ F(PLN(ns ); 1, ns N ), such that
+f (x) =
+
+N
+X
+
+fˆi (x), ∀x ∈ R.
+
+i=1
+
+12
+
+(43)
+
+Parallel Layer Normalization for Universal Approximation
+
+It holds vice versa, namely N shallow LN-Nets fˆi ∈ F(LN(ns ); 1, ns ) for 1 ≤ i ≤ N can represent a shallow PLN-Net
+f ∈ F (PLN(ns ); 1, ns N ) by addition.
+Proof. Given N shallow LN-Nets fˆi ∈ F(LN(ns ); 1, ns ) for 1 ≤ i ≤ N , set fˆi (x) = Wi2 LN(Wi1 x + bi1 ) + bi2 , where
+Wi1 ∈ Rns ×d , bi1 ∈ Rns , Wi2 ∈ Rm×ns , bi2 ∈ Rm .
+
+(44)
+
+For f ∈ F (PLN(ns ); 1, ns N ), set f (x) = W2⊤ PLN(W1 x + b1 ) + b2 , where
+W1 ∈ Rns N ×d , b1 ∈ Rns N , W2 ∈ Rm×ns N , b2 ∈ Rm .
+
+(45)
+
+This time, we construct that
+
+
+
+
+
+W11
+b11
+ W21 
+ b21 
+
+
+
+
+
+W1 =  .  , b1 =  .  , W2 = W12
+.
+.
+ . 
+ . 
+WN 1
+
+W22
+
+···
+
+N
+X
+
+WN 2 , b2 =
+bi2 .
+
+(46)
+
+i=1
+
+bN 1
+
+The following proof is almost the same as that in the proof of Lemma 4.3.
+A.3. Proof of Lemma 4.4
+Lemma 4.4 can simplify most the proofs, so we prove it at the early time.
+Lemma 4.4
+
+Shallow LN-Nets with width ns and shallow LS-Nets with width ns − 1 can represent each other, namely
+F(LN(ns ); 1, ns ) = F(LS(ns − 1); 1, ns − 1),
+
+(47)
+
+F(PLN(ns ); 1, ns N ) = F(PLS(ns − 1); 1, (ns − 1)N ).
+
+(48)
+
+for ns ≥ 2. Furthermore,
+
+To begin with, we require Lemma A.2 first, which is proved based on Lemma 6 in (Ni et al., 2024).
+Lemma A.1 (Lemma 6 in (Ni et al., 2024)). There is some orthogonal matrix Q ∈ Rd×d , such that z = Q
+
+ 
+x
+∈ {z ∈
+0
+
+Rd : z (1) + · · · + z (d) = 0} (namely z is centralized), for x ∈ Rd−1 ,
+Lemma A.2. Denote LN(·) as the LN operation in Rd (d ≥ 3), and LS(·) as the LS operation in Rd−1 . We can find some
+linear transformations φ1 and φ2 , such that
+LS(·) = φ2 ◦ LN(·) ◦ φ1 .
+
+(49)
+
+Besides, we can find some linear transformations φ∗1 and φ∗2 , such that
+LN(·) = φ∗2 ◦ LS(·) ◦ φ∗1 .
+
+(50)
+
+Proof. We denote that LS(·) is defined on Rd−1 , as
+√
+
+d − 1 x/∥x∥2 .
+
+(51)
+
+1
+1
+d (x − 11⊤ x)/∥x − 11⊤ x∥2 .
+d
+d
+
+(52)
+
+ 
+ 
+x
+x
+=
+= ∥x∥2 .
+0 2
+0 2
+
+(53)
+
+LS(x) =
+While LN(·) is defined on Rd , where
+√
+LN(x) =
+Based on the orthogonal matrix Q, we obtain
+∥z∥2 = Q
+
+13
+
+Parallel Layer Normalization for Universal Approximation
+
+1
+By Lemma A.1, we have 1⊤ z = 0, and z = z − 11⊤ z. We hence find that
+d
+√
+√
+1
+1
+LN(z) = d(z − 11⊤ z)/∥z − 11⊤ z∥2 = d z/∥z∥2 .
+d
+d
+Let Id denotes the identity matrix in Rd×d . We thus have
+√
+√
+ ⊤
+
+⊤
+
+d−1
+d−1
+√
+Id−1 0 Q LN(Q Id−1 0 x) = √
+Id−1 0 Q⊤ LN(z)
+d
+d
+√
+√
+
+d−1
+Id−1 0 Q⊤ d z/∥z∥2
+= √
+d
+√
+ 
+ ⊤
+d − 1√ 
+x
+√
+I
+0
+=
+d d−1
+Q Q
+/∥x∥2
+0
+d
+√
+= d − 1 x/∥x∥2
+
+(54)
+
+(55)
+
+=LS(x).
+√
+
+Let φ1 (x) = Q Id−1
+
+⊤
+0 x and φ2 (x) =
+
+d−1
+√
+Id−1
+d
+
+
+0 Q⊤ x. We observe that
+
+LS(·) = φ2 ◦ LN(·) ◦ φ1 .
+
+Now we prove the inverse equation. According to z = Q Id−1
+
+LS( Id−1
+
+0
+
+
+
+0 Q⊤ z) = LS( Id−1
+
+= LS( Id−1
+
+⊤
+
+(56)
+
+x, we have
+
+
+
+⊤
+0 Q⊤ Q Id−1 0 x)
+
+⊤
+0 Id−1 0 x)
+
+(57)
+
+= LS(Id−1 x)
+= LS(x).
+We thus have
+√
+
+√
+
+
+d
+Q Id−1
+d−1
+
+0
+
+⊤
+
+
+LS( Id−1
+
+√
+
+
+d
+0 Q⊤ z) = √
+Q Id−1
+d−1
+√
+
+d
+=√
+Q Id−1
+d−1
+√
+= d z/∥z∥2
+
+⊤
+0 LS(x)
+⊤ √
+0
+d − 1 x/∥x∥2
+
+(58)
+
+= LN(z).
+
+Let φ∗1 (x) = Id−1
+
+√
+
+
+d
+0 Q⊤ x and φ∗2 = √
+Q Id−1
+d−1
+
+⊤
+0 x. We observe that
+
+LN(·) = φ∗2 ◦ LS(·) ◦ φ∗1 .
+
+(59)
+
+Now we prove Lemma 4.4.
+Proof. Step 1: Represent LN-Nets by LS-Nets. Namely given any fˆ ∈ F(LN(ns ); 1, ns ), there exists f ∈ F(LS(ns −
+1); 1, ns − 1), such that f = fˆ.
+Set fˆ = W2 ◦ LN ◦ W1 , where W1 : Rd → Rns and W2 : Rns → Rm denote the linear layers. Construct that
+f = V2 ◦ LS ◦ V1 , where V1 = φ1 ◦ W1 , V2 = W2 ◦ φ2 and LS(·) = φ2 ◦ LN(·) ◦ φ1 by Lemma A.2. We obtain that
+f = fˆ.
+14
+
+Parallel Layer Normalization for Universal Approximation
+
+Step 2: Represent LS-Nets by LN-Nets. Namely given any fˆ ∈ F(LS(ns −1); 1, ns −1), there exists f ∈ F(LN(ns ); 1, ns ),
+such that f = fˆ.
+Set fˆ = W2 ◦ LS ◦ W1 , where W1 : Rd → Rns −1 and W2 : Rns −1 → Rm denote the linear layers. Construct that
+f = V2 ◦ LN ◦ V1 , where V1 = φ∗1 ◦ W1 , V2 = W2 ◦ φ∗2 and LS(·) = φ∗2 ◦ LN(·) ◦ φ∗1 by Lemma A.2. We obtain that
+f = fˆ.
+Step 3: Extend to parallel structures.
+For simplicity, we define the sum of networks as
+(
+S(m, ϕ; L, N ) =
+
+f=
+
+m
+X
+
+)
+fi : fi ∈ F(ϕ; L, N ), 1 ≤ i ≤ m ,
+
+(60)
+
+i=1
+
+which represents the sum of m functions from F(ϕ; L, N ).
+Then by Lemma 4.3, we obtain that
+S(N, LN(ns ); 1, ns ) = F (PLN(ns ); 1, ns N ).
+
+(61)
+
+With the similar proof of Lemma 4.3, we will obtain
+S(N, LS(ns − 1); 1, ns − 1) = F(PLS(ns − 1); 1, (ns − 1)N ).
+
+(62)
+
+Since F(LN(ns ); 1, ns ) = F(LS(ns − 1); 1, ns − 1), it is easy to identify that
+S(N, LS(ns − 1); 1, ns − 1) = S(N, LN(ns ); 1, ns ),
+
+(63)
+
+F(PLN(ns ); 1, ns N ) = F(PLS(ns − 1); 1, (ns − 1)N ).
+
+(64)
+
+by the definition of S.
+Therefore, we obtain that
+Here we complete the proof.
+A.4. Proof of Lemma 4.2
+Lemma 4.2 Given any fˆ ∈ F(ϕ; 1, 1) with fˆ : R → R, there exists f ∈ F(LN(ns ); 1, ns ) with ns ≥ 3 such that f = fˆ.
+In short,
+F(ϕ; 1, 1) ⊆ F (LN(ns ); 1, ns ),
+(65)
+p
+where ϕ(x) = x/ x2 + 1.
+Proof. To simplify the proof, we apply Lemma 4.4 first, which says that F(LN(ns ); 1, ns ) = F(LS(ns − 1); 1, ns − 1)
+p
+For any fˆ ∈ F(ϕ; 1, 1), we have fˆ(x) = w2 ϕ(w1 x + b1 ) + b2 , where ϕ(x) = x/ x2 + 1.
+For f ∈ F(LS(ns − 1); 1, ns − 1) with ns ≥ 3, construct f (x) = v2⊤ LS(v1 x + c1 ) + c2 , where v1 , v2 , c1 ∈ Rns −1 and
+c2 ∈ R.
+Let
+
+
+
+
+
+
+√
+w1
+b1
+w2 / ns − 1
+ , c2 = b2 .
+v1 =  0  , c1 =  1  , v2 = 
+0
+0ns −3
+0ns −3
+0ns −3
+
+
+(66)
+
+We can identify that the first element of LS(v1 x + c1 ) is
+w1 x + b 1
+p
+
+[(w1 x + b1 )2 + 1]/(ns − 1)
+
+=
+
+√
+
+ns − 1
+
+√
+w1 x + b1
+= ns − 1ϕ(w1 x + b1 ).
+(w1 x + b1 )2 + 1
+
+15
+
+(67)
+
+Parallel Layer Normalization for Universal Approximation
+
+Therefore, we obtain
+f (x) = v2⊤ LS(v1 x + c1 ) + c2
+√
+√
+= w2 / ns − 1 · ns − 1ϕ(w1 x + b1 ) + c2
+= w2 ϕ(w1 x + b1 ) + b2 = fˆ(x).
+
+(68)
+
+This completes the proof.
+We can also extend it to high dimensions.
+Corollary A.3. Given any fˆ ∈ F (ϕ; 1, 1) and fˆ : Rd → Rm , there exists some f ∈ F(LN(ns ); 1, ns ) with ns ≥ 3, such
+that f = fˆ. In other words, we have
+F(ϕ; 1, 1) ⊆ F (LN(ns ); 1, ns ),
+p
+where ϕ(x) = x/ x2 + 1 is an activation function.
+Proof Sketch.
+
+(69)
+
+We can follow the proof above and apply the similar construction in the proof of Corollary A.1.
+
+A.5. Proof of Theorem 4.1
+To begin with, we point out that the univariate function f represented by a shallow LN-Net has at most two stationary points,
+if f is not a constant-value function.
+Lemma A.3. Given f ∈ F(LN(ns ); 1, ns ) with ns ≥ 2 and f : R → R, thus f has continuous derivative on R and has at
+most one stationary point—otherwise f ∈ F(sign; 1, 1), which has only two pieces of constant values.
+Proof. Again, we apply Lemma 4.4 for simplify the question, that F(LN(ns ); 1, ns ) = F(LS(ns − 1); 1, ns − 1) for
+ns ≥ 2.
+Take f ∈ F (LS(ns − 1); 1, ns − 1) for ns ≥ 2, we set
+f (x) =
+
+v ⊤ (wx + b)
++ b0 ,
+∥wx + b∥
+
+(70)
+
+where w, b, v ∈ Rd and b0 ∈ R.
+Case 1: w = b = 0, we have f (x) = b0 = sign(0 · x + 0) + b0 , thus f ∈ F(sign; 1, 1).
+Case 2: w = 0, b ̸= 0, we have f (x) = v ⊤ b/∥b∥ + b0 = v ⊤ b/∥b∥ · sign(0 · x + 1) + b0 , thus f ∈ F(sign; 1, 1).
+Case 3: w ̸= 0, and there is some k ∈ R such that b = kw. We have
+v ⊤ (wx + kw)
++ b0
+∥wx + kw∥
+v ⊤ w(x + k)
+=
++ b0
+∥w∥|x + k|
+v⊤ w
+=
+sign(x + k) + b0 ,
+∥w∥
+
+f (x) =
+
+(71)
+
+where we apply the supplement definition of LN at x + k = 0. Thus f ∈ F (sign; 1, 1).
+Case 4: w ̸= 0 and wx + b ̸= 0 for any x ∈ R.
+Note that
+f (x) = √
+we have
+
+v ⊤ wx + v ⊤ b
+w⊤ wx2 + 2w⊤ bx + b⊤ b
+
+ ⊤
+
+
+
+(v w)(w⊤ b) − (v ⊤ b)(w⊤ w) x + (v ⊤ w)(b⊤ b) − (v ⊤ b)(w⊤ b)
+f (x) =
+.
+∥wx + b∥3
+′
+
+16
+
+(72)
+
+(73)
+
+Parallel Layer Normalization for Universal Approximation
+
+Since wx + b ̸= 0, we can identify that f ′ (x) has at most one stationary point, namely
+x0 = −
+
+(v ⊤ w)(b⊤ b) − (v ⊤ b)(w⊤ b)
+,
+(v ⊤ w)(w⊤ b) − (v ⊤ b)(w⊤ w)
+
+(74)
+
+if (v ⊤ w)(w⊤ b) − (v ⊤ b)(w⊤ w) ̸= 0. Besides we point out that f ′ (x) is continuous on R.
+Finally, we complete the proof.
+Now we prove Theorem 4.1 based on Lemma A.3.
+Theorem 4.1 (Weak representation capacity of LN-Nets). There exists a continuous function fˆ on Ω ⊂ R, such that for
+any shallow LN-Net f ∈ F(LN(ns ); 1, ns ) with ns ≥ 2,
+|f − fˆ|L∞ (Ω) ≥ 1.
+
+(75)
+
+Proof. We choose fˆ to be fˆ(x) = cos(πx) on [−2, 2].
+We prove the theorem by contradiction, assume that |f (x) − fˆ(x)| < 1 for each x ∈ [−2, 2].
+Case 1: f ∈ F(sign; 1, 1), set as f (x) = w2 sign(w1 x + b1 ) + b2 .
+If w1 ̸= 0, we have f (x) ≡ C, else f (x) ≡ C1 for x > −b1 /w1 and f (x) ≡ C2 for x < −b1 /w1 .
+Without loss of generality, we assume −b1 /w1 ≤ 0, and f (x) ≡ C for x > 0.
+Note that f (1) = C, f (2) = C, fˆ(1) = −1, fˆ(2) = 1, |f (1) − fˆ(1)| < 1, |f (2) − fˆ(2)| < 1, we obtain
+|fˆ(2) − fˆ(1)| ≤ |fˆ(2) − C + C − fˆ(1)|
+≤ |f (1) − fˆ(1)| + |f (2) − fˆ(2)|
+
+(76)
+
+< 2,
+but fˆ(2) − fˆ(1) = 2. Thus |f − fˆ|L∞ ([−2,2]) ≥ 1, which contracts the assumption.
+Case 2: f ∈
+/ F(sign; 1, 1), thus f has continuous derivative on R and has at most one stationary point.
+Note that fˆ(−2) = 1, fˆ(−1) = −1, fˆ(0) = 1, fˆ(1) = −1, and |f (x) − fˆ(x)| < 1 for x = −2, −1, 0, 1 as assumed.
+We obtain that f (−2) > 0, f (−1) < 0, f (0) > 0, f (1) < 0. By Lagrange’s mean value theorem, there exists some
+η1 ∈ (−2, −1), η2 ∈ (−1, 0), η3 ∈ (0, 1), such that f ′ (η) < 0, f ′ (η2 ) > 0, f ′ (η3 ) < 0. Furthermore, since f ′ (x) is
+continuous on R, there exists some xi1 ∈ (η1 , η2 ), ξ2 ∈ (η2 , η3 ), such that f ′ (ξ1 ) = f ′ (ξ2 ) = 0.
+Note that ξ1 ̸= ξ2 , which contracts the property of f , which has at most one stationary point.
+Finally, we complete the proof.
+A.6. Proof of Corollary 4.1
+Corollary 4.1 Suppose there exists g ∈ F (LN(ns ); 1, ns ) that can represent any ĝ ∈ F (ϕ; 1, 1). Then for any fˆ ∈
+F(ϕ; 1, N ) with fˆ : R → R, there exists a shallow PLN-Net f ∈ F(PLN(ns ); 1, ns N ) such that f = fˆ. In short,
+F(ϕ; 1, N ) ⊆ F (PLN(ns ); 1, ns N ).
+
+(77)
+
+Proof. Let fˆ ∈ F(ϕ; 1, N ) and f : R → R. Set fˆ(x) = w2⊤ ϕ(w1 x + b1 ) + b2 . Note that ϕ is an element-wise activation
+function, we then have
+N
+X
+fˆ(x) = w2⊤ ϕ(w1 x + b1 ) + b2 =
+w2i ϕ(w1i x + b1i ) + b2i ,
+(78)
+i=1
+
+17
+
+Parallel Layer Normalization for Universal Approximation
+
+where
+
+
+
+
+
+
+b11
+w21
+w11
+N
+X
+
+
+
+
+
+
+b2i .
+w1 =  ...  , w2 =  ...  , b1 =  ...  , b2 =
+
+
+b1N
+
+w2N
+
+w1N
+
+(79)
+
+i=1
+
+That means fˆ can be represented by the sum of N shallow ϕ-Nets fˆi ∈ F(ϕ; 1, 1). By Lemma 4.2, each fi can be represented
+by a shallow LN-Net fi ∈ F(LN(ns ); 1, ns ). By Lemma 4.3, the sum of N shallow LN-Nets fi ∈ F(LN(ns ); 1, ns ) can
+be represented by a shallow PLN-Net f ∈ F(PLN(ns ); 1, ns N ). Therefore, f can represent fˆ.
+Here we complete the proof.
+Similarly, we can extend the corollary to the case fˆ : Rd → Rm .
+Corollary A.4. Suppose there exists g ∈ F(LN(ns ); 1, ns ) that can represent any ĝ ∈ F (ϕ; 1, 1). Then for any fˆ ∈
+F(ϕ; 1, N ) with fˆ : Rd → Rm , there exists a shallow PLN-Net f ∈ F(PLN(ns ); 1, ns N ) such that f = fˆ. In short,
+F(ϕ; 1, N ) ⊆ F (PLN(ns ); 1, ns N ).
+
+(80)
+
+Proof. Let fˆ ∈ F(ϕ; 1, N ) and f : Rd → Rm . Set fˆ(x) = W2 ϕ(W1 x + b1 ) + b2 . Note that ϕ is an element-wise
+activation function, we then have
+fˆ(x) = W2 ϕ(W1 x + b1 ) + b2 =
+
+N
+X
+
+⊤
+w2i ϕ(w1i
+x + b1i ) + b2i ,
+
+(81)
+
+i=1
+
+where
+
+
+⊤
+w11
+
+
+
+W1 =  ...  , W2 = w21
+
+
+
+
+···
+
+w2N
+
+⊤
+w1N
+
+
+
+
+b11
+N
+X
+
+
+, b1 =  ...  , b2 =
+b2i .
+b1N
+
+(82)
+
+i=1
+
+That means fˆ can be represented by the sum of N shallow ϕ-Nets fˆi ∈ F(ϕ; 1, 1). Correspondingly, we apply the highdimension case, namely Corollary A.3 rather than Lemma 4.2, and Corollary A.2 rather than Lemma 4.3. We can also
+observe that f can represent fˆ.
+Here we complete the proof.
+A.7. Proof of Theorem 4.2
+Theorem 4.2 (Universal approximations of univariate L-Lipschitz continuous functions by shallow PLN-Nets). Given any
+L-Lipschitz continuous function fˆ ∈ C([0, 1]), there exists a shallow PLN-Net f ∈ F(PLN(ns ); 1, ns N ) with ns ≥ 2 and
+N = ⌊L/2ϵ⌋ + 1, such that
+|f − fˆ|L∞ < ϵ
+(83)
+Proof. Step 1: construct a proper f¯ ∈ F (sign; 1, N ) to approximate fˆ, namely |f¯ − fˆ|L∞ < ϵ.
+We construct a function
+f¯(x) =
+
+N
+X
+
+αj sign(wj x + bj ),
+
+(84)
+
+j=1
+
+where N = ⌊L/(2ϵ)⌋ + 1. For 1 ≤ j ≤ N − 1, we set
+ 
+
+
+
+1 ˆ 2j + 1
+2j − 1
+αj =
+f
+− fˆ
+;
+2
+2N
+2N
+
+(85)
+
+and for j = N ,
+αN =
+
+ 
+
+
+
+1 ˆ 1
+2N − 1
+f
++ fˆ
+.
+2
+2N
+2N
+18
+
+(86)
+
+Parallel Layer Normalization for Universal Approximation
+
+Moreover, we take wj = 1 for all 1 ≤ j ≤ N , bj = −
+
+j
+for 1 ≤ j ≤ N − 1, and bN = 1.
+N
+
+With this construction, we can verify the following:
+1. For
+
+j−1
+j
+<x<
+with 1 ≤ j ≤ N ,
+N
+N
+
+2. For x =
+
+
+
+2j − 1
+¯
+ˆ
+.
+f (x) = f
+2N
+
+(87)
+
+ 
+
+
+
+2j + 1
+1 ˆ 2j − 1
+ˆ
+¯
+f
++f
+.
+f (x) =
+2
+2N
+2N
+
+(88)
+
+j
+with 1 ≤ j ≤ N − 1,
+N
+
+
+
+
+
+1
+2N − 1
+¯
+ˆ
+¯
+ˆ
+3. Additionally, f (0) = f
+and f (1) = f
+.
+2N
+2N
+Since N = ⌊L/(2ϵ)⌋ + 1, we have N > L/(2ϵ). Consequently, we obtain the following error estimates:
+1. For x = 0,
+
+
+1
+|f¯(0) − fˆ(0)| = fˆ(0) − fˆ
+2N
+
+L
+< ϵ.
+2N
+
+≤
+
+(89)
+
+2. For x = 1,
+
+
+2N − 1
+¯
+ˆ
+ˆ
+ˆ
+|f (1) − f (1)| = f (1) − f
+2N
+3. For x =
+
+4. For
+
+≤
+
+L
+< ϵ.
+2N
+
+j
+with 1 ≤ j ≤ N − 1,
+N
+ 
+ 
+ 
+
+
+
+ 
+1 ˆ 2j − 1
+j
+j
+2j + 1
+j
+¯
+ˆ
+ˆ
+ˆ
+=
+f
+−f
+f
++f
+−f
+N
+N
+2
+2N
+2N
+N
+
+
+ 
+
+
+ 
+1 ˆ 2j − 1
+j
+1 ˆ 2j + 1
+j
+ˆ
+ˆ
+≤
++ f
+f
+−f
+−f
+2
+2N
+N
+2
+2N
+N
+L
+L
+L
++
+=
+< ϵ.
+≤
+4N
+4N
+2N
+
+(90)
+
+(91)
+
+j−1
+j
+<x<
+with 1 ≤ j ≤ N ,
+N
+N
+
+
+2j − 1
+¯
+ˆ
+ˆ
+|f (x) − f (x)| = f
+− fˆ(x)
+2N
+
+≤L
+
+2j − 1
+L
+−x <
+< ϵ.
+2N
+2N
+
+(92)
+
+In summary, for every x ∈ [0, 1], one of the above four cases applies, and we have
+|f¯(x) − fˆ(x)|L∞ ([0,1]) < ϵ.
+Thus, the constructed function f¯(x) =
+
+N
+X
+
+(93)
+
+αj sign(x + bj ) uniformly approximates fˆ on [0, 1] with error less than ϵ.
+
+j=1
+
+Step 2: by Corollary 4.1 and Lemma 4.1, since f¯ ∈ F (sign; 1, N ), there exists a shallow PLN-Net f ∈
+F(PLN(ns ); 1, ns N ), such that f = f¯.
+Step 3: Since f = f¯ and |f¯(x) − fˆ(x)|L∞ ([0,1]) < ϵ, we obtain |f − fˆ|L∞ < ϵ.
+Here we complete the proof.
+19
+
+Parallel Layer Normalization for Universal Approximation
+
+A.8. Proof of Theorem 4.2. (The first-type definition of Layer Normalization)
+In this part, we discuss how to provide the proof with the first-type definition of LN, namely (ii) in Remark 3.2, which
+rewrites Eqn.3 as
+hj − µ
+ĥj = [LN(h)]j =
+, j = 1, 2, · · · , d,
+(94)
+σ+δ
+where δ > 0 is a small number for numerical stability in practice.
+We set ϕ = x/(|x| + δ), we first prove that F(ϕ; 1, N ) ⊆ F(PLN(ns ); 1, ns N ) for ns ≥ 2, where PLN applies the
+definition in Eqn.94.
+Lemma A.4. Given any fˆ ∈ F (ϕ; 1, N ), where ϕ = x/(|x| + δ), there exists f ∈ F(PLN(ns ); 1, ns N ) with ns ≥ 2, such
+that f = fˆ, namely
+F(ϕ; 1, N ) ⊆ F (PLN(ns ); 1, ns N ).
+
+(95)
+
+Proof. By Lemma 4.4, to prove F(ϕ; 1, N ) ⊆ F(PLN(ns ); 1, ns N ), we can just prove F(ϕ; 1, N ) ⊆ F(PLS(ns −
+1); 1, (ns − 1)N ).
+For any fˆ ∈ F(ϕ; 1, 1), we have fˆ(x) = w2 ϕ(w1 x + b1 ) + b2 , where ϕ(x) = x/(|x| + δ).
+For f ∈ F(LS(ns − 1); 1, ns − 1) with ns ≥ 2, construct f (x) = v2⊤ LS(v1 x + c1 ) + c2 , where v1 , v2 , c1 ∈ Rns −1 and
+c2 ∈ R.
+Let
+
+ √ 
+
+ √ 
+√ 
+b1 n s
+w2 / ns
+w1 ns
+, c1 =
+, v2 =
+, c2 = b2 .
+v1 =
+0ns −2
+0ns −2
+0ns −2
+
+(96)
+
+We can identify that the first element of LS(v1 x + c1 ) is
+
+p
+
+√
+(w1 x + b1 ) ns
+√
+√
+w1 x + b1
+= ns
+= ns ϕ(w1 x + b1 ).
+√
+|w1 x + b1 | + δ
+[(w1 x + b1 ) ns ]2 /(ns ) + δ
+
+(97)
+
+f (x) = v2⊤ LS(v1 x + c1 ) + c2
+√
+√
+= w2 / ns · ns ϕ(w1 x + b1 ) + c2
+= w2 ϕ(w1 x + b1 ) + b2 = fˆ(x).
+
+(98)
+
+Therefore, we obtain
+
+This completes the proof.
+Now we provide the formal proof with the fisrt-type definition of LN.
+Proof. The only difference from the previous proof in Appendix A.7 is that we will consider the new f ∈
+F(PLN(ns ); 1, ns N ) with the fisrt-type definition, namely Eqn.94. In the previous proof, we have proved that |f¯−fˆ|L∞ < ϵ,
+where f¯ ∈ F(sign; 1, N ) writes as
+N
+X
+f¯(x) =
+αj sign(wj x + bj ).
+(99)
+j=1
+
+Now we consider f˜ ∈ F(ϕ; 1, N ), specifically, f˜(x) =
+
+N
+X
+
+αj ϕ((wj /λ)x + (bj /λ)), where αj , wj , bj are the same
+
+j=1
+
+as Eqn.99, but we add a scalar parameter λ > 0 for further adjustment. We will construct a proper λ to satisfies that
+|f˜ − f¯| + |f¯ − fˆ| < ϵ. Note that
+f˜(x) =
+
+N
+X
+
+αj ϕ((wj /λ)x + (bj /λ)) =
+
+j=1
+
+N
+X
+j=1
+
+20
+
+αj
+
+wj x + b j
+.
+|wj x + bj | + λδ
+
+(100)
+
+
