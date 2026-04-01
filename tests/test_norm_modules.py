@@ -108,7 +108,7 @@ def test_pq_norm_supports_common_layouts():
 
 def test_pq_norm_matches_definition_5_1_constraint():
     x = torch.randn(4, 6)
-    y = PQNorm(6, p=4, q=2, affine=False)(x)
+    y = PQNorm(6, p=4, q=2, centering=False, affine=False)(x)
     q_moment = torch.mean(torch.abs(y).pow(2), dim=-1)
     assert torch.allclose(q_moment, torch.ones_like(q_moment), atol=1e-4, rtol=1e-4)
 
