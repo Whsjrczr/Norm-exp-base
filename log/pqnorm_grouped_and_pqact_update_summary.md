@@ -25,7 +25,7 @@ Relevant paper items:
 
 Updated:
 
-- [`extension/my_modules/pq_norm.py`](/e:/norm-exp/extension/my_modules/pq_norm.py)
+- [`extension/my_modules/norm/pq_norm.py`](/e:/norm-exp/extension/my_modules/norm/pq_norm.py)
 
 Change:
 
@@ -54,6 +54,23 @@ sign(x) * |x|^(p/q) / (mean(|x|^p) + eps)^(1/q)
 
 inside each group.
 
+### 1b. `PQNorm` now supports optional centering
+
+Updated:
+
+- [`extension/my_modules/norm/pq_norm.py`](/e:/norm-exp/extension/my_modules/norm/pq_norm.py)
+
+Change:
+
+- added `centering=False`
+
+Behavior:
+
+- `centering=False`: normalize directly on the original grouped features
+- `centering=True`: subtract the grouped mean before `(p, q)` normalization
+
+At `p=q=2`, grouped centered `PQN` matches `ParallelLN(..., centering=True)` when affine is disabled.
+
 ### 2. Normalization factory now supports grouped `PQN`
 
 Updated:
@@ -72,13 +89,14 @@ Example:
 
 ```bash
 --norm PQN --norm-cfg "num_per_group=8,p=4,q=2,dim=2"
+--norm PQN --norm-cfg "num_per_group=8,p=2,q=2,centering=True,dim=2"
 ```
 
 ### 3. Added the paper's `(p, q)` activation
 
 Created:
 
-- [`extension/my_modules/pq_activation.py`](/e:/norm-exp/extension/my_modules/pq_activation.py)
+- [`extension/my_modules/activation/pq_activation.py`](/e:/norm-exp/extension/my_modules/activation/pq_activation.py)
 
 Module:
 
@@ -135,9 +153,13 @@ Added checks for:
 - Definition 5.1 constraint:
   `mean(|y|^q) ~= 1`
 - grouped `PQN` factory path through `normalization.Norm(...)`
+- centered grouped `PQN` factory path through `normalization.Norm(...)`
 - equivalence at `p=q=2`:
   grouped `PQNorm(..., affine=False)` matches
   `ParallelLN(..., centering=False, affine=False)`
+- centered equivalence at `p=q=2`:
+  grouped `PQNorm(..., centering=True, affine=False)` matches
+  `ParallelLN(..., centering=True, affine=False)`
 - activation equivalence at `p=q=2`:
   `PQActivation(2,2)` matches `SinArctan`
 
@@ -188,6 +210,7 @@ Grouped `PQN` on MLP/KAN/PDE:
 
 ```bash
 --norm PQN --norm-cfg "num_per_group=8,p=4,q=2,dim=2"
+--norm PQN --norm-cfg "num_per_group=8,p=2,q=2,centering=True,dim=2"
 ```
 
 Grouped `PQN` on ViT:
@@ -205,6 +228,7 @@ Grouped `PQN` on ViT:
 ## Notes
 
 - When `p=q=2`, grouped `PQN` reduces to grouped L2 normalization, which matches `PLN` with `centering=False`.
+- When `p=q=2` and `centering=True`, grouped `PQN` matches `PLN` with `centering=True`.
 - When `p=q=2`, `pqact` reduces to:
 
 ```python

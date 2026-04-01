@@ -1,27 +1,27 @@
 import torch
 
 import extension.normalization as normalization
-from extension.my_modules.bn1d_modules import (
+from extension.my_modules.norm.bn1d_modules import (
     BatchNorm1dCentering,
     BatchNorm1dScaling,
     BatchNorm1dScalingRMS,
 )
-from extension.my_modules.bn2d_modules import (
+from extension.my_modules.norm.bn2d_modules import (
     BatchNorm2dCentering,
     BatchNorm2dScaling,
     BatchNorm2dScalingRMS,
 )
-from extension.my_modules.gn_modules import GroupNormScaling
-from extension.my_modules.pgn_modules import (
+from extension.my_modules.norm.gn_modules import GroupNormScaling
+from extension.my_modules.activation.pgn_modules import (
     PointwiseGroupNorm,
     PointwiseGroupNormCentering,
     PointwiseGroupNormScaling,
     PointwiseGroupNormScalingRMS,
 )
-from extension.my_modules.pln import ParallelLN
-from extension.my_modules.pq_activation import PQActivation
-from extension.my_modules.pq_norm import PQNorm
-from extension.my_modules.sinarctan import SinArctan
+from extension.my_modules.norm.pln import ParallelLN
+from extension.my_modules.activation.pq_activation import PQActivation
+from extension.my_modules.norm.pq_norm import PQNorm
+from extension.my_modules.activation.sinarctan import SinArctan
 from extension.normalization import _ParallelLayerNorm, _ParallelLayerScaling
 
 
@@ -115,8 +115,17 @@ def test_pq_norm_matches_definition_5_1_constraint():
 
 def test_grouped_pq_norm_matches_parallel_ln_scaling_when_p_equals_q_equals_2():
     x = torch.randn(3, 8, 5)
-    pqn = PQNorm(8, num_per_group=4, p=2, q=2, affine=False)
+    pqn = PQNorm(8, num_per_group=4, p=2, q=2, centering=False, affine=False)
     pln = ParallelLN(8, num_per_group=4, centering=False, affine=False)
+    y_pqn = pqn(x)
+    y_pln = pln(x)
+    assert torch.allclose(y_pqn, y_pln, atol=1e-6, rtol=1e-6)
+
+
+def test_centered_grouped_pq_norm_matches_parallel_ln_when_p_equals_q_equals_2():
+    x = torch.randn(3, 8, 5)
+    pqn = PQNorm(8, num_per_group=4, p=2, q=2, centering=True, affine=False)
+    pln = ParallelLN(8, num_per_group=4, centering=True, affine=False)
     y_pqn = pqn(x)
     y_pln = pln(x)
     assert torch.allclose(y_pqn, y_pln, atol=1e-6, rtol=1e-6)
@@ -140,6 +149,7 @@ def test_norm_factory_supports_mlp_2d_for_bn_and_gn():
         ("GNs", {"dim": 2, "num_groups": 4}),
         ("PQN", {"dim": 2, "p": 4, "q": 2}),
         ("PQN", {"dim": 2, "num_per_group": 4, "p": 2, "q": 2}),
+        ("PQN", {"dim": 2, "num_per_group": 4, "p": 2, "q": 2, "centering": True}),
     ]
 
     for norm_name, kwargs in cases:
@@ -172,6 +182,7 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
         ("GNs", {"dim": 3, "layout": "last", "num_groups": 4}),
         ("PQN", {"dim": 3, "layout": "last", "p": 4, "q": 2}),
         ("PQN", {"dim": 3, "layout": "last", "num_per_group": 4, "p": 2, "q": 2}),
+        ("PQN", {"dim": 3, "layout": "last", "num_per_group": 4, "p": 2, "q": 2, "centering": True}),
     ]
 
     for norm_name, kwargs in cases:

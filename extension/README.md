@@ -847,6 +847,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - `(p, q)-normalization`????? Definition 5.1
 - ??????????? `sign(x) * |x|^(p/q) / (mean(|x|^p) + eps)^(1/q)`
+- ?? `centering=True` ?????????????? `(p, q)` normalization
 - ? `affine=True` ?????????
 
 `No` / `no`
@@ -920,6 +921,9 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 --norm PQN
 --norm-cfg "num_per_group=8,p=4,q=2,affine=False"
+
+--norm PQN
+--norm-cfg "num_per_group=8,p=2,q=2,centering=True,affine=False"
 ```
 
 ## `activation.py`
@@ -1035,6 +1039,31 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 - 作用：顺序容器扩展
 
 ### `my_modules/`
+
+????????????? `normalization.py` ? `activation.py` ?????
+???????
+
+`norm/`
+
+- `ln_modules.py`
+- `bn1d_modules.py`
+- `bn2d_modules.py`
+- `gn_modules.py`
+- `pln.py`
+- `pq_norm.py`
+
+`activation/`
+
+- `pgn_modules.py`
+- `pq_activation.py`
+- `sinarctan.py`
+- `dyt.py`
+
+??????
+
+- `copy.py`
+
+## `my_modules/`
 
 这里是自定义层实现，主要被 `normalization.py` 和 `activation.py` 注册调用：
 

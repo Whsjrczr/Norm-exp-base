@@ -2,12 +2,12 @@ import argparse
 from functools import partial
 import torch.nn as nn
 
-from .my_modules.ln_modules import *
-from .my_modules.bn1d_modules import *
-from .my_modules.bn2d_modules import *
-from .my_modules.gn_modules import *
-from .my_modules.pln import ParallelLN
-from .my_modules.pq_norm import PQNorm
+from .my_modules.norm.ln_modules import *
+from .my_modules.norm.bn1d_modules import *
+from .my_modules.norm.bn2d_modules import *
+from .my_modules.norm.gn_modules import *
+from .my_modules.norm.pln import ParallelLN
+from .my_modules.norm.pq_norm import PQNorm
 
 from .utils import str2dict
 
@@ -178,7 +178,7 @@ def _ParallelLayerScaling(num_features, num_per_group=8, eps=1e-5, centering=Fal
     layout = _normalize_layout(dim, layout)
     return ParallelLN(num_features, num_per_group=num_per_group, eps=eps, centering=centering, dim=dim, layout=layout, *args, **kwargs)
 
-def _PQNorm(num_features, num_per_group=None, p=2, q=2, eps=1e-5, affine=True, dim=4, layout=None, *args, **kwargs):
+def _PQNorm(num_features, num_per_group=None, p=2, q=2, eps=1e-5, centering=True, affine=True, dim=4, layout=None, *args, **kwargs):
     layout = _normalize_layout(dim, layout)
     module = PQNorm(
         num_features,
@@ -186,6 +186,7 @@ def _PQNorm(num_features, num_per_group=None, p=2, q=2, eps=1e-5, affine=True, d
         p=p,
         q=q,
         eps=eps,
+        centering=centering,
         affine=affine,
         dim=dim,
         *args,
@@ -264,6 +265,8 @@ def getNormConfigFlag():
             flag += "_P" + str(_config.norm_cfg.get("p"))
         if _config.norm_cfg.get("q") is not None:
             flag += "_Q" + str(_config.norm_cfg.get("q"))
+        if _config.norm_cfg.get("centering") == True:
+            flag += "_Ctr"
 
 
     return flag

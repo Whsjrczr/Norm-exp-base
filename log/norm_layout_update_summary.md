@@ -46,15 +46,15 @@ norm_4d = ext.make_norm_factory(dim=4)
 
 ### 3. Custom normalization module fixes included
 
-- [`extension/my_modules/bn1d_modules.py`](E:\norm-exp\extension\my_modules\bn1d_modules.py)
+- [`extension/my_modules/norm/bn1d_modules.py`](E:\norm-exp\extension\my_modules\norm\bn1d_modules.py)
   - supports both `[B, C, L]` and `[B, N, C]`
-- [`extension/my_modules/bn2d_modules.py`](E:\norm-exp\extension\my_modules\bn2d_modules.py)
+- [`extension/my_modules/norm/bn2d_modules.py`](E:\norm-exp\extension\my_modules\norm\bn2d_modules.py)
   - fixed running stats shape corruption
-- [`extension/my_modules/gn_modules.py`](E:\norm-exp\extension\my_modules\gn_modules.py)
+- [`extension/my_modules/norm/gn_modules.py`](E:\norm-exp\extension\my_modules\norm\gn_modules.py)
   - fixed `GroupNormScaling(..., bias=True)` initialization
-- [`extension/my_modules/pgn_modules.py`](E:\norm-exp\extension\my_modules\pgn_modules.py)
+- [`extension/my_modules/activation/pgn_modules.py`](E:\norm-exp\extension\my_modules\activation\pgn_modules.py)
   - fixed affine broadcasting for NCHW inputs
-- [`extension/my_modules/pln.py`](E:\norm-exp\extension\my_modules\pln.py)
+- [`extension/my_modules/norm/pln.py`](E:\norm-exp\extension\my_modules\norm\pln.py)
   - supports common 2D/3D/4D layouts
 
 ### 4. Training loop fix

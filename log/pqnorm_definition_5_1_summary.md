@@ -39,7 +39,7 @@ which is the numerically stable odd-extension consistent with the paper's later 
 
 Created:
 
-- [`extension/my_modules/pq_norm.py`](/e:/norm-exp/extension/my_modules/pq_norm.py)
+- [`extension/my_modules/norm/pq_norm.py`](/e:/norm-exp/extension/my_modules/norm/pq_norm.py)
 
 Behavior:
 
@@ -119,3 +119,14 @@ Observed environment warning:
 
 - The implementation is not grouped like `PLN`; it applies `(p, q)` normalization across the feature axis of each sample.
 - Current implementation assumes the normalization axis is the feature/channel axis, matching the rest of this repository's normalization interface.
+
+## Follow-up: centered PQN
+
+A later update added optional `centering` to `PQN`.
+
+Behavior:
+
+- `centering=False`: keep the original Definition 5.1 style implementation in code
+- `centering=True`: subtract the per-group or full-feature mean before `(p, q)` normalization
+
+This makes centered `PQN` align with `PLN` semantics when `p=q=2`.

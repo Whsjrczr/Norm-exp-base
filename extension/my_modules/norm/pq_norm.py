@@ -1,3 +1,12 @@
+"""
+(p,q) - Normalization
+This is a PyTorch implementation of the (p,q) normalization as described in the paper [2]. 
+
+Reference:
+[1] Ni Y, Guo Y, Jia J, et al. On the nonlinearity of layer normalization[J]. arXiv preprint arXiv:2406.01255, 2024.
+[2] Ni Y, Liu Y, Sun W, et al. Parallel layer normalization for universal approximation[J]. arXiv preprint arXiv:2505.13142, 2025.
+"""
+
 import torch
 import torch.nn as nn
 from torch.nn import init
@@ -12,6 +21,7 @@ class PQNorm(nn.Module):
         p=2,
         q=2,
         eps=1e-5,
+        centering=True,
         affine=True,
         dim=4,
         *args,
@@ -26,6 +36,7 @@ class PQNorm(nn.Module):
         self.p = p
         self.q = q
         self.eps = eps
+        self.centering = centering
         self.affine = affine
         self.dim = dim
         if self.num_features % self.num_per_group != 0:
@@ -76,6 +87,8 @@ class PQNorm(nn.Module):
 
         size = x.shape
         x = x.reshape(-1, self.num_features // self.num_per_group, self.num_per_group)
+        if self.centering:
+            x = x - x.mean(dim=-1, keepdim=True)
         ratio = self.p / self.q
         numerator = torch.sign(x) * torch.abs(x).pow(ratio)
         denominator = torch.mean(torch.abs(x).pow(self.p), dim=-1, keepdim=True)
@@ -102,6 +115,6 @@ class PQNorm(nn.Module):
         return y
 
     def extra_repr(self):
-        return "num_features={}, num_per_group={}, p={}, q={}, eps={}, affine={}".format(
-            self.num_features, self.num_per_group, self.p, self.q, self.eps, self.affine
+        return "num_features={}, num_per_group={}, p={}, q={}, eps={}, centering={}, affine={}".format(
+            self.num_features, self.num_per_group, self.p, self.q, self.eps, self.centering, self.affine
         )
