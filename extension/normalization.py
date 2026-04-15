@@ -137,6 +137,47 @@ def _bCRMSNorm(num_features, eps=1e-5, affine=True, *args, **kwargs):
     )
 
 
+def _DynamicSequenceCenterLayerScaling(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("DSeqBLS only supports layout='last' because LayerScaling is applied on the last feature axis.")
+    return nn.Sequential(
+        DynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        LayerNormScaling(num_features, eps=eps, elementwise_affine=affine, bias=affine),
+    )
+
+
+def _DynamicSequenceCenterLayerNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("DSeqBCLN only supports layout='last' because LayerNorm is applied on the last feature axis.")
+    return nn.Sequential(
+        DynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        nn.LayerNorm(num_features, eps=eps, elementwise_affine=affine),
+    )
+
+
+def _DynamicSequenceCenterRMSNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("DSeqBCRMS only supports layout='last' because RMSNorm is applied on the last feature axis.")
+    return nn.Sequential(
+        DynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        LayerNormScalingRMS(num_features, eps=eps, elementwise_affine=affine),
+    )
+
+
+def _DynamicSequenceCenterDropoutScaling(num_features, dim=3, layout=None, dropout_prob=0.0, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("DSeqBCDS only supports layout='last' because LayerScaling is applied on the last feature axis.")
+    return nn.Sequential(
+        DynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        nn.Dropout(p=dropout_prob),
+        LayerNormScaling(num_features, eps=eps, elementwise_affine=affine, bias=affine),
+    )
+
+
 # BN
 def _BatchNorm(num_features, dim=4, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
     layout = _normalize_layout(dim, layout)
@@ -281,6 +322,10 @@ class _config:
                     'DSeqBN': _DynamicSequenceBatchNorm,
                     'DSeqBNc': _DynamicSequenceBatchNormCentering,
                     'DSeqBNs': _DynamicSequenceBatchNormScaling,
+                    'DSeqBLS': _DynamicSequenceCenterLayerScaling,
+                    'DSeqBCLN': _DynamicSequenceCenterLayerNorm,
+                    'DSeqBCRMS': _DynamicSequenceCenterRMSNorm,
+                    'DSeqBCDS': _DynamicSequenceCenterDropoutScaling,
                     'bCDS':_bCenteringDropoutScaling,
                     'bClCDS':_bCenlCenDropScaling,
                     'bCLN': _bCLayerNorm,

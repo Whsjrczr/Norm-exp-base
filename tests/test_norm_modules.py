@@ -319,3 +319,4 @@ def test_vit_build_vit_norm_layer_uses_dynamic_sequence_norm_without_fixed_lengt
     normalization._config.norm_cfg = {}
     module = build_vit_norm_layer(cfg)(384)
     assert isinstance(module, DynamicSequenceBatchNorm1d)
+

@@ -230,6 +230,10 @@ python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-siz
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SeqBNc
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SeqBNs
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBLS
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBCLN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBCRMS
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBCDS
 ```
 
 Notes:
@@ -238,6 +242,10 @@ Notes:
 - You do not need `--norm-cfg "dim=3,layout=last"` for the ViT path.
 - Fixed-length `SeqBN*` is the better match when image size and patch size are fixed.
 - Dynamic `DSeqBN*` is safer if token length may vary across calls.
+- `DSeqBLS` means `DSeqBNc + LayerScaling`.
+- `DSeqBCLN` means `DSeqBNc + LayerNorm`.
+- `DSeqBCRMS` means `DSeqBNc + RMSNorm`.
+- `DSeqBCDS` means `DSeqBNc + Dropout + LayerScaling`.
 
 Batch script:
 

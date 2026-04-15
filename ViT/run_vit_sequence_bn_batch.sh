@@ -22,7 +22,7 @@ seed="${SEED:-0}"
 cuda_visible_devices="${CUDA_VISIBLE_DEVICES:-0}"
 
 patch_sizes=(4 16)
-norms=(SeqBN SeqBNc SeqBNs DSeqBN DSeqBNc DSeqBNs)
+norms=(SeqBN SeqBNc SeqBNs DSeqBN DSeqBNc DSeqBNs DSeqBLS DSeqBCLN DSeqBCRMS DSeqBCDS)
 
 mkdir -p "${output_root}"
 
