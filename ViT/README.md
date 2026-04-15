@@ -213,3 +213,32 @@ python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-siz
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm bCRMS
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --activation pqact --activation-cfg "p=4,q=2"
 ```
+
+### Sequence BatchNorm on ViT
+
+ViT now supports sequence-axis BatchNorm families directly through `select_vit.py`.
+
+For ViT token tensors `(B, N, C)`:
+
+- `SeqBN`, `SeqBNc`, `SeqBNs` automatically bind `num_features` to `N = num_patches + 1`
+- `DSeqBN`, `DSeqBNc`, `DSeqBNs` work without a fixed token count
+
+Minimal examples:
+
+```bash
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SeqBN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SeqBNc
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SeqBNs
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBN
+```
+
+Notes:
+
+- You do not need to pass `num_features` manually for ViT.
+- You do not need `--norm-cfg "dim=3,layout=last"` for the ViT path.
+- Fixed-length `SeqBN*` is the better match when image size and patch size are fixed.
+- Dynamic `DSeqBN*` is safer if token length may vary across calls.
+
+Batch script:
+
+- [`run_vit_sequence_bn_batch.sh`](/e:/norm-exp/ViT/run_vit_sequence_bn_batch.sh)

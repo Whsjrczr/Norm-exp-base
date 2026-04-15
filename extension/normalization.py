@@ -8,6 +8,7 @@ from .my_modules.norm.bn2d_modules import *
 from .my_modules.norm.gn_modules import *
 from .my_modules.norm.pln import ParallelLN
 from .my_modules.norm.pq_norm import PQNorm
+from .my_modules.norm.seq_bn import *
 
 from .utils import str2dict
 
@@ -52,6 +53,18 @@ def _wrap_layout(module, dim, layout):
     if layout == "last":
         return _LayoutAdapter(module, dim=dim, layout=layout)
     return module
+
+
+def _normalize_sequence_layout(dim, layout):
+    if dim < 3:
+        raise ValueError(f"Sequence BatchNorm requires dim >= 3, but got dim={dim}.")
+
+    if layout is None:
+        return "first"
+
+    if layout not in ("first", "last"):
+        raise ValueError(f"Unsupported norm layout: {layout}. Expected 'first' or 'last'.")
+    return layout
 
 
 def make_norm_factory(**bound_kwargs):
@@ -143,6 +156,59 @@ def _BatchNormScaling(num_features, dim=4, layout=None, eps=1e-5, momentum=0.1, 
     module = module_cls(num_features, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
     return _wrap_layout(module, dim=dim, layout=layout)
 
+
+def _SequenceBatchNormCentering(num_features, dim=3, layout=None, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    module = SequenceBatchNorm1dCentering(
+        num_features,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+    )
+    return module
+
+
+def _SequenceBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    module = SequenceBatchNorm1dScaling(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+    )
+    return module
+
+
+def _SequenceBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    module = SequenceBatchNorm1d(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+    )
+    return module
+
+
+def _DynamicSequenceBatchNormCentering(num_features=None, dim=3, layout=None, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return DynamicSequenceBatchNorm1dCentering(affine=affine, layout=layout)
+
+
+def _DynamicSequenceBatchNormScaling(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return DynamicSequenceBatchNorm1dScaling(eps=eps, affine=affine, bias=affine, layout=layout)
+
+
+def _DynamicSequenceBatchNorm(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return DynamicSequenceBatchNorm1d(eps=eps, affine=affine, layout=layout)
+
 # IN
 def _InstanceNorm(num_features, dim=4, layout=None, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False, *args,
                   **kwargs):
@@ -209,6 +275,12 @@ class _config:
                     'CDS': _CenteringDropoutScaling,
                     'BNc': _BatchNormCentering,
                     'BNs': _BatchNormScaling,
+                    'SeqBN': _SequenceBatchNorm,
+                    'SeqBNc': _SequenceBatchNormCentering,
+                    'SeqBNs': _SequenceBatchNormScaling,
+                    'DSeqBN': _DynamicSequenceBatchNorm,
+                    'DSeqBNc': _DynamicSequenceBatchNormCentering,
+                    'DSeqBNs': _DynamicSequenceBatchNormScaling,
                     'bCDS':_bCenteringDropoutScaling,
                     'bClCDS':_bCenlCenDropScaling,
                     'bCLN': _bCLayerNorm,

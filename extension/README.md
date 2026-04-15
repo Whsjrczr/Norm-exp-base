@@ -811,6 +811,37 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - BatchNormScaling
 
+`SeqBN`
+
+- SequenceBatchNorm = SequenceBatchNormCentering -> SequenceBatchNormScaling
+- Supports sequence-axis normalization for inputs with `dim >= 3`
+
+`SeqBNc`
+
+- SequenceBatchNormCentering
+- For inputs with `dim >= 3`, normalize along the sequence axis instead of the channel axis
+
+`SeqBNs`
+
+- SequenceBatchNormScaling
+- For inputs with `dim >= 3`, normalize along the sequence axis instead of the channel axis
+
+`DSeqBN`
+
+- DynamicSequenceBatchNorm = DynamicSequenceBatchNormCentering -> DynamicSequenceBatchNormScaling
+- Supports variable-length sequence inputs with `dim >= 3`
+- Does not keep per-position running statistics
+
+`DSeqBNc`
+
+- DynamicSequenceBatchNormCentering
+- Variable-length sequence centering without fixed `seq_len`
+
+`DSeqBNs`
+
+- DynamicSequenceBatchNormScaling
+- Variable-length sequence scaling without fixed `seq_len`
+
 `bCDS`
 
 - BN Centering + Dropout + Layer Scaling
@@ -1217,6 +1248,15 @@ Meaning:
 
 For channel-first norm families such as `BN`, `BNc`, `BNs`, `GN`, `GNc`, `GNs`, and `IN`, the factory now automatically adapts token-last inputs when `layout="last"` is given.
 
+For sequence-axis BatchNorm families `SeqBN`, `SeqBNc`, and `SeqBNs`, `num_features` means sequence length rather than hidden size.
+
+Layout convention:
+
+- `layout="last"`: `(B, N, ..., C)`
+- `layout="first"`: `(B, C, ..., N)`
+
+For dynamic sequence-axis BatchNorm families `DSeqBN`, `DSeqBNc`, and `DSeqBNs`, no fixed `num_features` is required. They are intended for variable-length sequence inputs and use current-batch statistics only.
+
 ### `make_norm_factory`
 
 Preferred wiring pattern:
@@ -1232,6 +1272,8 @@ norm_4d = ext.make_norm_factory(dim=4)
 - `InstanceNorm` is intentionally rejected for `dim=2` because pure `(N, C)` tensors have no spatial axis for instance statistics.
 - `bCLN`, `bCRMS`, `PLN`, `PLS`, and `PQN` now work on both 2D MLP inputs and 3D ViT token inputs.
 - `BN/GN/IN` can now be used on ViT through `dim=3, layout="last"`.
+- `SeqBN/SeqBNc/SeqBNs` support sequence inputs with `dim >= 3` and compute statistics per sequence position, not per channel.
+- `DSeqBN/DSeqBNc/DSeqBNs` support variable-length sequence inputs, but they do not maintain per-position running statistics and their affine parameters are shared scalars rather than per-position vectors.
 
 ### CLI examples
 
@@ -1243,6 +1285,26 @@ norm_4d = ext.make_norm_factory(dim=4)
 # ViT
 --norm GN
 --norm-cfg "num_groups=6,dim=3,layout=last"
+
+# ViT with sequence-axis BN centering
+--norm SeqBNc
+--norm-cfg "dim=3,layout=last"
+
+# ViT with sequence-axis BN scaling
+--norm SeqBNs
+--norm-cfg "dim=3,layout=last"
+
+# ViT with sequence-axis BN (centering -> scaling)
+--norm SeqBN
+--norm-cfg "dim=3,layout=last"
+
+# Higher-dimensional sequence input with sequence axis at the end
+--norm SeqBN
+--norm-cfg "dim=4,layout=first"
+
+# Variable-length sequence BN
+--norm DSeqBN
+--norm-cfg "dim=3,layout=last"
 
 # CNN
 --norm BN

@@ -4,6 +4,11 @@ from torch import Tensor
 import torch.nn as nn
 from torch.nn import init as init
 from torch.nn.parameter import Parameter
+from .seq_bn import (
+    SequenceBatchNorm1d,
+    SequenceBatchNorm1dCentering,
+    SequenceBatchNorm1dScaling,
+)
 
 
 def _resolve_1d_feature_layout(input: Tensor, num_features: int):
@@ -28,6 +33,7 @@ def _resolve_1d_feature_layout(input: Tensor, num_features: int):
         )
 
     return feature_dim, reduce_dims, view_shape, sample_count
+
 
 class BatchNorm1dCentering(nn.Module):
     _version = 2
