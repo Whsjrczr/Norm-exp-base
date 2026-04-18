@@ -52,8 +52,10 @@ class TaiyiTracker:
     def finish(self):
         info = {"taiyi_output": False, "taiyi_output_path": None}
         self.close()
+        output = None
         if self.monitor is not None:
             output = self.monitor.get_output()
+        if output is not None:
             if self.output_dir:
                 os.makedirs(self.output_dir, exist_ok=True)
                 output_path = os.path.join(self.output_dir, "taiyi_output.pt")

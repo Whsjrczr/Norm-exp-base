@@ -20,7 +20,6 @@ import extension as ext
 from extension.utils import str2list
 
 from kan_dataset import KANDatasetBuilder, add_dataset_arguments
-from model.select_kan import add_model_arguments, get_model
 
 
 class KANTrainer:
@@ -56,7 +55,7 @@ class KANTrainer:
         self.y_true_val = dataset["y_true_val"]
         self.y_true_test = dataset["y_true_test"]
 
-        self.model = get_model(self.cfg)
+        self.model = ext.model.get_model(self.cfg)
         self.logger("==> model [{}]: {}".format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -137,7 +136,8 @@ class KANTrainer:
 
     def add_arguments(self):
         parser = argparse.ArgumentParser("KAN Regression")
-        add_model_arguments(parser)
+        ext.model.add_model_arguments(parser, task="classification", default_family="kan")
+        parser.set_defaults(width=32, depth=3, arch="KAN")
         add_dataset_arguments(parser)
         parser.add_argument("--batch-size", dest="batch_size", type=str2list, default="256,1024")
         parser.add_argument("--offline", "-offline", action="store_true")

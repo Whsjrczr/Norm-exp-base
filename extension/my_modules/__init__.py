@@ -1,11 +1,21 @@
 from .activation import (
     DynamicTanh,
+    MLPActivation,
     PQActivation,
     PointwiseGroupNorm,
     PointwiseGroupNormCentering,
     PointwiseGroupNormScaling,
     PointwiseGroupNormScalingRMS,
     SinArctan,
+)
+from .copy import Bias, Copy, MLP_Basic_Layer, Weight
+from .multichannel import (
+    MultiChannelLinear,
+    MultiChannelMLP,
+    MultiChannelNorm,
+    apply_channel_freeze,
+    apply_parameter_freeze,
+    summarize_trainability,
 )
 from .norm import (
     BatchNorm1dCentering,

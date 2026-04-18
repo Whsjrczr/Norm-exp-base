@@ -164,6 +164,15 @@ class Visualizer:
         if self.wandb_enabled:
             self.wandb.log(data)
 
+    def update_wandb_config(self, data: dict):
+        if self.wandb_enabled and self.wandb.run is not None and data:
+            self.wandb.config.update(data, allow_val_change=True)
+
+    def update_wandb_summary(self, data: dict):
+        if self.wandb_enabled and self.wandb.run is not None and data:
+            for key, value in data.items():
+                self.wandb.run.summary[key] = value
+
     def add_value(self, name, value):
         self.visdom.add_value(name, value)
 

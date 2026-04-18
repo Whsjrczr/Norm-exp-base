@@ -12,12 +12,16 @@ import torch
 
 import sys
 
-sys.path.append('../')
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(THIS_DIR)
+MLP_DIR = os.path.join(PROJECT_ROOT, 'MLP')
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 import extension as ext
 from extension.utils import str2list
 
-sys.path.append('../MLP')
-from model.selection_tool import add_model_arguments, get_model
+if MLP_DIR not in sys.path:
+    sys.path.append(MLP_DIR)
 from pde_dataset import PDEBuilder
 
 
@@ -26,6 +30,8 @@ class PDETrainer:
         self.cfg = self.add_arguments()
         self.model_name = 'PDE_' + self.cfg.pde_type + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(
             self.cfg.width) + '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg) + '_lr' + str(self.cfg.lr) + '_epochs' + str(self.cfg.epochs) + '_seed' + str(self.cfg.seed)
+        if self.cfg.arch == "MultiChannelMLP":
+            self.model_name += "_" + ext.multichannel.setting(self.cfg)
         self.result_path = os.path.join(self.cfg.output, self.model_name, self.cfg.log_suffix)
         os.makedirs(self.result_path, exist_ok=True)
         self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, self.cfg.resume is not None)
@@ -46,8 +52,10 @@ class PDETrainer:
         self.logger('==> use {:d} GPUs'.format(self.num_gpu))
 
         self.model = get_model(self.cfg).to(self.device)
+        self.freeze_summary = ext.multichannel.summarize_freeze_state(self.model)
         if self.num_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
+        ext.multichannel.log_runtime_summary(self.logger, self.cfg, self.freeze_summary)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -91,6 +99,12 @@ class PDETrainer:
                 "scheduler": self.cfg.lr_method,
                 "scheduler_cfg": "step" + str(self.cfg.lr_step) + "_gamma" + str(self.cfg.lr_gamma),
                 "loss_weights": self.cfg.loss_weights,
+                **ext.multichannel.get_runtime_config(self.cfg),
+                "freeze_trainable_params": self.freeze_summary["trainable_params"],
+                "freeze_frozen_params": self.freeze_summary["frozen_params"],
+                "freeze_trainable_tensors": self.freeze_summary["trainable_tensors"],
+                "freeze_frozen_tensors": self.freeze_summary["frozen_tensors"],
+                "freeze_has_frozen_params": self.freeze_summary["has_frozen_params"],
             },
         )
         if self.cfg.resume and hasattr(self, 'wandb_id'):
@@ -103,16 +117,29 @@ class PDETrainer:
             vis_names=self._build_vis_names(),
             wandb_kwargs=wandb_kwargs,
         )
+        self.visualizer.update_wandb_summary(
+            {
+                "freeze_summary_text": ext.multichannel.format_freeze_summary(self.freeze_summary),
+                "freeze_frozen_names": self.freeze_summary["frozen_names"],
+                "freeze_multichannel_modules": self.freeze_summary["multichannel_modules"],
+            }
+        )
+        self.metrics = ext.measurement.setting(
+            result_path=self.result_path,
+            visualizer=self.visualizer,
+            logger=self.logger,
+        )
         self.taiyi = ext.taiyi.setting(
             self.cfg,
             model=self.net,
             monitor_config=taiyi_config,
             wandb=self.visualizer.wandb,
+            output_dir=self.result_path,
         )
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('PDE Solving')
-        add_model_arguments(parser, task='pde')
+        ext.model.add_model_arguments(parser, task='pde', default_family='mlp')
         parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'poisson_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
@@ -200,8 +227,7 @@ class PDETrainer:
 
         error = np.mean((y_pred - y_true)**2)
         self.logger('==> Validation L2 error: {:.5g}'.format(error))
-        self.visualizer.log({"val_error": error})
-        self.visualizer.add_value("val error", error)
+        self.metrics.log_validation("val error", error, wandb_key="val_error")
         self.best_loss = getattr(self, 'best_loss', float('inf'))
         if not self.cfg.test and not self.cfg.no_save_best and error < self.best_loss:
             self.best_loss = error
@@ -259,7 +285,7 @@ class PDETrainer:
                 for j in range(len(metrics)):
                     metric_name = str(metrics_names[j]).replace(' ', '_').replace('(', '').replace(')', '').replace(',', '').replace('.', '')
                     log_dict[f"metrics_{metric_name}"] = float(metrics[j])
-                self.visualizer.log(log_dict)
+                self.metrics.log_scalars(log_dict, step=offset + i + 1, step_key="iterations")
 
     def _log_histories_to_vis(self, histories):
         for _stage_idx, stage_cfg, losshistory, _train_state, _offset in histories:
@@ -270,14 +296,17 @@ class PDETrainer:
                 train_losses = losshistory.loss_train[i]
                 test_losses = losshistory.loss_test[i]
                 metrics = losshistory.metrics_test[i]
-                self.visualizer.add_value("train total loss", float(np.sum(train_losses)))
-                self.visualizer.add_value("test total loss", float(np.sum(test_losses)))
+                vis_scalars = {
+                    "train total loss": float(np.sum(train_losses)),
+                    "test total loss": float(np.sum(test_losses)),
+                }
                 for j in range(len(train_losses)):
-                    self.visualizer.add_value(f"train loss {j}", float(train_losses[j]))
+                    vis_scalars[f"train loss {j}"] = float(train_losses[j])
                 for j in range(len(test_losses)):
-                    self.visualizer.add_value(f"test loss {j}", float(test_losses[j]))
+                    vis_scalars[f"test loss {j}"] = float(test_losses[j])
                 for j in range(len(metrics)):
-                    self.visualizer.add_value(self._metric_vis_name(metrics_names[j]), float(metrics[j]))
+                    vis_scalars[self._metric_vis_name(metrics_names[j])] = float(metrics[j])
+                self.metrics.log_scalars({}, vis_scalars=vis_scalars)
 
     def _build_vis_names(self):
         names = {

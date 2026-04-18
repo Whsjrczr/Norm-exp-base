@@ -2,6 +2,7 @@ import argparse
 import torch
 import torch.nn as nn
 from .utils import str2dict
+from .my_modules.activation.mlp_activation import MLPActivation
 from .my_modules.activation.pgn_modules import PointwiseGroupNorm
 from .my_modules.activation.pq_activation import PQActivation
 from .my_modules.activation.sinarctan import SinArctan
@@ -36,6 +37,16 @@ def _silu(num_features, *args, **kwargs):
 def _gelu(num_features, *args, **kwargs):
     return nn.GELU()
 
+def _mlpact(num_features, hidden_dim=16, n=None, act='relu', act_cfg=None, bias=True, *args, **kwargs):
+    return MLPActivation(
+        num_features=num_features,
+        hidden_dim=hidden_dim,
+        n=n,
+        act=act,
+        act_cfg=act_cfg,
+        bias=bias,
+    )
+
 class _config:
     activation = 'relu'
     activation_cfg = {}
@@ -47,6 +58,7 @@ class _config:
         'pgn': _PointwiseGroupNorm,
         'sinarctan': _sinarctan,
         'pqact': _pqact,
+        'mlpact': _mlpact,
         'no': torch.nn.Identity,
         'silu': _silu,
         'gelu': _gelu,
@@ -91,6 +103,12 @@ def getActivationConfigFlag():
             flag += '_P' + str(_config.activation_cfg.get('p'))
         if _config.activation_cfg.get('q') is not None:
             flag += '_Q' + str(_config.activation_cfg.get('q'))
+    if _config.activation == 'mlpact':
+        hidden_dim = _config.activation_cfg.get('n', _config.activation_cfg.get('hidden_dim'))
+        if hidden_dim is not None:
+            flag += '_H' + str(hidden_dim)
+        if _config.activation_cfg.get('act') is not None:
+            flag += '_A' + str(_config.activation_cfg.get('act'))
     return flag
 
 

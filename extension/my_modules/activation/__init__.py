@@ -1,4 +1,5 @@
 from .dyt import DynamicTanh
+from .mlp_activation import MLPActivation
 from .pgn_modules import (
     PointwiseGroupNorm,
     PointwiseGroupNormCentering,

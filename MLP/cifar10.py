@@ -9,9 +9,11 @@ import torch.nn as nn
 from torchvision.utils import save_image
 import sys
 
-sys.path.append('../')
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(THIS_DIR)
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 import extension as ext
-from model.selection_tool import add_model_arguments, get_model
 
 
 def to_img(x):
@@ -22,6 +24,8 @@ class MNIST:
     def __init__(self):
         self.cfg = self.add_arguments()
         self.model_name = self.cfg.arch + '_' + ext.dataset.setting(self.cfg) + '_d' + str(self.cfg.depth) + '_w' + str(self.cfg.width) + '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg)
+        if self.cfg.arch == "MultiChannelMLP":
+            self.model_name += "_" + ext.multichannel.setting(self.cfg)
         self.model_name = self.model_name + '_lr' + str(self.cfg.lr) + '_bs' + str(
             self.cfg.batch_size[0]) + '_dropout' + str(self.cfg.dropout) + \
                            '_wd' + str(self.cfg.weight_decay) + '_seed' + str(self.cfg.seed)
@@ -36,6 +40,8 @@ class MNIST:
         self.val_loader = ext.dataset.get_dataset_loader(self.cfg, train=False, use_cuda=False)
 
         self.model = get_model(self.cfg)
+        self.freeze_summary = ext.multichannel.summarize_freeze_state(self.model)
+        ext.multichannel.log_runtime_summary(self.logger, self.cfg, self.freeze_summary)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -96,6 +102,12 @@ class MNIST:
                 "seed": self.cfg.seed,
                 "scheduler": getattr(self.cfg, "lr_method", None),
                 "scheduler_cfg": f"step{getattr(self.cfg,'lr_step',None)}_gamma{getattr(self.cfg,'lr_gamma',None)}",
+                **ext.multichannel.get_runtime_config(self.cfg),
+                "freeze_trainable_params": self.freeze_summary["trainable_params"],
+                "freeze_frozen_params": self.freeze_summary["frozen_params"],
+                "freeze_trainable_tensors": self.freeze_summary["trainable_tensors"],
+                "freeze_frozen_tensors": self.freeze_summary["frozen_tensors"],
+                "freeze_has_frozen_params": self.freeze_summary["has_frozen_params"],
             },
         )
 
@@ -109,18 +121,31 @@ class MNIST:
             vis_names={'train loss': 'loss', 'test loss': 'loss', 'train accuracy': 'accuracy', 'test accuracy': 'accuracy'},
             wandb_kwargs=wandb_kwargs,
         )
+        self.visualizer.update_wandb_summary(
+            {
+                "freeze_summary_text": ext.multichannel.format_freeze_summary(self.freeze_summary),
+                "freeze_frozen_names": self.freeze_summary["frozen_names"],
+                "freeze_multichannel_modules": self.freeze_summary["multichannel_modules"],
+            }
+        )
+        self.metrics = ext.measurement.setting(
+            result_path=self.result_path,
+            visualizer=self.visualizer,
+            logger=self.logger,
+        )
         self.taiyi = ext.taiyi.setting(
             self.cfg,
             model=self.model,
             monitor_config=taiyi_config,
             wandb=self.visualizer.wandb,
+            output_dir=self.result_path,
         )
         if self.taiyi.enabled:
             self.logger('==> taiyi config: {}'.format(taiyi_config))
 
     def add_arguments(self):
         parser = argparse.ArgumentParser('MNIST Classification')
-        add_model_arguments(parser, task='classification')
+        ext.model.add_model_arguments(parser, task='classification', default_family='mlp')
         parser.add_argument('--offline', '-offline', action='store_true', help='offline mode')
 
         ext.trainer.add_arguments(parser)
@@ -242,7 +267,11 @@ class MNIST:
 
                 self.train_epoch(epoch)
 
-                self.visualizer.log({"learning_rate": self.scheduler.get_last_lr()[0], "steps": self.step, "stage": si, "epochs": epoch})
+                self.metrics.log_scalars(
+                    {"learning_rate": self.scheduler.get_last_lr()[0], "stage": si},
+                    step=self.step,
+                    epoch=epoch,
+                )
 
                 accuracy, val_loss = self.validate(epoch)
 
@@ -310,9 +339,7 @@ class MNIST:
         train_loss /= total
         accuracy = 100. * correct / total
 
-        self.visualizer.log({"train_acc": accuracy, "train_loss": train_loss, "epochs": epoch, "steps": self.step})
-        self.visualizer.add_value('train loss', train_loss)
-        self.visualizer.add_value('train accuracy', accuracy)
+        self.metrics.log_classification("train", train_loss, accuracy=accuracy, step=self.step, epoch=epoch)
 
         self.logger('Train on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(
             epoch, train_loss, accuracy, correct, total, progress_bar.time_used()
@@ -341,9 +368,7 @@ class MNIST:
         test_loss /= total
         accuracy = correct * 100. / total
 
-        self.visualizer.add_value('test loss', test_loss)
-        self.visualizer.add_value('test accuracy', accuracy)
-        self.visualizer.log({"test_acc": accuracy, "test_loss": test_loss, "epochs": epoch, "steps": self.step})
+        self.metrics.log_classification("test", test_loss, accuracy=accuracy, step=self.step, epoch=epoch)
 
         self.logger('Test on epoch {}: average loss={:.5g}, accuracy={:.2f}% ({}/{}), time: {}'.format(
             epoch, test_loss, accuracy, correct, total, progress_bar.time_used()

@@ -1,5 +1,10 @@
+import re
+
 import torch
 import torch.nn as nn
+
+from ..activation import Activation
+from ..normalization import Norm
 
 class Copy(nn.Module):
     def __init__(self, thickness=1, data_dim=2, copy_dim=None):
@@ -104,12 +109,12 @@ class MLP_Basic_Layer(nn.Module):
                     )
                 )
             elif m == "a": # activation
-                self.layers.append(my.Activation(input_dim))
+                self.layers.append(Activation(input_dim))
             elif m == "c": # copy operation
                 self.layers.append(Copy(thickness=thickness, data_dim=dim))
                 input_dim *= thickness
             elif m == "n": # normalization
-                self.layers.append(my.Norm(input_dim, dim=dim))
+                self.layers.append(Norm(input_dim, dim=dim))
         self.layers = nn.Sequential(*self.layers)
 
     def forward(self, x):

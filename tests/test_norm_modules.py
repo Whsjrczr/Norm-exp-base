@@ -27,10 +27,12 @@ from extension.my_modules.activation.pgn_modules import (
     PointwiseGroupNormScaling,
     PointwiseGroupNormScalingRMS,
 )
+from extension.my_modules.activation.mlp_activation import MLPActivation
 from extension.my_modules.norm.pln import ParallelLN
 from extension.my_modules.activation.pq_activation import PQActivation
 from extension.my_modules.norm.pq_norm import PQNorm
 from extension.my_modules.activation.sinarctan import SinArctan
+import extension.activation as activation
 from extension.normalization import _ParallelLayerNorm, _ParallelLayerScaling
 from ViT.model_vit.select_vit import build_vit_norm_layer
 
@@ -211,6 +213,33 @@ def test_pq_activation_matches_sinarctan_when_p_equals_q_equals_2():
     y_pq = PQActivation(p=2, q=2)(x)
     y_sat = SinArctan(num_features=7)(x)
     assert torch.allclose(y_pq, y_sat, atol=1e-6, rtol=1e-6)
+
+
+def test_mlp_activation_supports_common_shapes_and_has_trainable_parameters():
+    module = MLPActivation(hidden_dim=8, act="tanh")
+    x2 = torch.randn(4, 7, requires_grad=True)
+    x3 = torch.randn(2, 5, 8, requires_grad=True)
+
+    y2 = module(x2)
+    y3 = module(x3)
+
+    assert y2.shape == x2.shape
+    assert y3.shape == x3.shape
+
+    (y2.sum() + y3.sum()).backward()
+    assert module.fc1.weight.grad is not None
+    assert module.fc2.weight.grad is not None
+
+
+def test_activation_factory_builds_mlpact_and_formats_flag():
+    activation._config.activation = "mlpact"
+    activation._config.activation_cfg = {"n": 11, "act": "gelu"}
+
+    module = activation.Activation(32)
+    assert isinstance(module, MLPActivation)
+    assert module.hidden_dim == 11
+    assert module.act_name == "gelu"
+    assert activation.getActivationConfigFlag() == "mlpact_H11_Agelu"
 
 
 def test_norm_factory_supports_mlp_2d_for_bn_and_gn():

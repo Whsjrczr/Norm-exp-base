@@ -13,12 +13,16 @@ import torch
 
 import sys
 
-sys.path.append('../')
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(THIS_DIR)
+MLP_DIR = os.path.join(PROJECT_ROOT, 'MLP')
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 import extension as ext
 from extension.utils import str2list
 
-sys.path.append('../MLP')
-from model.selection_tool import add_model_arguments, get_model
+if MLP_DIR not in sys.path:
+    sys.path.append(MLP_DIR)
 from pde_dataset import PDEBuilder
 
 
@@ -76,6 +80,8 @@ class PDETaiyiTrainer:
         self.cfg = self.add_arguments()
         self.model_name = 'PDE_TAIYI_' + self.cfg.pde_type + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(
             self.cfg.width) + '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg) + '_lr' + str(self.cfg.lr) + '_epochs' + str(self.cfg.epochs) + '_seed' + str(self.cfg.seed)
+        if self.cfg.arch == "MultiChannelMLP":
+            self.model_name += "_" + ext.multichannel.setting(self.cfg)
         self.result_path = os.path.join(self.cfg.output, self.model_name, self.cfg.log_suffix)
         os.makedirs(self.result_path, exist_ok=True)
         self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, self.cfg.resume is not None)
@@ -96,9 +102,11 @@ class PDETaiyiTrainer:
         self.num_gpu = torch.cuda.device_count()
         self.logger('==> use {:d} GPUs'.format(self.num_gpu))
 
-        self.model = get_model(self.cfg).to(self.device)
+        self.model = ext.model.get_model(self.cfg).to(self.device)
+        self.freeze_summary = ext.multichannel.summarize_freeze_state(self.model)
         if self.num_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
+        ext.multichannel.log_runtime_summary(self.logger, self.cfg, self.freeze_summary)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -158,6 +166,12 @@ class PDETaiyiTrainer:
                 "taiyi_modules": taiyi_modules,
                 "taiyi_quantities": taiyi_quantities,
                 "taiyi_config": taiyi_config,
+                **ext.multichannel.get_runtime_config(self.cfg),
+                "freeze_trainable_params": self.freeze_summary["trainable_params"],
+                "freeze_frozen_params": self.freeze_summary["frozen_params"],
+                "freeze_trainable_tensors": self.freeze_summary["trainable_tensors"],
+                "freeze_frozen_tensors": self.freeze_summary["frozen_tensors"],
+                "freeze_has_frozen_params": self.freeze_summary["has_frozen_params"],
             },
         )
         if self.cfg.resume and hasattr(self, 'wandb_id'):
@@ -169,6 +183,18 @@ class PDETaiyiTrainer:
             env_name=self.model_name,
             vis_names=self._build_vis_names(),
             wandb_kwargs=wandb_kwargs,
+        )
+        self.metrics = ext.measurement.setting(
+            result_path=self.result_path,
+            visualizer=self.visualizer,
+            logger=self.logger,
+        )
+        self.visualizer.update_wandb_summary(
+            {
+                "freeze_summary_text": ext.multichannel.format_freeze_summary(self.freeze_summary),
+                "freeze_frozen_names": self.freeze_summary["frozen_names"],
+                "freeze_multichannel_modules": self.freeze_summary["multichannel_modules"],
+            }
         )
         self.taiyi = ext.taiyi.setting(
             self.cfg,
@@ -182,7 +208,7 @@ class PDETaiyiTrainer:
     def add_arguments(self):
         raw_argv = sys.argv[1:]
         parser = argparse.ArgumentParser('PDE Solving with Taiyi Layer Dynamics Tracking')
-        add_model_arguments(parser, task='pde')
+        ext.model.add_model_arguments(parser, task='pde', default_family='mlp')
         parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'helmholtz_2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'poisson_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
@@ -225,9 +251,6 @@ class PDETaiyiTrainer:
             args.epochs = stage_total_iterations
         if not getattr(args, "taiyi", False):
             args.taiyi = True
-        if not getattr(args, "wandb", False):
-            args.wandb = True
-            args.visualize = True
         return ext.tracking.normalize_config(args)
 
     def _has_cli_flag(self, argv, *flags):
@@ -311,8 +334,7 @@ class PDETaiyiTrainer:
             self.logger('==> Validation produced non-finite error; skip val logging and best-checkpoint update.')
             return None
 
-        self.visualizer.log({"val_error": error})
-        self.visualizer.add_value("val error", error)
+        self.metrics.log_validation("val error", error, wandb_key="val_error")
         self.best_loss = getattr(self, 'best_loss', float('inf'))
         if not self.cfg.test and not self.cfg.no_save_best and error < self.best_loss:
             self.best_loss = error
@@ -378,7 +400,7 @@ class PDETaiyiTrainer:
                     if np.isfinite(value):
                         log_dict[f"metrics_{metric_name}"] = value
                 if len(log_dict) > 2:
-                    self.visualizer.log(log_dict)
+                    self.metrics.log_scalars(log_dict, step=offset + i + 1, step_key="iterations")
 
     def _log_histories_to_vis(self, histories):
         for _stage_idx, stage_cfg, losshistory, _train_state, _offset in histories:
@@ -391,22 +413,25 @@ class PDETaiyiTrainer:
                 metrics = losshistory.metrics_test[i]
                 train_total = float(np.sum(train_losses))
                 test_total = float(np.sum(test_losses))
+                vis_scalars = {}
                 if np.isfinite(train_total):
-                    self.visualizer.add_value("train total loss", train_total)
+                    vis_scalars["train total loss"] = train_total
                 if np.isfinite(test_total):
-                    self.visualizer.add_value("test total loss", test_total)
+                    vis_scalars["test total loss"] = test_total
                 for j in range(len(train_losses)):
                     value = float(train_losses[j])
                     if np.isfinite(value):
-                        self.visualizer.add_value(f"train loss {j}", value)
+                        vis_scalars[f"train loss {j}"] = value
                 for j in range(len(test_losses)):
                     value = float(test_losses[j])
                     if np.isfinite(value):
-                        self.visualizer.add_value(f"test loss {j}", value)
+                        vis_scalars[f"test loss {j}"] = value
                 for j in range(len(metrics)):
                     value = float(metrics[j])
                     if np.isfinite(value):
-                        self.visualizer.add_value(self._metric_vis_name(metrics_names[j]), value)
+                        vis_scalars[self._metric_vis_name(metrics_names[j])] = value
+                if vis_scalars:
+                    self.metrics.log_scalars({}, vis_scalars=vis_scalars)
 
     def _build_vis_names(self):
         names = {

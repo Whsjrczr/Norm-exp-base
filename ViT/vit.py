@@ -8,10 +8,11 @@ import time
 import torch
 import torch.nn as nn
 
-sys.path.append("../")
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(THIS_DIR)
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 import extension as ext
-
-from model_vit.select_vit import add_model_arguments, get_model
 
 
 class ViTTrainer:
@@ -40,7 +41,7 @@ class ViTTrainer:
         self.train_loader = ext.dataset.get_dataset_loader(self.cfg, train=True, use_cuda=self.device.type == "cuda")
         self.val_loader = ext.dataset.get_dataset_loader(self.cfg, train=False, use_cuda=self.device.type == "cuda")
 
-        self.model = get_model(self.cfg)
+        self.model = ext.model.get_model(self.cfg)
         self.logger("==> model [{}]: {}".format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -54,6 +55,7 @@ class ViTTrainer:
         self.model.to(self.device)
 
         self.best_acc1 = 0.0
+        self.step = 0
         if self.cfg.resume:
             saved = self.saver.resume(self.cfg.resume)
             self.cfg.start_epoch = saved["epoch"]
@@ -118,6 +120,11 @@ class ViTTrainer:
             },
             wandb_kwargs=wandb_kwargs,
         )
+        self.metrics = ext.measurement.setting(
+            result_path=self.result_path,
+            visualizer=self.visualizer,
+            logger=self.logger,
+        )
         self.taiyi = ext.taiyi.setting(
             self.cfg,
             model=self.model,
@@ -130,7 +137,7 @@ class ViTTrainer:
     def add_arguments(self):
         argv = ["--batch-size" if arg == "--batch_size" else arg for arg in sys.argv[1:]]
         parser = argparse.ArgumentParser("ViT Classification")
-        add_model_arguments(parser)
+        ext.model.add_model_arguments(parser, task="classification", default_family="vit")
         parser.add_argument("--data_path", type=str, default="", help="alias of --dataset-root for ImageFolder datasets")
         parser.add_argument("--val-resize-size", dest="val_resize_size", type=int, default=None)
         parser.add_argument("--disable-train-shuffle", action="store_true")
@@ -215,13 +222,13 @@ class ViTTrainer:
 
             for epoch in range(epoch_begin, epoch_end):
                 self.train_epoch(epoch)
-                self.visualizer.log(
+                self.metrics.log_scalars(
                     {
                         "learning_rate": self.optimizer.param_groups[0]["lr"],
-                        "steps": self.step,
                         "stage": stage_idx,
-                        "epochs": epoch,
-                    }
+                    },
+                    step=self.step,
+                    epoch=epoch,
                 )
 
                 accuracy1, accuracy5, val_loss = self.validate(epoch)
@@ -355,12 +362,15 @@ class ViTTrainer:
                     10,
                 )
 
-        self.visualizer.log(
-            {"train_acc": train_acc1.avg, "train_acc5": train_acc5.avg, "train_loss": train_loss.avg, "epochs": epoch, "steps": self.step}
+        self.metrics.log_classification(
+            "train",
+            train_loss.avg,
+            accuracy=train_acc1.avg,
+            step=self.step,
+            epoch=epoch,
+            extra_scalars={"train_acc5": train_acc5.avg},
         )
-        self.visualizer.add_value("train loss", train_loss.avg)
-        self.visualizer.add_value("train accuracy", train_acc1.avg)
-        self.visualizer.add_value("train acc@5", train_acc5.avg)
+        self.metrics.log_scalars({}, vis_scalars={"train acc@5": train_acc5.avg})
         self.logger(
             "Train on epoch {}: average loss={:.5g}, acc@1={:.2f}%, acc@5={:.2f}%, time: {}".format(
                 epoch, train_loss.avg, train_acc1.avg, train_acc5.avg, progress_bar.time_used()
@@ -391,10 +401,15 @@ class ViTTrainer:
                     )
                 )
 
-        self.visualizer.add_value("test loss", test_loss.avg)
-        self.visualizer.add_value("test accuracy", test_acc1.avg)
-        self.visualizer.add_value("test acc@5", test_acc5.avg)
-        self.visualizer.log({"test_acc": test_acc1.avg, "test_acc5": test_acc5.avg, "test_loss": test_loss.avg, "epochs": epoch, "steps": self.step})
+        self.metrics.log_classification(
+            "test",
+            test_loss.avg,
+            accuracy=test_acc1.avg,
+            step=self.step,
+            epoch=epoch,
+            extra_scalars={"test_acc5": test_acc5.avg},
+        )
+        self.metrics.log_scalars({}, vis_scalars={"test acc@5": test_acc5.avg})
         self.logger(
             "Test on epoch {}: average loss={:.5g}, acc@1={:.2f}%, acc@5={:.2f}%, time: {}".format(
                 epoch, test_loss.avg, test_acc1.avg, test_acc5.avg, progress_bar.time_used()

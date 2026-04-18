@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import csv
-import json
 import os
 os.environ['DDE_BACKEND'] = 'pytorch'
 import time
@@ -14,12 +12,16 @@ import torch
 
 import sys
 
-sys.path.append('../')
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(THIS_DIR)
+MLP_DIR = os.path.join(PROJECT_ROOT, 'MLP')
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 import extension as ext
 from extension.utils import str2list
 
-sys.path.append('../MLP')
-from model.selection_tool import add_model_arguments, get_model
+if MLP_DIR not in sys.path:
+    sys.path.append(MLP_DIR)
 from pde_dataset import PDEBuilder
 
 
@@ -75,6 +77,8 @@ class PDENTKTrainer:
         self.cfg = self.add_arguments()
         self.model_name = 'PDE_NTK_' + self.cfg.pde_type + '_' + self.cfg.arch + '_d' + str(self.cfg.depth) + '_w' + str(
             self.cfg.width) + '_' + ext.normalization.setting(self.cfg) + '_' + ext.activation.setting(self.cfg) + '_lr' + str(self.cfg.lr) + '_epochs' + str(self.cfg.epochs) + '_seed' + str(self.cfg.seed)
+        if self.cfg.arch == "MultiChannelMLP":
+            self.model_name += "_" + ext.multichannel.setting(self.cfg)
         self.result_path = os.path.join(self.cfg.output, self.model_name, self.cfg.log_suffix)
         os.makedirs(self.result_path, exist_ok=True)
         self.logger = ext.logger.setting('log.txt', self.result_path, self.cfg.test, self.cfg.resume is not None)
@@ -95,9 +99,11 @@ class PDENTKTrainer:
         self.num_gpu = torch.cuda.device_count()
         self.logger('==> use {:d} GPUs'.format(self.num_gpu))
 
-        self.model = get_model(self.cfg).to(self.device)
+        self.model = ext.model.get_model(self.cfg).to(self.device)
+        self.freeze_summary = ext.multichannel.summarize_freeze_state(self.model)
         if self.num_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
+        ext.multichannel.log_runtime_summary(self.logger, self.cfg, self.freeze_summary)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -139,6 +145,12 @@ class PDENTKTrainer:
                 "ntk_boundary_points": self.cfg.ntk_boundary_points,
                 "ntk_when": self.cfg.ntk_when,
                 "ntk_track_every": self.cfg.ntk_track_every,
+                **ext.multichannel.get_runtime_config(self.cfg),
+                "freeze_trainable_params": self.freeze_summary["trainable_params"],
+                "freeze_frozen_params": self.freeze_summary["frozen_params"],
+                "freeze_trainable_tensors": self.freeze_summary["trainable_tensors"],
+                "freeze_frozen_tensors": self.freeze_summary["frozen_tensors"],
+                "freeze_has_frozen_params": self.freeze_summary["has_frozen_params"],
             },
         )
         if self.cfg.resume and hasattr(self, 'wandb_id'):
@@ -151,12 +163,41 @@ class PDENTKTrainer:
             vis_names=self._build_vis_names(),
             wandb_kwargs=wandb_kwargs,
         )
-        self.ntk_records = []
+        self.visualizer.update_wandb_summary(
+            {
+                "freeze_summary_text": ext.multichannel.format_freeze_summary(self.freeze_summary),
+                "freeze_frozen_names": self.freeze_summary["frozen_names"],
+                "freeze_multichannel_modules": self.freeze_summary["multichannel_modules"],
+            }
+        )
+        self.metrics = ext.measurement.setting(
+            result_path=self.result_path,
+            visualizer=self.visualizer,
+            logger=self.logger,
+        )
+        taiyi_config = {
+            'ResidualBlock': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'ResBlockDropout': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'BasicBlock': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+            'Bottleneck': [['ResidualInputAngleMean', 'linear(5,0)'], ['ResidualStreamOutputAngleMean', 'linear(5,0)']],
+        }
+        self.taiyi = ext.taiyi.setting(
+            self.cfg,
+            model=self.net,
+            monitor_config=taiyi_config,
+            wandb=self.visualizer.wandb,
+            output_dir=self.result_path,
+        )
+        self.ntk = ext.ntk.EmpiricalNTK(
+            result_path=self.result_path,
+            metrics=self.metrics,
+            save_eigvals=self.cfg.ntk_save_eigvals,
+        )
 
     def add_arguments(self):
         raw_argv = sys.argv[1:]
         parser = argparse.ArgumentParser('PDE Solving with NTK Analysis')
-        add_model_arguments(parser, task='pde')
+        ext.model.add_model_arguments(parser, task='pde', default_family='mlp')
         parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'helmholtz_2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'poisson_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
@@ -257,7 +298,10 @@ class PDENTKTrainer:
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))
 
+        taiyi_info = self.taiyi.finish()
         finish_info = self.visualizer.finish(sync_offline=self.cfg.offline)
+        if taiyi_info["taiyi_output"]:
+            self.logger("==> Taiyi monitor collected output.")
         if finish_info["synced"]:
             self.logger("==> WandB offline run synced.")
 
@@ -278,15 +322,15 @@ class PDENTKTrainer:
         self.logger(f'==> NTK [{phase}] analyzing {len(point_sets)} point sets.')
         for set_name, points in point_sets.items():
             x = torch.as_tensor(points, device=self.device, dtype=next(self.net.parameters()).dtype)
-            jacobian = self._compute_empirical_jacobian(self.net, x)
-            stats = self._compute_ntk_spectrum(jacobian)
+            jacobian = self.ntk.compute_empirical_jacobian(self.net, x)
+            stats = self.ntk.compute_ntk_spectrum(jacobian)
             record = {
                 "phase": phase,
                 "step": int(step),
                 "point_set": set_name,
                 "n_points": int(x.shape[0]),
                 "input_dim": int(x.shape[1]),
-                "output_dim": int(self._infer_output_dim(x)),
+                "output_dim": int(self.ntk.infer_output_dim(self.net, x)),
                 "cond": float(stats["cond"]),
                 "eff_rank_90": int(stats["eff_rank_90"]),
                 "numerical_rank": int(stats["numerical_rank"]),
@@ -296,23 +340,13 @@ class PDENTKTrainer:
                 "lambda_min": float(stats["lambda_min"]),
                 "stable_rank": float(stats["stable_rank"]),
             }
-            self.ntk_records.append(record)
-            self._log_ntk_record(record)
+            self.ntk.append_record(record, eigvals=stats["eigvals"])
             self.logger(
                 f"==> NTK [{phase}/{set_name}] cond={record['cond']:.3e}, "
                 f"eff_rank_90={record['eff_rank_90']}, numerical_rank={record['numerical_rank']}, "
                 f"mean_self_kernel={record['mean_self_kernel']:.3e}"
             )
-            if self.cfg.ntk_save_eigvals:
-                eig_path = os.path.join(self.result_path, f'ntk_eigvals_{phase}_{set_name}.npy')
-                np.save(eig_path, stats["eigvals"])
-
-        self._save_ntk_records()
-
-    def _infer_output_dim(self, x):
-        with torch.no_grad():
-            y = self.net(x[:1])
-        return y.reshape(1, -1).shape[1]
+        self.ntk.save_records()
 
     def _current_train_step(self, default=-1):
         train_state = getattr(self.model, "train_state", None)
@@ -388,92 +422,6 @@ class PDENTKTrainer:
         points = np.asarray(points)
         return points[:min(num_points, len(points))]
 
-    def _compute_empirical_jacobian(self, model, x):
-        model.eval()
-        params = [param for param in model.parameters() if param.requires_grad]
-        if not params:
-            raise RuntimeError("No trainable parameters were found for NTK analysis.")
-
-        rows = []
-        for i in range(x.shape[0]):
-            xi = x[i:i + 1]
-            yi = model(xi).reshape(-1)
-            grads_per_output = []
-            for out_idx in range(yi.numel()):
-                grads = torch.autograd.grad(
-                    yi[out_idx],
-                    params,
-                    retain_graph=out_idx + 1 < yi.numel(),
-                    create_graph=False,
-                    allow_unused=False,
-                )
-                grads_per_output.append(torch.cat([grad.reshape(-1) for grad in grads]))
-            rows.append(torch.cat(grads_per_output).detach())
-        return torch.stack(rows, dim=0)
-
-    def _compute_ntk_spectrum(self, jacobian):
-        with torch.no_grad():
-            theta = jacobian @ jacobian.T
-            theta = 0.5 * (theta + theta.T)
-        eigvals = torch.linalg.eigvalsh(theta).detach().cpu().numpy()
-        eigvals = np.clip(np.sort(eigvals)[::-1], a_min=0.0, a_max=None)
-        trace = float(eigvals.sum())
-        lambda_max = float(eigvals[0]) if eigvals.size else 0.0
-        lambda_min = float(eigvals[-1]) if eigvals.size else 0.0
-        denom = max(lambda_min, 1e-12)
-        cond = lambda_max / denom if eigvals.size else float("inf")
-        energy = trace if trace > 0 else 1.0
-        cumsum = np.cumsum(eigvals) / energy
-        eff_rank_90 = int(np.searchsorted(cumsum, 0.9) + 1) if eigvals.size else 0
-        tol = max(lambda_max, 1.0) * 1e-12
-        numerical_rank = int(np.sum(eigvals > tol))
-        mean_self_kernel = trace / max(len(eigvals), 1)
-        stable_rank = trace / max(lambda_max, 1e-12) if eigvals.size else 0.0
-        return {
-            "eigvals": eigvals,
-            "cond": cond,
-            "eff_rank_90": eff_rank_90,
-            "numerical_rank": numerical_rank,
-            "mean_self_kernel": mean_self_kernel,
-            "trace": trace,
-            "lambda_max": lambda_max,
-            "lambda_min": lambda_min,
-            "stable_rank": stable_rank,
-        }
-
-    def _save_ntk_records(self):
-        if not self.ntk_records:
-            return
-        csv_path = os.path.join(self.result_path, 'ntk_stats.csv')
-        fieldnames = list(self.ntk_records[0].keys())
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(self.ntk_records)
-
-        json_path = os.path.join(self.result_path, 'ntk_stats.json')
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(self.ntk_records, f, indent=2)
-
-    def _log_ntk_record(self, record):
-        metric_prefix = f"ntk/{record['phase']}/{record['point_set']}"
-        if self.visualizer.wandb_enabled:
-            self.visualizer.log({
-                "iterations": record["step"],
-                "ntk_step": record["step"],
-                f"{metric_prefix}/cond": record["cond"],
-                f"{metric_prefix}/eff_rank_90": record["eff_rank_90"],
-                f"{metric_prefix}/numerical_rank": record["numerical_rank"],
-                f"{metric_prefix}/mean_self_kernel": record["mean_self_kernel"],
-                f"{metric_prefix}/trace": record["trace"],
-                f"{metric_prefix}/lambda_max": record["lambda_max"],
-                f"{metric_prefix}/lambda_min": record["lambda_min"],
-                f"{metric_prefix}/stable_rank": record["stable_rank"],
-            })
-        if self.visualizer.visdom_enabled:
-            for metric in ("cond", "eff_rank_90", "numerical_rank", "mean_self_kernel", "trace", "stable_rank"):
-                self.visualizer.add_value(f"ntk {record['phase']} {record['point_set']} {metric}", record[metric])
-
     def validate(self):
         if self._supports_curve_validation():
             _x, y_pred, y_true = self._predict_validation_curve()
@@ -491,8 +439,7 @@ class PDENTKTrainer:
             self.logger('==> Validation produced non-finite error; skip val logging and best-checkpoint update.')
             return None
 
-        self.visualizer.log({"val_error": error})
-        self.visualizer.add_value("val error", error)
+        self.metrics.log_validation("val error", error, wandb_key="val_error", step=self._current_train_step(default=-1))
         self.best_loss = getattr(self, 'best_loss', float('inf'))
         if not self.cfg.test and not self.cfg.no_save_best and error < self.best_loss:
             self.best_loss = error
@@ -558,7 +505,7 @@ class PDENTKTrainer:
                     if np.isfinite(value):
                         log_dict[f"metrics_{metric_name}"] = value
                 if len(log_dict) > 2:
-                    self.visualizer.log(log_dict)
+                    self.metrics.log_scalars(log_dict, step=offset + i + 1, step_key="iterations")
 
     def _log_histories_to_vis(self, histories):
         for _stage_idx, stage_cfg, losshistory, _train_state, _offset in histories:
@@ -571,22 +518,25 @@ class PDENTKTrainer:
                 metrics = losshistory.metrics_test[i]
                 train_total = float(np.sum(train_losses))
                 test_total = float(np.sum(test_losses))
+                vis_scalars = {}
                 if np.isfinite(train_total):
-                    self.visualizer.add_value("train total loss", train_total)
+                    vis_scalars["train total loss"] = train_total
                 if np.isfinite(test_total):
-                    self.visualizer.add_value("test total loss", test_total)
+                    vis_scalars["test total loss"] = test_total
                 for j in range(len(train_losses)):
                     value = float(train_losses[j])
                     if np.isfinite(value):
-                        self.visualizer.add_value(f"train loss {j}", value)
+                        vis_scalars[f"train loss {j}"] = value
                 for j in range(len(test_losses)):
                     value = float(test_losses[j])
                     if np.isfinite(value):
-                        self.visualizer.add_value(f"test loss {j}", value)
+                        vis_scalars[f"test loss {j}"] = value
                 for j in range(len(metrics)):
                     value = float(metrics[j])
                     if np.isfinite(value):
-                        self.visualizer.add_value(self._metric_vis_name(metrics_names[j]), value)
+                        vis_scalars[self._metric_vis_name(metrics_names[j])] = value
+                if vis_scalars:
+                    self.metrics.log_scalars({}, vis_scalars=vis_scalars)
 
     def _build_vis_names(self):
         names = {

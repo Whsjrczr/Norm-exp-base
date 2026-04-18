@@ -1318,3 +1318,140 @@ norm_4d = ext.make_norm_factory(dim=4)
 --norm PQN
 --norm-cfg "p=4,q=2,dim=3,layout=last"
 ```
+
+## 2026-04 MultiChannel Tool
+
+`extension.multichannel` is a small utility layer for grouped fully-connected models where the whole operator still looks like one large linear map, but different channel groups do not interact.
+
+Files:
+
+- `extension/multichannel.py`
+- `extension/my_modules/multichannel.py`
+
+### Components
+
+`MultiChannelLinear`
+
+- Implements a block-diagonal linear operator.
+- Input/output stay as one flat feature vector.
+- Internally the feature dimension is split into `num_channels` groups.
+- Each group has its own weight block and optional bias.
+- No cross-channel mixing happens inside this layer.
+
+`MultiChannelMLP`
+
+- Stacks `MultiChannelLinear` layers into a grouped MLP.
+- Hidden layers stay channel-independent.
+- The final layer can be:
+  - `merge`: one dense `Linear(width -> output_size)`
+  - `grouped`: one more `MultiChannelLinear(width -> output_size)`
+
+### CLI arguments
+
+These options are registered through `ext.multichannel.add_arguments(parser)` and are already wired into `MLP/model/selection_tool.py`.
+
+`--multi-channels`
+
+- Number of independent channel groups.
+
+`--multi-final-layer`
+
+- `merge` or `grouped`.
+
+`--multi-norm`
+
+- apply one independent normalization module per channel after each grouped linear.
+- each channel gets its own normalization instance.
+- the normalization type still comes from `--norm` and `--norm-cfg`.
+
+`--freeze-patterns`
+
+- Comma-separated regex patterns for parameter names to freeze completely.
+
+`--train-patterns`
+
+- Comma-separated regex patterns for parameters to re-enable after freezing.
+
+`--freeze-channels`
+
+- Comma-separated channel indices to freeze inside every `MultiChannelLinear`.
+
+`--trainable-channels`
+
+- Comma-separated channel indices to keep trainable inside every `MultiChannelLinear`.
+
+### Constraints
+
+- `input_size % multi_channels == 0`
+- `width % multi_channels == 0`
+- if `--multi-final-layer grouped`, then `output_size % multi_channels == 0`
+
+### Freezing behavior
+
+There are two different freeze modes.
+
+1. Whole-parameter freezing
+
+- Implemented by changing `requires_grad`.
+- Best for freezing complete modules such as `trunk.*` or `head.*`.
+
+2. Partial channel freezing inside `MultiChannelLinear`
+
+- Implemented with a train mask plus a frozen-value buffer.
+- Frozen channels use a fixed cached parameter value in forward.
+- Trainable channels still use live parameters and receive gradients.
+
+This is stronger than only zeroing gradients, because the frozen part is also fixed in the forward path.
+
+### Logging and WandB
+
+At model construction time the training scripts now record a freeze summary:
+
+- local logger text
+- WandB config fields
+- WandB run summary fields
+
+Recorded items include:
+
+- number of trainable parameters
+- number of frozen parameters
+- number of trainable/frozen tensors
+- frozen parameter names
+- per-module trainable/frozen channel indices for `MultiChannelLinear`
+
+### Examples
+
+Grouped MLP with six independent channels:
+
+```bash
+python MLP/cifar10.py \
+  -a MultiChannelMLP \
+  --width 120 \
+  --depth 4 \
+  --multi-channels 6 \
+  --multi-norm \
+  --multi-final-layer merge
+```
+
+Freeze channel `0` and `1`:
+
+```bash
+python MLP/cifar10.py \
+  -a MultiChannelMLP \
+  --width 120 \
+  --depth 4 \
+  --multi-channels 6 \
+  --freeze-channels "0,1"
+```
+
+Freeze the grouped trunk and only train the head:
+
+```bash
+python MLP/cifar10.py \
+  -a MultiChannelMLP \
+  --width 120 \
+  --depth 4 \
+  --multi-channels 6 \
+  --freeze-patterns "trunk.*" \
+  --train-patterns "head.*"
+```
