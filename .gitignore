@@ -21,7 +21,7 @@ extension/modules/__pycache__/
 extension/modules/.ipynb_checkpoints/
 extension/my_modules/__pycache__/
 
-# result
+# experiments and results
 MLP/results/
 results/
 PDE/results/
@@ -30,6 +30,7 @@ PDE/exp*
 PDE/*generate.sh
 ViT/test/
 ViT/exp*
+KAN/*.sh
 
 # wandb related
 wandb/
@@ -43,4 +44,7 @@ pytest*
 
 test.py
 
+#dataset
 cifar10/
+
+
