@@ -39,7 +39,7 @@ class MNIST:
         self.train_loader = ext.dataset.get_dataset_loader(self.cfg, train=True, use_cuda=False)
         self.val_loader = ext.dataset.get_dataset_loader(self.cfg, train=False, use_cuda=False)
 
-        self.model = get_model(self.cfg)
+        self.model = ext.model.get_model(self.cfg)
         self.freeze_summary = ext.multichannel.summarize_freeze_state(self.model)
         ext.multichannel.log_runtime_summary(self.logger, self.cfg, self.freeze_summary)
         self.logger('==> model [{}]: {}'.format(self.model_name, self.model))
@@ -262,9 +262,6 @@ class MNIST:
             )
 
             for epoch in range(epoch_begin, epoch_end):
-                if self.cfg.lr_method != 'auto':
-                    self.scheduler.step()
-
                 self.train_epoch(epoch)
 
                 self.metrics.log_scalars(
@@ -282,6 +279,8 @@ class MNIST:
 
                 if self.cfg.lr_method == 'auto':
                     self.scheduler.step(val_loss)
+                else:
+                    self.scheduler.step()
 
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))

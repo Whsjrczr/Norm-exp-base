@@ -291,6 +291,12 @@ class PDENTKTrainer:
 
             if not self.cfg.no_save_best:
                 self.model.save(os.path.join(self.result_path, 'model'))
+            self.saver.save_checkpoint(
+                epoch=self.cfg.epochs - 1,
+                best_loss=getattr(self, "best_loss", None),
+                step=self._current_train_step(default=self.cfg.epochs),
+                wandb_id=self.visualizer.run_id,
+            )
 
         if 'final' in when:
             self.run_ntk_analysis('final', step=self._current_train_step(default=self.cfg.epochs))

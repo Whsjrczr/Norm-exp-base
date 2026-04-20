@@ -1,6 +1,11 @@
 import argparse
 
 from .kan import KAN_MODEL_NAMES, add_kan_arguments, get_kan_model
+from .initialization import (
+    add_initialization_arguments,
+    apply_init_preset,
+    maybe_map_kan_init,
+)
 from .mlp import MLP_CLASSIFICATION_MODEL_NAMES, MLP_PDE_MODEL_NAMES, add_mlp_arguments, get_mlp_model
 from .vit import VIT_MODEL_NAMES, add_vit_arguments, build_vit_norm_layer, get_vit_model
 
@@ -63,6 +68,7 @@ def add_model_arguments(
         default=default_arch,
         help="model architecture, available names: " + " | ".join(_all_model_names()),
     )
+    add_initialization_arguments(group)
 
     add_mlp_arguments(parser, task=task)
     add_kan_arguments(parser)
@@ -72,18 +78,26 @@ def add_model_arguments(
 
 def get_model(cfg):
     family = resolve_model_family(cfg)
+    maybe_map_kan_init(cfg, family)
+
     if family == "mlp":
-        return get_mlp_model(cfg)
-    if family == "kan":
-        return get_kan_model(cfg)
-    if family == "vit":
-        return get_vit_model(cfg)
-    raise ValueError(f"Unknown model family: {family}")
+        model = get_mlp_model(cfg)
+    elif family == "kan":
+        model = get_kan_model(cfg)
+    elif family == "vit":
+        model = get_vit_model(cfg)
+    else:
+        raise ValueError(f"Unknown model family: {family}")
+
+    init_summary = apply_init_preset(model, cfg)
+    setattr(model, "init_summary", init_summary)
+    return model
 
 
 __all__ = [
     "MODEL_FAMILIES",
     "add_model_arguments",
+    "apply_init_preset",
     "build_vit_norm_layer",
     "get_model",
     "resolve_model_family",

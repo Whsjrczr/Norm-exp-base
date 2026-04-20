@@ -300,6 +300,12 @@ class PDETaiyiTrainer:
 
         if not self.cfg.no_save_best:
             self.model.save(os.path.join(self.result_path, 'model'))
+        self.saver.save_checkpoint(
+            epoch=self.cfg.epochs - 1,
+            best_loss=getattr(self, "best_loss", None),
+            step=getattr(self, "step", None),
+            wandb_id=self.visualizer.run_id,
+        )
 
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))

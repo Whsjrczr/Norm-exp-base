@@ -1452,3 +1452,46 @@ python MLP/cifar10.py \
   --freeze-patterns "trunk.*" \
   --train-patterns "head.*"
 ```
+
+## 2026-04 Landscape Tool
+
+`extension.landscape` is the shared post-hoc loss-landscape helper used by `MLP-fitting`, `MLP`, and `PDE`.
+
+It is intentionally outside `taiyi.py`.
+
+- `Taiyi` is reserved for hook-based internal layer statistics.
+- `landscape` is a parameter-space analysis tool that runs after training from saved checkpoints.
+
+### Provided utilities
+
+- flatten / restore model parameters
+- sample an isosceles-right 2D slice from `theta0 -> theta_v`
+- evaluate scalar objectives on a parameter grid
+- save landscape arrays as `.npz`
+- render 2D contour plots and optional 3D surface plots
+- track geometry scalars such as:
+  - `distance_from_init`
+  - `update_rate`
+  - `curve_rate`
+  - `cosine_similarity`
+
+### Current task entry points
+
+- `MLP-fitting/landscape.py`
+- `MLP/landscape.py`
+- `PDE/landscape.py`
+
+### Output convention
+
+Most landscape tools save:
+
+- `*.npz`
+- `*_2d.png`
+- optional `*_3d.png`
+
+Examples:
+
+- `loss_landscape.npz`
+- `loss_landscape_2d.png`
+- `landscape_train_loss.npz`
+- `landscape_val_error_2d.png`

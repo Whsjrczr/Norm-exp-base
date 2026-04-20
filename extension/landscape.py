@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import torch
+import random
 
 
 class GeometryTracker:
@@ -80,6 +81,18 @@ def flatten_parameters(model):
     return torch.cat(
         [param.detach().cpu().reshape(-1) for param in model.parameters()]
     ).double()
+
+
+def set_seed(seed):
+    if seed is None:
+        return
+    seed = int(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
 
 def assign_parameters(model, theta):

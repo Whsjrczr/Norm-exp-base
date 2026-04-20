@@ -51,7 +51,7 @@ class PDETrainer:
         self.num_gpu = torch.cuda.device_count()
         self.logger('==> use {:d} GPUs'.format(self.num_gpu))
 
-        self.model = get_model(self.cfg).to(self.device)
+        self.model = ext.model.get_model(self.cfg).to(self.device)
         self.freeze_summary = ext.multichannel.summarize_freeze_state(self.model)
         if self.num_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
@@ -204,6 +204,10 @@ class PDETrainer:
 
         if not self.cfg.no_save_best:
             self.model.save(os.path.join(self.result_path, 'model'))
+        self.saver.save_checkpoint(
+            epoch=self.cfg.epochs - 1,
+            best_loss=getattr(self, "best_loss", None),
+        )
 
         now_date = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime(time.time()))
         self.logger('==> end time: {}'.format(now_date))

@@ -253,3 +253,48 @@ python MLP/cifar10.py -a MLP --norm PQN --norm-cfg "dim=2,p=4,q=2"
 python MLP/cifar10.py -a ConvBN --norm BN --norm-cfg "dim=4"
 python MLP/cifar10.py -a ConvLN --norm LN --norm-cfg "dim=4"
 ```
+
+## 2026-04 Landscape
+
+`MLP/landscape.py` is the post-hoc loss-landscape entry for classification MLP runs.
+
+It restores:
+
+- `checkpoint.pth` for config
+- `best.pth` for the final parameter vector
+
+Then it rebuilds:
+
+- the initialization-side parameter vector `theta0`
+- the trained parameter vector `theta_v`
+- a 2D slice in parameter space
+
+### Example
+
+```bash
+python MLP/landscape.py \
+  --resume results/.../checkpoint.pth \
+  --output results/mlp-landscape \
+  --split train \
+  --grid-size 41 \
+  --batch-size 256 \
+  --max-batches 4
+```
+
+### Main options
+
+- `--resume`: checkpoint path from `MLP/cifar10.py`
+- `--best-model`: optional override for `best.pth`
+- `--split`: `train` or `val`
+- `--grid-size`
+- `--s-range`
+- `--t-range`
+- `--direction-seed`
+- `--max-batches`
+- `--plot-3d`
+
+### Outputs
+
+- `loss_landscape.npz`
+- `loss_landscape_2d.png`
+- optional `loss_landscape_3d.png`
