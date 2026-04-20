@@ -31,6 +31,8 @@ PDE/*generate.sh
 ViT/test/
 ViT/exp*
 KAN/*.sh
+KAN/results/
+KAN/test/
 
 # wandb related
 wandb/
