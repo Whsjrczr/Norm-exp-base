@@ -99,7 +99,12 @@ class KANLinear(nn.Module):
         original_shape = x.shape
         x = x.reshape(-1, self.in_feature)
 
-        base_output = 0.0
+        base_output = torch.zeros(
+            x.size(0),
+            self.out_feature,
+            device=x.device,
+            dtype=x.dtype,
+        )
         if self.use_base_branch:
             base_output = F.linear(self.base_activation(x), self.base_weight)
 
@@ -108,9 +113,17 @@ class KANLinear(nn.Module):
             self.scaled_spline_weight.reshape(self.out_feature, -1),
         )
 
-        output = base_output + spline_output
+        combined_output = base_output + spline_output
+        output = combined_output
         if self.output_activation is not None:
             output = self.output_activation(output)
+        self.residual_states = {
+            "default": {
+                "stream": base_output.detach(),
+                "branch": spline_output.detach(),
+                "output": combined_output.detach(),
+            }
+        }
         return output.reshape(*original_shape[:-1], self.out_feature)
 
     @torch.no_grad()

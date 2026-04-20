@@ -20,6 +20,7 @@ import extension as ext
 from extension.utils import str2list
 
 from kan_dataset import KANDatasetBuilder, add_dataset_arguments
+from extension.model.kan.KAN_layer import KANLinear
 
 
 class KANTrainer:
@@ -139,6 +140,23 @@ class KANTrainer:
             visualizer=self.visualizer,
             logger=self.logger,
         )
+        self.taiyi_config = self._build_taiyi_config()
+        if self.visualizer.wandb_enabled and self.taiyi_config:
+            self.visualizer.update_wandb_config(
+                {
+                    "taiyi_track_every": self.cfg.taiyi_track_every,
+                    "taiyi_config": self.taiyi_config,
+                }
+            )
+        self.taiyi = ext.taiyi.setting(
+            self.cfg,
+            model=self._unwrap_model(self.model),
+            monitor_config=self.taiyi_config,
+            wandb=self.visualizer.wandb,
+            output_dir=self.result_path,
+        )
+        if self.taiyi.enabled:
+            self.logger("==> taiyi config: {}".format(self.taiyi_config))
 
     def add_arguments(self):
         parser = argparse.ArgumentParser("KAN Regression")
@@ -147,6 +165,12 @@ class KANTrainer:
         add_dataset_arguments(parser)
         parser.add_argument("--batch-size", dest="batch_size", type=str2list, default="256,1024")
         parser.add_argument("--offline", "-offline", action="store_true")
+        parser.add_argument(
+            "--taiyi-track-every",
+            type=int,
+            default=100,
+            help="track Taiyi residual statistics every N iterations",
+        )
 
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=500)
@@ -194,6 +218,25 @@ class KANTrainer:
             f"_lr{self.cfg.lr}_bs{self.cfg.batch_size[0]}"
             f"_wd{self.cfg.weight_decay}_noise{self.cfg.error}_seed{self.cfg.seed}"
         )
+
+    def _unwrap_model(self, model):
+        return model.module if isinstance(model, nn.DataParallel) else model
+
+    def _build_taiyi_config(self):
+        if not getattr(self.cfg, "taiyi", False):
+            return {}
+        if self.cfg.arch != "KAN":
+            return {}
+        schedule = f"linear({max(int(self.cfg.taiyi_track_every), 1)},0)"
+        return {
+            KANLinear: [
+                ["ResidualEnergyRatio", schedule],
+                ["ResidualInputAngleMean", schedule],
+                ["ResidualInputAngleStd", schedule],
+                ["ResidualStreamOutputAngleMean", schedule],
+                ["ResidualStreamOutputAngleStd", schedule],
+            ]
+        }
 
     def _rebuild_optim_sched_and_sync_saver(self):
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -323,6 +366,9 @@ class KANTrainer:
 
         new_log_filename = f"{self.model_name}_{now_date}.txt"
         self.logger("==> Network training completed. Copy log file to {}".format(new_log_filename))
+        taiyi_info = self.taiyi.finish()
+        if taiyi_info["taiyi_output"]:
+            self.logger("==> Taiyi monitor collected output.")
         self.visualizer.finish(sync_offline=self.cfg.offline)
         shutil.copy(self.logger.filename, os.path.join(self.result_path, new_log_filename))
 
@@ -353,6 +399,7 @@ class KANTrainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            self.taiyi.track(self.step)
             self.step += 1
 
             total_loss += loss.item() * targets.size(0)
