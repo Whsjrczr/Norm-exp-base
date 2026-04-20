@@ -2,7 +2,7 @@
 
 `extension/model/` 是仓库里统一的模型选择入口。
 
-现在 `MLP/`、`KAN/`、`ViT/` 的训练脚本都不再各自维护一份独立的 `selection_tool`，而是统一调用：
+现在 `MLP/`、`KAN/`、`ViT/` 的训练脚本都统一走 `extension.model`，不再各自维护单独的模型选择入口：
 
 ```python
 import extension as ext
@@ -64,7 +64,7 @@ family 解析顺序：
 
 ### `mlp/`
 
-负责原来 `MLP/model/selection_tool.py` 的模型族，包括：
+负责 MLP 家族模型，包括：
 
 - `MLP`
 - `PreNormMLP`
@@ -79,7 +79,7 @@ family 解析顺序：
 
 ### `kan/`
 
-负责原来 `KAN/model/select_kan.py` 的模型族，包括：
+负责 KAN 家族模型，包括：
 
 - `KAN`
 - `MLP`
@@ -93,7 +93,7 @@ family 解析顺序：
 
 ### `vit/`
 
-负责原来 `ViT/model_vit/select_vit.py` 的模型族，包括：
+负责 ViT 家族模型，包括：
 
 - `vit_tiny`
 - `vit_small`
@@ -104,16 +104,6 @@ family 解析顺序：
 - `build_vit_norm_layer(cfg)`
 
 用于 ViT 序列维度相关的 norm 构造，现有测试可以继续复用。
-
-## 兼容层
-
-以下旧文件仍然保留，但现在只做转发：
-
-- `MLP/model/selection_tool.py`
-- `KAN/model/select_kan.py`
-- `ViT/model_vit/select_vit.py`
-
-这保证旧 import 路径还能工作，同时新代码应优先写成 `ext.model.*`。
 
 ## 训练脚本接入方式
 

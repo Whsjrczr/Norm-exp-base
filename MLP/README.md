@@ -6,7 +6,7 @@
 
 - `cifar10.py`：单阶段与多阶段训练统一入口
 - `cifar10_multistage.py`：兼容入口
-- `model/selection_tool.py`：模型选择逻辑
+- `extension/model/mlp/`：MLP 相关模型实现与统一选择逻辑
 - `model/MLP.py`、`model/resnet.py`：模型定义
 
 ## 快速开始

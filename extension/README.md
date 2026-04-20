@@ -18,8 +18,8 @@
 - `scheduler.py`：学习率调度器
 - `checkpoint.py`：模型保存、加载、恢复
 - `logger.py`：日志输出
-- `visualization.py`：Visdom 可视化
-- `vis_taiyi.py`：WandB / Taiyi 参数
+- `visdom.py`：Visdom 可视化入口
+- `tracking.py` / `taiyi.py`：WandB、Visdom、Taiyi 参数与运行时接入
 - `normalization.py`：归一化层工厂
 - `activation.py`：激活函数工厂
 - `utils.py`：命令行字符串解析工具
@@ -707,7 +707,7 @@ checkpoint 参数注册函数：`ext.checkpoint.add_arguments(parser)`
 - 说明：
   该参数已注册，但并不是所有训练脚本都实际使用它控制输出频率
 
-## `visualization.py`
+## `visdom.py`
 
 Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
@@ -733,7 +733,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 - 实际行为：
   上层脚本通常会在 `setting(cfg, env_name, names)` 时传入模型名作为环境名
 
-## `vis_taiyi.py`
+## `tracking.py` + `taiyi.py`
 
 ### `--visualize`
 
@@ -1163,9 +1163,6 @@ python ViT/vit.py \
 - 新的统一入口是 `tracking.py`
 - 新的 Visdom 专用入口是 `visdom.py`
 - 新的 Taiyi 专用入口是 `taiyi.py`
-- `visualize.py` 现在只是 `tracking.py` 的兼容别名
-- `visualization.py` 现在只是 `visdom.py` 的兼容别名
-- `vis_taiyi.py` 暂时保留为旧参数兼容入口
 
 ### Recommended Usage
 
@@ -1348,7 +1345,7 @@ Files:
 
 ### CLI arguments
 
-These options are registered through `ext.multichannel.add_arguments(parser)` and are already wired into `MLP/model/selection_tool.py`.
+These options are registered through `ext.multichannel.add_arguments(parser)` and are wired into the unified model entry under `extension/model/`.
 
 `--multi-channels`
 

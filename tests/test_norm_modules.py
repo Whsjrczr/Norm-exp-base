@@ -34,7 +34,7 @@ from extension.my_modules.norm.pq_norm import PQNorm
 from extension.my_modules.activation.sinarctan import SinArctan
 import extension.activation as activation
 from extension.normalization import _ParallelLayerNorm, _ParallelLayerScaling
-from ViT.model_vit.select_vit import build_vit_norm_layer
+from extension.model import build_vit_norm_layer
 
 
 def test_bn1d_variants_support_channel_first_and_channel_last():

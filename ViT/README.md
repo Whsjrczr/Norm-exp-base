@@ -5,8 +5,8 @@
 ## 目录
 
 - `vit.py`: ViT 训练入口
-- `model_vit/select_vit.py`: 模型选择
-- `model_vit/vision_transformer.py`: ViT 结构定义
+- `extension/model/vit/__init__.py`: 模型选择
+- `extension/model/vit/vision_transformer.py`: ViT 结构定义
 
 ## 支持模型
 
@@ -216,7 +216,7 @@ python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-siz
 
 ### Sequence BatchNorm on ViT
 
-ViT now supports sequence-axis BatchNorm families directly through `select_vit.py`.
+ViT now supports sequence-axis BatchNorm families directly through `extension/model/vit/__init__.py`.
 
 For ViT token tensors `(B, N, C)`:
 

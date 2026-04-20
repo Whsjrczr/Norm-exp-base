@@ -98,8 +98,8 @@ def _resolve_base_activation(cfg):
 
 def get_kan_model(cfg):
     import extension as ext
-    from KAN.model.KAN import KAN_norm
-    from KAN.model.MLP import MLP
+    from .KAN import KAN_norm
+    from .MLP import MLP
 
     model_name = getattr(cfg, "arch", None) or "KAN"
     layers_hidden = _resolve_layers_hidden(cfg)

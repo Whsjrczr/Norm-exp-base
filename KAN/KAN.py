@@ -76,6 +76,7 @@ class KANTrainer:
         self.model.to(self.device)
 
         self.best_r2 = float("-inf")
+        self.step = 0
         if self.cfg.resume:
             saved = self.saver.resume(self.cfg.resume)
             self.cfg.start_epoch = saved["epoch"]
@@ -132,6 +133,11 @@ class KANTrainer:
                 "true test r2": "metric",
             },
             wandb_kwargs=wandb_kwargs,
+        )
+        self.metrics = ext.measurement.setting(
+            result_path=self.result_path,
+            visualizer=self.visualizer,
+            logger=self.logger,
         )
 
     def add_arguments(self):
@@ -278,11 +284,9 @@ class KANTrainer:
                 train_loss, train_r2 = self.train_epoch(epoch)
                 val_loss, val_r2, true_val_loss, true_val_r2 = self.validate(epoch)
 
-                self.visualizer.log(
+                self.metrics.log_scalars(
                     {
                         "learning_rate": self.scheduler.get_last_lr()[0],
-                        "epochs": epoch,
-                        "steps": self.step,
                         "stage": stage_idx,
                         "train_loss": train_loss,
                         "train_r2": train_r2,
@@ -290,7 +294,9 @@ class KANTrainer:
                         "val_r2": val_r2,
                         "true_val_loss": true_val_loss,
                         "true_val_r2": true_val_r2,
-                    }
+                    },
+                    step=self.step,
+                    epoch=epoch,
                 )
 
                 if self.visualizer.wandb_enabled:
@@ -357,8 +363,12 @@ class KANTrainer:
         avg_loss = total_loss / max(total_count, 1)
         train_r2 = self._compute_r2(torch.cat(outputs_list), torch.cat(targets_list))
 
-        self.visualizer.add_value("train loss", avg_loss)
-        self.visualizer.add_value("train r2", train_r2)
+        self.metrics.log_scalars(
+            {"train_loss": avg_loss, "train_r2": train_r2},
+            step=self.step,
+            epoch=epoch,
+            vis_scalars={"train loss": avg_loss, "train r2": train_r2},
+        )
         self.logger(
             "Train on epoch {}: average loss={:.5g}, r2={:.4f}".format(epoch, avg_loss, train_r2)
         )
@@ -368,8 +378,17 @@ class KANTrainer:
         val_loss, val_r2 = self._evaluate_loader(self.val_loader)
         true_loss, true_r2 = self._evaluate_true_targets(self.val_loader, split="val")
 
-        self.visualizer.add_value("val loss", val_loss)
-        self.visualizer.add_value("val r2", val_r2)
+        self.metrics.log_scalars(
+            {
+                "val_loss": val_loss,
+                "val_r2": val_r2,
+                "true_val_loss": true_loss,
+                "true_val_r2": true_r2,
+            },
+            step=self.step,
+            epoch=epoch,
+            vis_scalars={"val loss": val_loss, "val r2": val_r2},
+        )
         self.logger(
             "Validate on epoch {}: loss={:.5g}, r2={:.4f}, true_loss={:.5g}, true_r2={:.4f}".format(
                 epoch, val_loss, val_r2, true_loss, true_r2
@@ -385,17 +404,20 @@ class KANTrainer:
     def test(self):
         test_loss, test_r2 = self._evaluate_loader(self.test_loader)
         true_loss, true_r2 = self._evaluate_true_targets(self.test_loader, split="test")
-        self.visualizer.add_value("test loss", test_loss)
-        self.visualizer.add_value("test r2", test_r2)
-        self.visualizer.add_value("true test loss", true_loss)
-        self.visualizer.add_value("true test r2", true_r2)
-        self.visualizer.log(
+        self.metrics.log_scalars(
             {
                 "test_loss": test_loss,
                 "test_r2": test_r2,
                 "true_test_loss": true_loss,
                 "true_test_r2": true_r2,
-            }
+            },
+            step=self.step,
+            vis_scalars={
+                "test loss": test_loss,
+                "test r2": test_r2,
+                "true test loss": true_loss,
+                "true test r2": true_r2,
+            },
         )
         self.logger(
             "Test: loss={:.5g}, r2={:.4f}, true_loss={:.5g}, true_r2={:.4f}".format(

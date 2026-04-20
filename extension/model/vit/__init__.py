@@ -1,6 +1,6 @@
 import extension as ext
 
-from ViT.model_vit import vision_transformer as vits
+from . import vision_transformer as vits
 
 
 VIT_MODEL_NAMES = ["vit_tiny", "vit_small", "vit_base"]

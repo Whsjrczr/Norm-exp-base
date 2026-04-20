@@ -83,7 +83,11 @@ class MeasurementTracker:
             return
         stem = stem or group
         csv_path = os.path.join(self.result_path, f"{stem}.csv")
-        fieldnames = list(records[0].keys())
+        fieldnames = []
+        for record in records:
+            for key in record.keys():
+                if key not in fieldnames:
+                    fieldnames.append(key)
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()

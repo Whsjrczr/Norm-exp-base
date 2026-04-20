@@ -55,7 +55,7 @@ def _resolve_input_size(cfg):
 
 
 def get_mlp_model(cfg, task: str = "classification"):
-    from MLP.model.MLP import (
+    from .MLP import (
         CenDropScalingMLP,
         CenDropScalingPreNormMLP,
         MLP,
@@ -63,9 +63,9 @@ def get_mlp_model(cfg, task: str = "classification"):
         ResCenDropScalingMLP,
         ResMLP,
     )
-    from MLP.model.resnet import resnet18, resnet34, resnet50
-    from MLP.model.test_bn import ConvBN, ConvBNPre, ConvBNRes, ConvBNResPre
-    from MLP.model.test_ln import ConvLN, ConvLNPre, ConvLNRes, ConvLNResPre
+    from .resnet import resnet18, resnet34, resnet50
+    from .test_bn import ConvBN, ConvBNPre, ConvBNRes, ConvBNResPre
+    from .test_ln import ConvLN, ConvLNPre, ConvLNRes, ConvLNResPre
 
     model_name = getattr(cfg, "arch", None) or "MLP"
     model_width = getattr(cfg, "width", 100)
