@@ -145,7 +145,7 @@ class KANTrainer:
             self.visualizer.update_wandb_config(
                 {
                     "taiyi_track_every": self.cfg.taiyi_track_every,
-                    "taiyi_config": self.taiyi_config,
+                    "taiyi_config": self._serialize_taiyi_config(self.taiyi_config),
                 }
             )
         self.taiyi = ext.taiyi.setting(
@@ -237,6 +237,16 @@ class KANTrainer:
                 ["ResidualStreamOutputAngleStd", schedule],
             ]
         }
+
+    def _serialize_taiyi_config(self, taiyi_config):
+        serializable = {}
+        for module_key, quantities in taiyi_config.items():
+            if isinstance(module_key, type):
+                key = module_key.__name__
+            else:
+                key = str(module_key)
+            serializable[key] = quantities
+        return serializable
 
     def _rebuild_optim_sched_and_sync_saver(self):
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
