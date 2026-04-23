@@ -71,6 +71,31 @@ def make_norm_factory(**bound_kwargs):
     return partial(Norm, **bound_kwargs)
 
 
+def _split_norm_names(norm_name):
+    return [name.strip() for name in str(norm_name).split("+") if name.strip()]
+
+
+def _make_single_norm(norm_name, *args, **kwargs):
+    if norm_name == "None":
+        return None
+    if norm_name not in _config.norm_methods:
+        raise KeyError(
+            f"Unknown normalization '{norm_name}'. "
+            f"Expected one of {_config.norm_methods.keys()} or a '+' combination."
+        )
+    return _config.norm_methods[norm_name](*args, **kwargs)
+
+
+def _make_composite_norm(norm_names, *args, **kwargs):
+    modules = [_make_single_norm(norm_name, *args, **kwargs) for norm_name in norm_names]
+    modules = [module for module in modules if module is not None]
+    if not modules:
+        return None
+    if len(modules) == 1:
+        return modules[0]
+    return nn.Sequential(*modules)
+
+
 
 # GN
 def _GroupNorm(num_features, num_groups=32, eps=1e-5, affine=True, dim=4, layout=None, *args, **kwargs):
@@ -399,7 +424,7 @@ class _config:
 def add_arguments(parser: argparse.ArgumentParser):
     group = parser.add_argument_group('Normalization Options')
     group.add_argument('--norm', default='No', help='Use which normalization layers? {' + ', '.join(
-        _config.norm_methods.keys()) + '}' + ' (defalut: {})'.format(_config.norm))
+        _config.norm_methods.keys()) + '}; use + for sequential combinations, e.g. BNc+LNc+LNs' + ' (defalut: {})'.format(_config.norm))
     group.add_argument('--norm-cfg', type=str2dict, default={}, metavar='DICT', help='layers config.')
     return group
 
@@ -460,6 +485,7 @@ def setting(cfg: argparse.Namespace):
 
 def Norm(*args, **kwargs):
     kwargs.update(_config.norm_cfg)
-    if _config.norm == 'None':
+    norm_names = _split_norm_names(_config.norm)
+    if not norm_names:
         return None
-    return _config.norm_methods[_config.norm](*args, **kwargs)
+    return _make_composite_norm(norm_names, *args, **kwargs)

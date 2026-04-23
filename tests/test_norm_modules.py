@@ -294,6 +294,19 @@ def test_norm_factory_supports_mlp_2d_for_bn_and_gn():
         assert y.shape == x.shape
 
 
+def test_norm_factory_supports_plus_composite_norms():
+    x = torch.randn(2, 8)
+    normalization._config.norm = "BNc+LNc+LNs"
+    normalization._config.norm_cfg = {"dim": 2}
+
+    module = normalization.Norm(8)
+    y = module(x)
+
+    assert isinstance(module, torch.nn.Sequential)
+    assert len(module) == 3
+    assert y.shape == x.shape
+
+
 def test_instance_norm_rejects_dim_2_inputs():
     normalization._config.norm = "IN"
     normalization._config.norm_cfg = {}
