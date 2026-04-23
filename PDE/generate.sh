@@ -62,7 +62,6 @@ CUDA_VISIBLE_DEVICES=0 /home/dlth/miniconda3/envs/norm-base/bin/python /home/dlt
  --optimizer=${optimizers[$u]} \\
  --seed=${seeds[$q]} \\
  --log-suffix=base \\
- --no_save_best \\
  --display_every=${display_every} \\
  --output ./${dir} \\
  --metrics \"${metrics}\" \\

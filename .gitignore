@@ -2,6 +2,7 @@
 .conda/
 .codex/
 .vscode/
+tmp_pytest_checkpoint/
 __pycache__/
 
 # dataset

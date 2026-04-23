@@ -236,6 +236,36 @@ def _SequenceBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1,
     return module
 
 
+def _SequenceDimBatchNormCentering(num_features, dim=3, layout=None, affine=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return SequenceDimBatchNorm1dCentering(num_features, affine=affine, layout=layout, causal=causal)
+
+
+def _SequenceDimBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, affine=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return SequenceDimBatchNorm1dScaling(num_features, eps=eps, affine=affine, bias=affine, layout=layout, causal=causal)
+
+
+def _SequenceDimBatchNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return SequenceDimBatchNorm1d(num_features, eps=eps, affine=affine, layout=layout, causal=causal)
+
+
+def _CausalSequenceBatchNormCentering(num_features, dim=3, layout=None, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalSequenceBatchNorm1dCentering(num_features, affine=affine, layout=layout)
+
+
+def _CausalSequenceBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalSequenceBatchNorm1dScaling(num_features, eps=eps, affine=affine, bias=affine, layout=layout)
+
+
+def _CausalSequenceBatchNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalSequenceBatchNorm1d(num_features, eps=eps, affine=affine, layout=layout)
+
+
 def _DynamicSequenceBatchNormCentering(num_features=None, dim=3, layout=None, affine=False, *args, **kwargs):
     layout = _normalize_sequence_layout(dim, layout)
     return DynamicSequenceBatchNorm1dCentering(affine=affine, layout=layout)
@@ -249,6 +279,21 @@ def _DynamicSequenceBatchNormScaling(num_features=None, dim=3, layout=None, eps=
 def _DynamicSequenceBatchNorm(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
     layout = _normalize_sequence_layout(dim, layout)
     return DynamicSequenceBatchNorm1d(eps=eps, affine=affine, layout=layout)
+
+
+def _CausalDynamicSequenceBatchNormCentering(num_features=None, dim=3, layout=None, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalDynamicSequenceBatchNorm1dCentering(affine=affine, layout=layout)
+
+
+def _CausalDynamicSequenceBatchNormScaling(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalDynamicSequenceBatchNorm1dScaling(eps=eps, affine=affine, bias=affine, layout=layout)
+
+
+def _CausalDynamicSequenceBatchNorm(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalDynamicSequenceBatchNorm1d(eps=eps, affine=affine, layout=layout)
 
 # IN
 def _InstanceNorm(num_features, dim=4, layout=None, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False, *args,
@@ -319,9 +364,21 @@ class _config:
                     'SeqBN': _SequenceBatchNorm,
                     'SeqBNc': _SequenceBatchNormCentering,
                     'SeqBNs': _SequenceBatchNormScaling,
+                    'CSeqBN': _CausalSequenceBatchNorm,
+                    'CSeqBNc': _CausalSequenceBatchNormCentering,
+                    'CSeqBNs': _CausalSequenceBatchNormScaling,
+                    'SBN': _SequenceDimBatchNorm,
+                    'SBNc': _SequenceDimBatchNormCentering,
+                    'SBNs': _SequenceDimBatchNormScaling,
+                    'CSBN': partial(_SequenceDimBatchNorm, causal=True),
+                    'CSBNc': partial(_SequenceDimBatchNormCentering, causal=True),
+                    'CSBNs': partial(_SequenceDimBatchNormScaling, causal=True),
                     'DSeqBN': _DynamicSequenceBatchNorm,
                     'DSeqBNc': _DynamicSequenceBatchNormCentering,
                     'DSeqBNs': _DynamicSequenceBatchNormScaling,
+                    'CDSeqBN': _CausalDynamicSequenceBatchNorm,
+                    'CDSeqBNc': _CausalDynamicSequenceBatchNormCentering,
+                    'CDSeqBNs': _CausalDynamicSequenceBatchNormScaling,
                     'DSeqBLS': _DynamicSequenceCenterLayerScaling,
                     'DSeqBCLN': _DynamicSequenceCenterLayerNorm,
                     'DSeqBCRMS': _DynamicSequenceCenterRMSNorm,

@@ -52,6 +52,57 @@ def _resolve_sequence_dim(input: Tensor, layout: str | None, num_features: int |
     return sequence_dim, reduce_dims, view_shape
 
 
+def _resolve_feature_dim(input: Tensor, layout: str | None, num_features: int | None = None):
+    if input.dim() < 3:
+        raise RuntimeError(
+            f"Expected input.dim() >= 3 for sequence norm, but got shape {tuple(input.shape)}."
+        )
+
+    if layout is None or layout == "last":
+        feature_dim = input.dim() - 1
+    elif layout == "first":
+        feature_dim = 1
+    else:
+        raise ValueError(f"Unsupported sequence layout: {layout}. Expected 'first' or 'last'.")
+
+    if num_features is not None and input.shape[feature_dim] != num_features:
+        raise RuntimeError(
+            f"Expected num_features={num_features} on dim {feature_dim}, "
+            f"but got shape {tuple(input.shape)}."
+        )
+
+    view_shape = [1] * input.dim()
+    view_shape[feature_dim] = input.shape[feature_dim]
+    return feature_dim, view_shape
+
+
+def _prefix_stats(input: Tensor, sequence_dim: int, eps: float | None = None, reduce_non_sequence: bool = False):
+    if reduce_non_sequence:
+        reduce_dims = tuple(dim for dim in range(input.dim()) if dim != sequence_dim)
+        summed = input.sum(dim=reduce_dims, keepdim=True)
+        squared = input.square().sum(dim=reduce_dims, keepdim=True)
+        sample_count = 1
+        for dim in reduce_dims:
+            sample_count *= input.shape[dim]
+    else:
+        summed = input
+        squared = input.square()
+        sample_count = 1
+
+    prefix_sum = summed.cumsum(dim=sequence_dim)
+    prefix_square_sum = squared.cumsum(dim=sequence_dim)
+    length_shape = [1] * input.dim()
+    length_shape[sequence_dim] = input.shape[sequence_dim]
+    lengths = torch.arange(1, input.shape[sequence_dim] + 1, device=input.device, dtype=input.dtype).view(*length_shape)
+    counts = lengths * sample_count
+    mean = prefix_sum / counts
+    square_mean = prefix_square_sum / counts
+    var = (square_mean - mean.square()).clamp_min(0.0)
+    if eps is not None:
+        var = var + eps
+    return mean, var
+
+
 class SequenceBatchNorm1dCentering(nn.Module):
     _version = 2
     __constants__ = ["track_running_stats", "momentum", "num_features", "affine"]
@@ -255,6 +306,216 @@ class SequenceBatchNorm1d(nn.Sequential):
         )
 
 
+class SequenceDimBatchNorm1dCentering(nn.Module):
+    def __init__(self, num_features: int, affine: bool = True, layout: str = "last", causal: bool = False, device=None, dtype=None) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.num_features = num_features
+        self.affine = affine
+        self.layout = layout
+        self.causal = causal
+        if self.affine:
+            self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, _ = _resolve_sequence_dim(input, self.layout)
+        _, feature_shape = _resolve_feature_dim(input, self.layout, self.num_features)
+        if self.causal:
+            mean, _ = _prefix_stats(input, sequence_dim, reduce_non_sequence=False)
+        else:
+            mean = input.mean(dim=sequence_dim, keepdim=True)
+        output = input - mean
+        if self.affine:
+            output = output + self.bias.view(*feature_shape)
+        return output
+
+
+class SequenceDimBatchNorm1dScaling(nn.Module):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-5,
+        affine: bool = True,
+        bias: bool = False,
+        layout: str = "last",
+        causal: bool = False,
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.num_features = num_features
+        self.eps = eps
+        self.affine = affine
+        self.affine_bias = bias
+        self.layout = layout
+        self.causal = causal
+        if self.affine:
+            self.weight = Parameter(torch.empty(num_features, **factory_kwargs))
+            if self.affine_bias:
+                self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
+            else:
+                self.register_parameter("bias", None)
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, _ = _resolve_sequence_dim(input, self.layout)
+        _, feature_shape = _resolve_feature_dim(input, self.layout, self.num_features)
+        if self.causal:
+            _, var = _prefix_stats(input, sequence_dim, reduce_non_sequence=False)
+        else:
+            var = input.var(dim=sequence_dim, unbiased=False, keepdim=True)
+        output = input / torch.sqrt(var + self.eps)
+        if self.affine:
+            output = output * self.weight.view(*feature_shape)
+            if self.affine_bias:
+                output = output + self.bias.view(*feature_shape)
+        return output
+
+
+class SequenceDimBatchNorm1d(nn.Sequential):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-5,
+        affine: bool = True,
+        layout: str = "last",
+        causal: bool = False,
+        device=None,
+        dtype=None,
+    ) -> None:
+        super().__init__(
+            SequenceDimBatchNorm1dCentering(
+                num_features,
+                affine=False,
+                layout=layout,
+                causal=causal,
+                device=device,
+                dtype=dtype,
+            ),
+            SequenceDimBatchNorm1dScaling(
+                num_features,
+                eps=eps,
+                affine=affine,
+                bias=affine,
+                layout=layout,
+                causal=causal,
+                device=device,
+                dtype=dtype,
+            ),
+        )
+
+
+class CausalSequenceBatchNorm1dCentering(nn.Module):
+    def __init__(self, num_features: int, affine: bool = True, layout: str = "last", device=None, dtype=None) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.num_features = num_features
+        self.affine = affine
+        self.layout = layout
+        if self.affine:
+            self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, shape = _resolve_sequence_dim(input, self.layout, num_features=self.num_features)
+        mean, _ = _prefix_stats(input, sequence_dim, reduce_non_sequence=True)
+        output = input - mean
+        if self.affine:
+            output = output + self.bias.view(*shape)
+        return output
+
+
+class CausalSequenceBatchNorm1dScaling(nn.Module):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-5,
+        affine: bool = True,
+        bias: bool = False,
+        layout: str = "last",
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.num_features = num_features
+        self.eps = eps
+        self.affine = affine
+        self.affine_bias = bias
+        self.layout = layout
+        if self.affine:
+            self.weight = Parameter(torch.empty(num_features, **factory_kwargs))
+            if self.affine_bias:
+                self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
+            else:
+                self.register_parameter("bias", None)
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, shape = _resolve_sequence_dim(input, self.layout, num_features=self.num_features)
+        _, var = _prefix_stats(input, sequence_dim, reduce_non_sequence=True)
+        output = input / torch.sqrt(var + self.eps)
+        if self.affine:
+            output = output * self.weight.view(*shape)
+            if self.affine_bias:
+                output = output + self.bias.view(*shape)
+        return output
+
+
+class CausalSequenceBatchNorm1d(nn.Sequential):
+    def __init__(self, num_features: int, eps: float = 1e-5, affine: bool = True, layout: str = "last", device=None, dtype=None) -> None:
+        super().__init__(
+            CausalSequenceBatchNorm1dCentering(
+                num_features,
+                affine=False,
+                layout=layout,
+                device=device,
+                dtype=dtype,
+            ),
+            CausalSequenceBatchNorm1dScaling(
+                num_features,
+                eps=eps,
+                affine=affine,
+                bias=affine,
+                layout=layout,
+                device=device,
+                dtype=dtype,
+            ),
+        )
+
+
 class DynamicSequenceBatchNorm1dCentering(nn.Module):
     def __init__(self, affine: bool = False, layout: str = "last", device=None, dtype=None) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
@@ -326,6 +587,87 @@ class DynamicSequenceBatchNorm1d(nn.Sequential):
                 dtype=dtype,
             ),
             DynamicSequenceBatchNorm1dScaling(
+                eps=eps,
+                affine=affine,
+                bias=affine,
+                layout=layout,
+                device=device,
+                dtype=dtype,
+            ),
+        )
+
+
+class CausalDynamicSequenceBatchNorm1dCentering(nn.Module):
+    def __init__(self, affine: bool = False, layout: str = "last", device=None, dtype=None) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.affine = affine
+        self.layout = layout
+        if self.affine:
+            self.bias = Parameter(torch.empty(1, **factory_kwargs))
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, _ = _resolve_sequence_dim(input, self.layout)
+        mean, _ = _prefix_stats(input, sequence_dim, reduce_non_sequence=True)
+        output = input - mean
+        if self.affine:
+            output = output + self.bias
+        return output
+
+
+class CausalDynamicSequenceBatchNorm1dScaling(nn.Module):
+    def __init__(self, eps: float = 1e-5, affine: bool = False, bias: bool = False, layout: str = "last", device=None, dtype=None) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.eps = eps
+        self.affine = affine
+        self.affine_bias = bias
+        self.layout = layout
+        if self.affine:
+            self.weight = Parameter(torch.empty(1, **factory_kwargs))
+            if self.affine_bias:
+                self.bias = Parameter(torch.empty(1, **factory_kwargs))
+            else:
+                self.register_parameter("bias", None)
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, _ = _resolve_sequence_dim(input, self.layout)
+        _, var = _prefix_stats(input, sequence_dim, reduce_non_sequence=True)
+        output = input / torch.sqrt(var + self.eps)
+        if self.affine:
+            output = output * self.weight
+            if self.affine_bias:
+                output = output + self.bias
+        return output
+
+
+class CausalDynamicSequenceBatchNorm1d(nn.Sequential):
+    def __init__(self, eps: float = 1e-5, affine: bool = False, layout: str = "last", device=None, dtype=None) -> None:
+        super().__init__(
+            CausalDynamicSequenceBatchNorm1dCentering(
+                affine=False,
+                layout=layout,
+                device=device,
+                dtype=dtype,
+            ),
+            CausalDynamicSequenceBatchNorm1dScaling(
                 eps=eps,
                 affine=affine,
                 bias=affine,

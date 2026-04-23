@@ -106,7 +106,6 @@ do
   --optimizer=${optimizer} \\
   --weight-decay=${weightdecay} \\
   --seed=${seeds[$q]} \\
-  --no_save_best \\
   --display_every=${display_every} \\
   --output ./results/${dir} \\
   --metrics \"${metrics}\" \\
@@ -152,7 +151,6 @@ do
   --optimizer=${optimizer} \\
   --weight-decay=${weightdecay} \\
   --seed=${seeds[$q]} \\
-  --no_save_best \\
   --display_every=${display_every} \\
   --output ./results/${dir} \\
   --metrics \"${metrics}\" \\

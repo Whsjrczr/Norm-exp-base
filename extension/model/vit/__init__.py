@@ -5,8 +5,8 @@ from . import vision_transformer as vits
 
 VIT_MODEL_NAMES = ["vit_tiny", "vit_small", "vit_base"]
 
-FIXED_SEQUENCE_NORM_NAMES = {"SeqBN", "SeqBNc", "SeqBNs"}
-DYNAMIC_SEQUENCE_NORM_NAMES = {"DSeqBN", "DSeqBNc", "DSeqBNs"}
+FIXED_SEQUENCE_NORM_NAMES = {"SeqBN", "SeqBNc", "SeqBNs", "CSeqBN", "CSeqBNc", "CSeqBNs"}
+DYNAMIC_SEQUENCE_NORM_NAMES = {"DSeqBN", "DSeqBNc", "DSeqBNs", "CDSeqBN", "CDSeqBNc", "CDSeqBNs"}
 
 
 def add_vit_arguments(parser):

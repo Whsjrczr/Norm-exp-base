@@ -143,7 +143,6 @@ class PDETrainer:
         parser.add_argument('--pde_type', default='poisson', choices=['poisson', 'helmholtz', 'helmholtz2d', 'allen_cahn', 'wave', 'klein_gordon', 'convdiff', 'cavity', 'helmholtz_new', 'helmholtz_learnable_2', 'poisson_new', 'allen_cahn_new'], help='PDE type')
         parser.add_argument('--loss-weights', type=str2list, default='1.0,1.0', help='comma-separated list of loss weights')
         parser.add_argument('--offline', action='store_true', help='offline mode')
-        parser.add_argument('--no_save_best', action='store_true', help='do not save best model during training')
         parser.add_argument('--display_every', type=int, default=1000, help='display and log every N iterations')
         parser.add_argument('--metrics', type=str2list, default='l2 relative error', help='comma-separated list of metrics to evaluate')
         parser.add_argument('--batch_size', type=int, default=128)
@@ -202,8 +201,7 @@ class PDETrainer:
         self.validate()
         self._save_solution_plot()
 
-        if not self.cfg.no_save_best:
-            self.model.save(os.path.join(self.result_path, 'model'))
+        self.model.save(os.path.join(self.result_path, 'model'))
         self.saver.save_checkpoint(
             epoch=self.cfg.epochs - 1,
             best_loss=getattr(self, "best_loss", None),
@@ -233,7 +231,7 @@ class PDETrainer:
         self.logger('==> Validation L2 error: {:.5g}'.format(error))
         self.metrics.log_validation("val error", error, wandb_key="val_error")
         self.best_loss = getattr(self, 'best_loss', float('inf'))
-        if not self.cfg.test and not self.cfg.no_save_best and error < self.best_loss:
+        if not self.cfg.test and error < self.best_loss:
             self.best_loss = error
             self.saver.save_model('best.pth')
             self.logger('==> best loss: {:.5g}'.format(self.best_loss))

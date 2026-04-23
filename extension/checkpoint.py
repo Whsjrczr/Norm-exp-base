@@ -15,6 +15,14 @@ def add_arguments(parser: argparse.ArgumentParser):
     group.add_argument('--load', default="", metavar='PATH', type=utils.path, help='The path to (pre-)trained model.')
     group.add_argument('--load-no-strict', default=True, action='store_false',
                        help='The keys of loaded model may not exactly match the model\'s. (May usefully for finetune)')
+    if hasattr(argparse, "BooleanOptionalAction"):
+        group.add_argument('--save-checkpoint', default=True, action=argparse.BooleanOptionalAction,
+                           help='whether to save training checkpoints')
+    else:
+        group.add_argument('--save-checkpoint', dest='save_checkpoint', default=True, action='store_true',
+                           help='save training checkpoints')
+        group.add_argument('--no-save-checkpoint', dest='save_checkpoint', action='store_false',
+                           help='do not save training checkpoints')
     return
 
 
@@ -38,6 +46,7 @@ class Checkpoint(object):
         self.scheduler = scheduler
         self.save_dir = save_dir
         self.save_to_disk = save_to_disk and bool(self.save_dir)
+        self._checkpoint_disabled_logged = False
         if logger is None:
             logger = get_logger()
         self.logger = logger
@@ -49,6 +58,11 @@ class Checkpoint(object):
 
     def save_checkpoint(self, name='checkpoint.pth', **kwargs):
         if not self.save_to_disk:
+            return
+        if self.cfg is not None and not getattr(self.cfg, "save_checkpoint", True):
+            if not self._checkpoint_disabled_logged:
+                self.logger("Checkpoint saving disabled by --no-save-checkpoint")
+                self._checkpoint_disabled_logged = True
             return
         #import pdb
         #pdb.set_trace()

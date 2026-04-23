@@ -8,12 +8,16 @@ from extension.my_modules.norm.bn1d_modules import (
     BatchNorm1dScalingRMS,
 )
 from extension.my_modules.norm.seq_bn import (
+    CausalDynamicSequenceBatchNorm1d,
+    CausalSequenceBatchNorm1d,
     DynamicSequenceBatchNorm1d,
     DynamicSequenceBatchNorm1dCentering,
     DynamicSequenceBatchNorm1dScaling,
     SequenceBatchNorm1d,
     SequenceBatchNorm1dCentering,
     SequenceBatchNorm1dScaling,
+    SequenceDimBatchNorm1dCentering,
+    SequenceDimBatchNorm1dScaling,
 )
 from extension.my_modules.norm.bn2d_modules import (
     BatchNorm2dCentering,
@@ -110,6 +114,33 @@ def test_dynamic_sequence_bn_centering_and_scaling_normalize_sequence_axis():
     scaled = DynamicSequenceBatchNorm1dScaling(layout="last")(x)
     scale_var = scaled.var(dim=(0, 2), unbiased=False)
     assert torch.allclose(scale_var, torch.ones_like(scale_var), atol=1e-4, rtol=1e-4)
+
+
+def test_sbn_normalizes_only_over_sequence_axis():
+    x = torch.randn(3, 6, 8)
+    centered = SequenceDimBatchNorm1dCentering(8, affine=False, layout="last")(x)
+    center_mean = centered.mean(dim=1)
+    assert torch.allclose(center_mean, torch.zeros_like(center_mean), atol=1e-6, rtol=1e-6)
+
+    scaled = SequenceDimBatchNorm1dScaling(8, affine=False, layout="last")(x)
+    scale_var = scaled.var(dim=1, unbiased=False)
+    assert torch.allclose(scale_var, torch.ones_like(scale_var), atol=1e-4, rtol=1e-4)
+
+
+def test_causal_sbn_uses_only_prefix_tokens():
+    x = torch.randn(2, 5, 4)
+    centered = SequenceDimBatchNorm1dCentering(4, affine=False, layout="last", causal=True)(x)
+    assert torch.allclose(centered[:, 0], torch.zeros_like(centered[:, 0]), atol=1e-6, rtol=1e-6)
+    prefix_mean = x[:, :3].mean(dim=1, keepdim=True)
+    assert torch.allclose(centered[:, 2:3], x[:, 2:3] - prefix_mean, atol=1e-6, rtol=1e-6)
+
+
+def test_causal_seqbn_variants_keep_shapes():
+    x = torch.randn(2, 5, 8)
+    y_fixed = CausalSequenceBatchNorm1d(5, affine=False, layout="last")(x)
+    y_dynamic = CausalDynamicSequenceBatchNorm1d(layout="last")(x)
+    assert y_fixed.shape == x.shape
+    assert y_dynamic.shape == x.shape
 
 
 def test_bn2d_variants_keep_running_stats_flat_after_training():
@@ -283,9 +314,21 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
         ("SeqBN", {"dim": 3, "layout": "last"}),
         ("SeqBNc", {"dim": 3, "layout": "last"}),
         ("SeqBNs", {"dim": 3, "layout": "last"}),
+        ("CSeqBN", {"dim": 3, "layout": "last"}),
+        ("CSeqBNc", {"dim": 3, "layout": "last"}),
+        ("CSeqBNs", {"dim": 3, "layout": "last"}),
+        ("SBN", {"dim": 3, "layout": "last"}),
+        ("SBNc", {"dim": 3, "layout": "last"}),
+        ("SBNs", {"dim": 3, "layout": "last"}),
+        ("CSBN", {"dim": 3, "layout": "last"}),
+        ("CSBNc", {"dim": 3, "layout": "last"}),
+        ("CSBNs", {"dim": 3, "layout": "last"}),
         ("DSeqBN", {"dim": 3, "layout": "last"}),
         ("DSeqBNc", {"dim": 3, "layout": "last"}),
         ("DSeqBNs", {"dim": 3, "layout": "last"}),
+        ("CDSeqBN", {"dim": 3, "layout": "last"}),
+        ("CDSeqBNc", {"dim": 3, "layout": "last"}),
+        ("CDSeqBNs", {"dim": 3, "layout": "last"}),
         ("IN", {"dim": 3, "layout": "last"}),
         ("GN", {"dim": 3, "layout": "last", "num_groups": 4}),
         ("GNc", {"dim": 3, "layout": "last", "num_groups": 4}),
@@ -298,9 +341,9 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
     for norm_name, kwargs in cases:
         normalization._config.norm = norm_name
         normalization._config.norm_cfg = {}
-        if norm_name.startswith("SeqBN"):
+        if norm_name.startswith("SeqBN") or norm_name.startswith("CSeqBN"):
             y = normalization.Norm(x.shape[1], **kwargs)(x)
-        elif norm_name.startswith("DSeqBN"):
+        elif norm_name.startswith("DSeqBN") or norm_name.startswith("CDSeqBN"):
             y = normalization.Norm(**kwargs)(x)
         else:
             y = normalization.Norm(x.shape[2], **kwargs)(x)

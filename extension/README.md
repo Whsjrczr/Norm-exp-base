@@ -816,6 +816,11 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 - SequenceBatchNorm = SequenceBatchNormCentering -> SequenceBatchNormScaling
 - Supports sequence-axis normalization for inputs with `dim >= 3`
 
+`CSeqBN`
+
+- Causal SequenceBatchNorm
+- Prefix-only variant of `SeqBN`; each sequence position only uses current and previous positions
+
 `SeqBNc`
 
 - SequenceBatchNormCentering
@@ -826,11 +831,26 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 - SequenceBatchNormScaling
 - For inputs with `dim >= 3`, normalize along the sequence axis instead of the channel axis
 
+`SBN`
+
+- Sequence-only BatchNorm = SBNCentering -> SBNScaling
+- Normalizes only across the sequence dimension, treating sequence positions as the batch axis
+
+`CSBN`
+
+- Causal sequence-only BatchNorm
+- Prefix-only variant of `SBN`
+
 `DSeqBN`
 
 - DynamicSequenceBatchNorm = DynamicSequenceBatchNormCentering -> DynamicSequenceBatchNormScaling
 - Supports variable-length sequence inputs with `dim >= 3`
 - Does not keep per-position running statistics
+
+`CDSeqBN`
+
+- Causal DynamicSequenceBatchNorm
+- Prefix-only variant of `DSeqBN`
 
 `DSeqBNc`
 
@@ -1271,6 +1291,8 @@ norm_4d = ext.make_norm_factory(dim=4)
 - `BN/GN/IN` can now be used on ViT through `dim=3, layout="last"`.
 - `SeqBN/SeqBNc/SeqBNs` support sequence inputs with `dim >= 3` and compute statistics per sequence position, not per channel.
 - `DSeqBN/DSeqBNc/DSeqBNs` support variable-length sequence inputs, but they do not maintain per-position running statistics and their affine parameters are shared scalars rather than per-position vectors.
+- `SBN/SBNc/SBNs` compute statistics only over the sequence dimension; affine parameters are feature-wise.
+- Causal variants `CSBN*`, `CSeqBN*`, and `CDSeqBN*` only use prefix positions, matching autoregressive normalization behavior.
 
 ### CLI examples
 
