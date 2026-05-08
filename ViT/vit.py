@@ -76,6 +76,8 @@ class ViTTrainer:
                 ["ResidualStreamOutputAngleMean", "linear(5,0)"],
             ],
         }
+        if self.cfg.diagnostics:
+            taiyi_config.update(self._vit_diagnostics_config())
         wandb_kwargs = dict(
             project=self.cfg.wandb_project if hasattr(self.cfg, "wandb_project") else "test",
             entity="whsjrc-buaa",
@@ -133,6 +135,8 @@ class ViTTrainer:
         )
         if self.taiyi.enabled:
             self.logger("==> taiyi config: {}".format(taiyi_config))
+            if self.cfg.diagnostics:
+                self.logger("==> ViT Taiyi diagnostics enabled; metrics are logged through wandb")
 
     def add_arguments(self):
         argv = ["--batch-size" if arg == "--batch_size" else arg for arg in sys.argv[1:]]
@@ -143,6 +147,7 @@ class ViTTrainer:
         parser.add_argument("--disable-train-shuffle", action="store_true")
         parser.add_argument("--offline", "-offline", action="store_true", help="offline mode")
         parser.add_argument("--val-batch-size", dest="val_batch_size", type=int, default=None)
+        parser.add_argument("--diagnostics", action="store_true", help="enable lightweight ViT diagnostics through Taiyi and wandb")
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=100)
         ext.dataset.add_arguments(parser)
@@ -191,6 +196,10 @@ class ViTTrainer:
         args.dataset_cfg.setdefault("loader", "vit")
         args.dataset_cfg.setdefault("image_size", image_size)
         args.dataset_cfg.setdefault("val_resize_size", args.val_resize_size)
+        if args.diagnostics:
+            args.taiyi = True
+            args.wandb = True
+            args.visualize = True
         if args.lr_method == "cos" and args.lr_step == 30:
             args.lr_step = args.epochs
             args.lr_gamma = 0.0
@@ -326,6 +335,72 @@ class ViTTrainer:
         if "lr_gamma" in stage_cfg:
             self.cfg.lr_gamma = stage_cfg["lr_gamma"]
 
+    def _vit_diagnostics_config(self):
+        config = {}
+        block_quantities = [
+            ["ViTResidualStats", "linear(1,0)"],
+            ["ResidualInputAngleMean", "linear(5,0)"],
+            ["ResidualStreamOutputAngleMean", "linear(5,0)"],
+        ]
+        norm_quantities = [
+            ["ViTNormStats", "linear(1,0)"],
+            ["InputSndNorm", "linear(5,0)"],
+            ["OutputGradSndNorm", "linear(5,0)"],
+        ]
+        for block_idx in (0, 6, 11):
+            config[f"blocks.{block_idx}"] = block_quantities
+            config[f"blocks.{block_idx}.norm1"] = norm_quantities
+            config[f"blocks.{block_idx}.norm2"] = norm_quantities
+        config["norm"] = norm_quantities
+        config["fc"] = [["ViTLogitsStats", "linear(1,0)"]]
+        return config
+
+    def _log_taiyi_gradients(self, epoch, step):
+        if not self.cfg.diagnostics:
+            return
+        base = self.model.module if hasattr(self.model, "module") else self.model
+        total_sq = 0.0
+        max_norm = 0.0
+        for param in base.parameters():
+            if param.grad is None:
+                continue
+            grad_norm = float(param.grad.detach().float().norm(2).item())
+            total_sq += grad_norm * grad_norm
+            max_norm = max(max_norm, grad_norm)
+
+        scalars = {
+            "taiyi/vit_gradients/epoch": int(epoch),
+            "taiyi/vit_gradients/total_grad_norm": total_sq ** 0.5,
+            "taiyi/vit_gradients/max_grad_norm": max_norm,
+        }
+        modules = {
+            "patch_embed": getattr(base, "patch_embed", None),
+            "block_0": self._get_vit_block(base, 0),
+            "block_6": self._get_vit_block(base, 6),
+            "block_11": self._get_vit_block(base, 11),
+            "final_norm": getattr(base, "norm", None),
+            "fc": getattr(base, "fc", None),
+        }
+        for name, module in modules.items():
+            if module is not None:
+                scalars[f"taiyi/vit_gradients/{name}_grad_norm"] = self._module_grad_norm(module)
+        self.taiyi.log_ext(scalars, step=step)
+
+    def _get_vit_block(self, model, idx):
+        blocks = getattr(model, "blocks", None)
+        if blocks is None or idx >= len(blocks):
+            return None
+        return blocks[idx]
+
+    def _module_grad_norm(self, module):
+        total_sq = 0.0
+        for param in module.parameters():
+            if param.grad is None:
+                continue
+            grad_norm = float(param.grad.detach().float().norm(2).item())
+            total_sq += grad_norm * grad_norm
+        return total_sq ** 0.5
+
     def train_epoch(self, epoch):
         self.logger("\nEpoch: {}, lr: {:.2g}, weight decay: {:.2g} on model {}".format(
             epoch, self.optimizer.param_groups[0]["lr"], self.optimizer.param_groups[0]["weight_decay"], self.model_name))
@@ -344,6 +419,8 @@ class ViTTrainer:
 
             self.optimizer.zero_grad()
             losses.backward()
+            if i == len(self.train_loader):
+                self._log_taiyi_gradients(epoch=epoch, step=self.step)
             self.optimizer.step()
 
             self.taiyi.track(self.step)

@@ -45,6 +45,18 @@ class TaiyiTracker:
         if self.visualization is not None:
             self.visualization.show(step)
 
+    def log_ext(self, scalars, step=None):
+        if not self.enabled or not scalars:
+            return
+        payload = {}
+        if step is not None:
+            payload["steps"] = int(step)
+        payload.update(scalars)
+        if self.visualization is not None:
+            self.visualization.log_ext(payload)
+        elif self.wandb is not None and getattr(self.wandb, "run", None) is not None:
+            self.wandb.log(payload)
+
     def close(self):
         if self.visualization is not None:
             self.visualization.close()
