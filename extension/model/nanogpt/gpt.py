@@ -55,11 +55,11 @@ class MLP(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, n_embd, n_head, dropout, bias, norm_layer, act_layer):
+    def __init__(self, n_embd, n_head, dropout, bias, attn_norm_layer, mlp_norm_layer, act_layer):
         super().__init__()
-        self.ln_1 = norm_layer(n_embd)
+        self.ln_1 = attn_norm_layer(n_embd)
         self.attn = CausalSelfAttention(n_embd, n_head, dropout, bias)
-        self.ln_2 = norm_layer(n_embd)
+        self.ln_2 = mlp_norm_layer(n_embd)
         self.mlp = MLP(n_embd, dropout, bias, act_layer)
 
     def forward(self, x):
@@ -79,10 +79,16 @@ class GPT(nn.Module):
         dropout=0.0,
         bias=False,
         norm_layer=nn.LayerNorm,
+        attn_norm_layer=None,
+        mlp_norm_layer=None,
+        final_norm_layer=None,
         act_layer=nn.GELU,
     ):
         super().__init__()
         self.block_size = block_size
+        attn_norm_layer = attn_norm_layer or norm_layer
+        mlp_norm_layer = mlp_norm_layer or norm_layer
+        final_norm_layer = final_norm_layer or norm_layer
         self.transformer = nn.ModuleDict(
             dict(
                 wte=nn.Embedding(vocab_size, n_embd),
@@ -90,11 +96,11 @@ class GPT(nn.Module):
                 drop=nn.Dropout(dropout),
                 h=nn.ModuleList(
                     [
-                        Block(n_embd, n_head, dropout, bias, norm_layer, act_layer)
+                        Block(n_embd, n_head, dropout, bias, attn_norm_layer, mlp_norm_layer, act_layer)
                         for _ in range(n_layer)
                     ]
                 ),
-                ln_f=norm_layer(n_embd),
+                ln_f=final_norm_layer(n_embd),
             )
         )
         self.lm_head = nn.Linear(n_embd, vocab_size, bias=False)

@@ -15,14 +15,17 @@ if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
 import extension as ext
+from extension.model.nanogpt import format_nanogpt_activation_setting, format_nanogpt_norm_setting
 from nanoGPT.tinyshakespeare import TinyShakespeareBatches, prepare_tinyshakespeare
 
 
 class NanoGPTTrainer:
     def __init__(self):
         self.cfg = self.add_arguments()
-        norm_flag = ext.normalization.setting(self.cfg)
-        activation_flag = ext.activation.setting(self.cfg)
+        ext.normalization.setting(self.cfg)
+        ext.activation.setting(self.cfg)
+        norm_flag = format_nanogpt_norm_setting(self.cfg)
+        activation_flag = format_nanogpt_activation_setting(self.cfg)
         self.model_name = (
             f"nanoGPT_tinyshakespeare_L{self.cfg.n_layer}_H{self.cfg.n_head}_D{self.cfg.n_embd}"
             f"_ctx{self.cfg.block_size}_{norm_flag}_{activation_flag}"
@@ -180,6 +183,12 @@ class NanoGPTTrainer:
                 "block_size": self.cfg.block_size,
                 "normalization": ext.normalization.setting(self.cfg),
                 "activation": ext.activation.setting(self.cfg),
+                "nanogpt_norm": format_nanogpt_norm_setting(self.cfg),
+                "nanogpt_activation": format_nanogpt_activation_setting(self.cfg),
+                "attn_norm": self.cfg.attn_norm,
+                "mlp_norm": self.cfg.mlp_norm,
+                "final_norm": self.cfg.final_norm,
+                "mlp_activation": self.cfg.mlp_activation,
                 "optimizer": self.cfg.optimizer,
                 "learning_rate": self.cfg.lr,
                 "batch_size": self.cfg.batch_size[0],

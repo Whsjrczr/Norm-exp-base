@@ -14,6 +14,7 @@ TinyShakespeare. It follows the existing project task layout and reuses:
 - `tinyshakespeare.py`: data preparation and random token batch provider.
 - `prepare_tinyshakespeare.py`: explicit dataset preparation command.
 - `run_tinyshakespeare_4090.ps1`: recommended RTX 4090 training command.
+- `run_nanogpt_sequence_bn_batch.sh`: SeqBN-family traversal script.
 - `extension/model/nanogpt/`: causal Transformer implementation and model factory.
 
 ## Dataset
@@ -113,3 +114,51 @@ sequence options `CSBN`, `CSBNc`, `CSBNs`, `CDSeqBN`, `CDSeqBNc`, and
 
 Non-causal batch or sequence normalizations are rejected in this task because
 they expose future tokens during language-model training.
+
+The coarse setting applies one norm/activation choice to all Transformer blocks:
+
+```powershell
+python nanoGPT/nanogpt.py `
+  --norm PQN `
+  --norm-cfg "num_per_group=8,p=4,q=2" `
+  --activation pqact `
+  --activation-cfg "p=4,q=2"
+```
+
+You can also override each GPT slot independently:
+
+```powershell
+python nanoGPT/nanogpt.py `
+  --norm LN `
+  --attn-norm RMS `
+  --mlp-norm PQN `
+  --mlp-norm-cfg "num_per_group=8,p=4,q=2" `
+  --final-norm No `
+  --mlp-activation mlpact `
+  --mlp-activation-cfg "hidden_dim=16,act=gelu"
+```
+
+Slot-specific options inherit `--norm-cfg` first, then apply their own
+`--attn-norm-cfg`, `--mlp-norm-cfg`, or `--final-norm-cfg` overrides.
+
+Batch traversal for causal SeqBN variants:
+
+```bash
+bash nanoGPT/run_nanogpt_sequence_bn_batch.sh
+```
+
+The script mirrors `ViT/run_vit_sequence_bn_batch.sh`, but only traverses
+autoregressive-safe variants:
+
+```text
+CSBN CSBNc CSBNs
+CSeqBN CSeqBNc CSeqBNs
+CDSeqBN CDSeqBNc CDSeqBNs
+```
+
+It runs each norm on `attn`, `mlp`, `final`, and `all` slots. Override common
+settings through environment variables, for example:
+
+```bash
+PYTHON_BIN=./.conda/python.exe EPOCHS=5 BATCH_SIZE=32,32 bash nanoGPT/run_nanogpt_sequence_bn_batch.sh
+```
