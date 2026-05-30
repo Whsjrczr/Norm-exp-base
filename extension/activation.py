@@ -2,10 +2,10 @@ import argparse
 import torch
 import torch.nn as nn
 from .utils import str2dict
-from .my_modules.activation.mlp_activation import MLPActivation
-from .my_modules.activation.pgn_modules import PointwiseGroupNorm
-from .my_modules.activation.pq_activation import PQActivation
-from .my_modules.activation.sinarctan import SinArctan
+from .modules.activation.mlp_activation import MLPActivation
+from .modules.activation.pgn_modules import PointwiseGroupNorm
+from .modules.activation.pq_activation import PQActivation
+from .modules.activation.sinarctan import SinArctan
 
 def _ReLU(num_features, inplace=False, *args, **kwargs):
     return nn.ReLU(inplace=inplace)

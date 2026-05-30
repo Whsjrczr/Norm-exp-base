@@ -2,13 +2,13 @@ import argparse
 from functools import partial
 import torch.nn as nn
 
-from .my_modules.norm.ln_modules import *
-from .my_modules.norm.bn1d_modules import *
-from .my_modules.norm.bn2d_modules import *
-from .my_modules.norm.gn_modules import *
-from .my_modules.norm.pln import ParallelLN
-from .my_modules.norm.pq_norm import PQNorm
-from .my_modules.norm.seq_bn import *
+from .modules.norm.ln_modules import *
+from .modules.norm.bn1d_modules import *
+from .modules.norm.bn2d_modules import *
+from .modules.norm.gn_modules import *
+from .modules.norm.pln import ParallelLN
+from .modules.norm.pq_norm import PQNorm
+from .modules.norm.seq_bn import *
 
 from .utils import str2dict
 

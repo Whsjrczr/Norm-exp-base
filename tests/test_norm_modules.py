@@ -2,12 +2,12 @@ import torch
 from types import SimpleNamespace
 
 import extension.normalization as normalization
-from extension.my_modules.norm.bn1d_modules import (
+from extension.modules.norm.bn1d_modules import (
     BatchNorm1dCentering,
     BatchNorm1dScaling,
     BatchNorm1dScalingRMS,
 )
-from extension.my_modules.norm.seq_bn import (
+from extension.modules.norm.seq_bn import (
     CausalDynamicSequenceBatchNorm1d,
     CausalSequenceBatchNorm1d,
     DynamicSequenceBatchNorm1d,
@@ -19,23 +19,23 @@ from extension.my_modules.norm.seq_bn import (
     SequenceDimBatchNorm1dCentering,
     SequenceDimBatchNorm1dScaling,
 )
-from extension.my_modules.norm.bn2d_modules import (
+from extension.modules.norm.bn2d_modules import (
     BatchNorm2dCentering,
     BatchNorm2dScaling,
     BatchNorm2dScalingRMS,
 )
-from extension.my_modules.norm.gn_modules import GroupNormScaling
-from extension.my_modules.activation.pgn_modules import (
+from extension.modules.norm.gn_modules import GroupNormScaling
+from extension.modules.activation.pgn_modules import (
     PointwiseGroupNorm,
     PointwiseGroupNormCentering,
     PointwiseGroupNormScaling,
     PointwiseGroupNormScalingRMS,
 )
-from extension.my_modules.activation.mlp_activation import MLPActivation
-from extension.my_modules.norm.pln import ParallelLN
-from extension.my_modules.activation.pq_activation import PQActivation
-from extension.my_modules.norm.pq_norm import PQNorm
-from extension.my_modules.activation.sinarctan import SinArctan
+from extension.modules.activation.mlp_activation import MLPActivation
+from extension.modules.norm.pln import ParallelLN
+from extension.modules.activation.pq_activation import PQActivation
+from extension.modules.norm.pq_norm import PQNorm
+from extension.modules.activation.sinarctan import SinArctan
 import extension.activation as activation
 from extension.normalization import _ParallelLayerNorm, _ParallelLayerScaling
 from extension.model import build_vit_norm_layer

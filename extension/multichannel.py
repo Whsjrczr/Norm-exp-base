@@ -1,7 +1,7 @@
 import argparse
 
 from .utils import str2list
-from .my_modules.multichannel import (
+from .modules.multichannel import (
     MultiChannelLinear,
     MultiChannelMLP,
     MultiChannelNorm,

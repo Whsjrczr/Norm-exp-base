@@ -1,7 +1,6 @@
 import importlib
 
 from .modules import *
-from .my_modules import *
 
 from .progress_bar import ProgressBar
 from .trainer import *

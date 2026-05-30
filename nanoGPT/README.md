@@ -141,24 +141,18 @@ python nanoGPT/nanogpt.py `
 Slot-specific options inherit `--norm-cfg` first, then apply their own
 `--attn-norm-cfg`, `--mlp-norm-cfg`, or `--final-norm-cfg` overrides.
 
-Batch traversal for causal SeqBN variants:
+Batch generation for causal SeqBN variants:
 
 ```bash
 bash nanoGPT/run_nanogpt_sequence_bn_batch.sh
 ```
 
-The script mirrors `ViT/run_vit_sequence_bn_batch.sh`, but only traverses
-autoregressive-safe variants:
+The script mirrors the generated-script style used by the ViT SeqBN runs: it
+creates one shell script per experiment under `nanoGPT/exp-seqbn/` plus a
+`z_bash_execute.sh` launcher. It only traverses autoregressive-safe variants:
 
 ```text
-CSBN CSBNc CSBNs
-CSeqBN CSeqBNc CSeqBNs
-CDSeqBN CDSeqBNc CDSeqBNs
+CSBNs CSeqBNs CDSeqBNs
 ```
 
-It runs each norm on `attn`, `mlp`, `final`, and `all` slots. Override common
-settings through environment variables, for example:
-
-```bash
-PYTHON_BIN=./.conda/python.exe EPOCHS=5 BATCH_SIZE=32,32 bash nanoGPT/run_nanogpt_sequence_bn_batch.sh
-```
+It runs each norm on `attn`, `mlp`, `final`, and `all` slots.

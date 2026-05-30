@@ -23,8 +23,7 @@
 - `normalization.py`：归一化层工厂
 - `activation.py`：激活函数工厂
 - `utils.py`：命令行字符串解析工具
-- `modules/`：基础层
-- `my_modules/`：自定义归一化和激活层
+- `modules/`：基础层、自定义归一化和激活层
 
 ## 参数格式总规则
 
@@ -1073,7 +1072,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 --resume ./results/exp1/checkpoint.pth
 ```
 
-## `modules/` 和 `my_modules/`
+## `modules/`
 
 ### `modules/`
 
@@ -1089,7 +1088,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - 作用：顺序容器扩展
 
-### `my_modules/`
+### 自定义层
 
 ????????????? `normalization.py` ? `activation.py` ?????
 ???????
@@ -1114,7 +1113,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - `copy.py`
 
-## `my_modules/`
+## `modules/`
 
 这里是自定义层实现，主要被 `normalization.py` 和 `activation.py` 注册调用：
 
@@ -1345,7 +1344,7 @@ norm_4d = ext.make_norm_factory(dim=4)
 Files:
 
 - `extension/multichannel.py`
-- `extension/my_modules/multichannel.py`
+- `extension/modules/multichannel.py`
 
 ### Components
 
