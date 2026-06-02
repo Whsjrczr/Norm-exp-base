@@ -46,6 +46,11 @@ def add_nanogpt_arguments(parser):
     group.add_argument("--final-norm-cfg", dest="final_norm_cfg", type=ext.utils.str2dict, default=None, metavar="DICT")
     group.add_argument("--mlp-activation", dest="mlp_activation", default=None, help="activation inside the Transformer MLP")
     group.add_argument("--mlp-activation-cfg", dest="mlp_activation_cfg", type=ext.utils.str2dict, default=None, metavar="DICT")
+    group.add_argument(
+        "--allow-noncausal-norm",
+        action="store_true",
+        help="allow BN/SeqBN-style controls that mix future tokens; use only for explicit baselines",
+    )
     return group
 
 
@@ -65,13 +70,15 @@ def _slot_norm_name(cfg, slot):
     return getattr(cfg, f"{slot}_norm", None) or getattr(cfg, "norm", "LN")
 
 
-def _validate_norm_names(names):
+def _validate_norm_names(names, allow_noncausal=False):
     if names in (["No"], ["no"]):
         return
     unsupported = [
         name for name in names if name not in _FEATURE_SAFE_NORMS and name not in _CAUSAL_SEQUENCE_NORMS
     ]
     if unsupported:
+        if allow_noncausal and all(name in ext.normalization._config.norm_methods for name in unsupported):
+            return
         raise ValueError(
             "nanoGPT only supports feature-axis norms or causal sequence norms. "
             f"Unsupported for causal language modeling: {', '.join(unsupported)}."
@@ -82,24 +89,28 @@ def _validate_norm_names(names):
 
 def _build_norm_layer(norm_name, norm_cfg, block_size=None):
     names = _norm_names(norm_name)
-    _validate_norm_names(names)
     if names in (["No"], ["no"]):
         return lambda _num_features: nn.Identity()
 
     bound_kwargs = dict(norm_cfg or {})
     bound_kwargs.setdefault("dim", 3)
     bound_kwargs.setdefault("layout", "last")
+    allow_noncausal = bool(bound_kwargs.pop("allow_noncausal_norm", False))
+    _validate_norm_names(names, allow_noncausal=allow_noncausal)
 
-    if len(names) == 1 and names[0].startswith("CSeqBN") and not names[0].startswith("CDSeqBN"):
+    if len(names) == 1 and (
+        (names[0].startswith("SeqBN") and not names[0].startswith("DSeqBN"))
+        or (names[0].startswith("CSeqBN") and not names[0].startswith("CDSeqBN"))
+    ):
         if block_size is None:
-            raise ValueError("CSeqBN variants require block_size for fixed sequence length binding.")
+            raise ValueError("Fixed sequence norm variants require block_size for sequence length binding.")
 
         def norm_layer(_num_features):
             return ext.normalization._make_composite_norm(names, int(block_size), **bound_kwargs)
 
         return norm_layer
 
-    if len(names) == 1 and names[0].startswith("CDSeqBN"):
+    if len(names) == 1 and (names[0].startswith("DSeqBN") or names[0].startswith("CDSeqBN")):
         def norm_layer(_num_features):
             return ext.normalization._make_composite_norm(names, **bound_kwargs)
 
@@ -143,9 +154,11 @@ def format_nanogpt_activation_setting(cfg):
 
 
 def build_nanogpt_norm_layer(cfg):
+    norm_cfg = dict(getattr(cfg, "norm_cfg", {}) or {})
+    norm_cfg["allow_noncausal_norm"] = getattr(cfg, "allow_noncausal_norm", False)
     return _build_norm_layer(
         getattr(cfg, "norm", "LN"),
-        getattr(cfg, "norm_cfg", {}) or {},
+        norm_cfg,
         block_size=getattr(cfg, "block_size", None),
     )
 
@@ -154,17 +167,17 @@ def build_nanogpt_norm_layers(cfg):
     return {
         "attn_norm_layer": _build_norm_layer(
             _slot_norm_name(cfg, "attn"),
-            _merged_slot_cfg(cfg, "attn"),
+            {**_merged_slot_cfg(cfg, "attn"), "allow_noncausal_norm": getattr(cfg, "allow_noncausal_norm", False)},
             block_size=getattr(cfg, "block_size", None),
         ),
         "mlp_norm_layer": _build_norm_layer(
             _slot_norm_name(cfg, "mlp"),
-            _merged_slot_cfg(cfg, "mlp"),
+            {**_merged_slot_cfg(cfg, "mlp"), "allow_noncausal_norm": getattr(cfg, "allow_noncausal_norm", False)},
             block_size=getattr(cfg, "block_size", None),
         ),
         "final_norm_layer": _build_norm_layer(
             _slot_norm_name(cfg, "final"),
-            _merged_slot_cfg(cfg, "final"),
+            {**_merged_slot_cfg(cfg, "final"), "allow_noncausal_norm": getattr(cfg, "allow_noncausal_norm", False)},
             block_size=getattr(cfg, "block_size", None),
         ),
     }

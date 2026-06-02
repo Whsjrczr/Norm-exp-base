@@ -30,6 +30,7 @@ def _cfg(norm="LN"):
         activation_cfg={},
         mlp_activation=None,
         mlp_activation_cfg=None,
+        allow_noncausal_norm=False,
         init_preset="default",
     )
 
@@ -59,6 +60,20 @@ def test_nanogpt_rejects_noncausal_token_mixing_norms(norm):
     ext.activation.setting(cfg)
     with pytest.raises(ValueError, match="causal language modeling"):
         ext.model.get_model(cfg)
+
+
+def test_nanogpt_allows_explicit_bn_control():
+    cfg = _cfg("BN")
+    cfg.allow_noncausal_norm = True
+    ext.normalization.setting(cfg)
+    ext.activation.setting(cfg)
+    model = ext.model.get_model(cfg)
+    tokens = torch.randint(0, cfg.vocab_size, (2, cfg.block_size))
+
+    logits, loss = model(tokens, tokens)
+
+    assert logits.shape == (2, cfg.block_size, cfg.vocab_size)
+    assert torch.isfinite(loss)
 
 
 def test_nanogpt_supports_independent_norm_and_activation_slots():

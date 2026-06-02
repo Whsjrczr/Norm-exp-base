@@ -31,6 +31,8 @@ PDE/exp*
 PDE/*generate.sh
 ViT/test/
 ViT/exp*
+ViT/analysis/
+ViT/analyze_failure_diagnostics_wandb.py
 KAN/*.sh
 KAN/results/
 KAN/test/
@@ -47,8 +49,9 @@ tmp-kan-results*/
 pytest*
 
 test.py
+*.csv
 
 #dataset
 cifar10/
 
-
+wandb_logs_latest/

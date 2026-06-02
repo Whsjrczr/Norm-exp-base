@@ -113,7 +113,8 @@ sequence options `CSBN`, `CSBNc`, `CSBNs`, `CDSeqBN`, `CDSeqBNc`, and
 `CDSeqBNs` are also supported.
 
 Non-causal batch or sequence normalizations are rejected in this task because
-they expose future tokens during language-model training.
+they expose future tokens during language-model training. Use
+`--allow-noncausal-norm` only for explicit control baselines such as BN.
 
 The coarse setting applies one norm/activation choice to all Transformer blocks:
 
@@ -155,4 +156,6 @@ creates one shell script per experiment under `nanoGPT/exp-seqbn/` plus a
 CSBNs CSeqBNs CDSeqBNs
 ```
 
-It runs each norm on `attn`, `mlp`, `final`, and `all` slots.
+It first generates `LN` and `BN` control jobs, then runs each causal SeqBN norm
+on `attn`, `mlp`, `final`, and `all` slots. The BN control is generated with
+`--allow-noncausal-norm` because it is not a strict autoregressive setting.
