@@ -6,6 +6,22 @@ from torch.nn import init as init
 from torch.nn.parameter import Parameter
 
 
+def _prod(shape):
+    value = 1
+    for item in shape:
+        value *= int(item)
+    return value
+
+
+def _canonical_feature_shape(num_features):
+    if num_features is None:
+        return None, None
+    if isinstance(num_features, int):
+        return (int(num_features),), int(num_features)
+    feature_shape = tuple(int(item) for item in num_features)
+    return feature_shape, _prod(feature_shape)
+
+
 def _resolve_sequence_dim(input: Tensor, layout: str | None, num_features: int | None = None):
     if input.dim() < 3:
         raise RuntimeError(
@@ -76,6 +92,41 @@ def _resolve_feature_dim(input: Tensor, layout: str | None, num_features: int | 
     return feature_dim, view_shape
 
 
+def _resolve_channel_feature_dims(input: Tensor, layout: str, normalized_shape):
+    if input.dim() < 3:
+        raise RuntimeError(
+            f"Expected input.dim() >= 3 for channel-feature batch norm, but got shape {tuple(input.shape)}."
+        )
+
+    expected_shape, expected_num_features = _canonical_feature_shape(normalized_shape)
+    if layout == "last":
+        sequence_dim = 1
+        feature_shape = tuple(input.shape[2:])
+        view_shape = [1, 1, *feature_shape]
+    elif layout == "first":
+        sequence_dim = input.dim() - 1
+        feature_shape = tuple(input.shape[1:-1])
+        view_shape = [1, *feature_shape, 1]
+    else:
+        raise ValueError(f"Unsupported sequence layout: {layout}. Expected 'first' or 'last'.")
+
+    actual_num_features = _prod(feature_shape)
+    if expected_num_features is not None:
+        if len(expected_shape) > 1 and expected_shape != feature_shape:
+            raise RuntimeError(
+                f"Expected feature shape={expected_shape}, but got feature shape={feature_shape} "
+                f"for input shape {tuple(input.shape)}."
+            )
+        if actual_num_features != expected_num_features:
+            raise RuntimeError(
+                f"Expected flattened feature count={expected_num_features}, but got "
+                f"{actual_num_features} from feature shape={feature_shape}."
+            )
+
+    reduce_dims = (0, sequence_dim)
+    return sequence_dim, reduce_dims, view_shape, actual_num_features
+
+
 def _prefix_stats(input: Tensor, sequence_dim: int, eps: float | None = None, reduce_non_sequence: bool = False):
     if reduce_non_sequence:
         reduce_dims = tuple(dim for dim in range(input.dim()) if dim != sequence_dim)
@@ -101,6 +152,272 @@ def _prefix_stats(input: Tensor, sequence_dim: int, eps: float | None = None, re
     if eps is not None:
         var = var + eps
     return mean, var
+
+
+def _batch_prefix_stats(input: Tensor, sequence_dim: int, eps: float | None = None):
+    batch_summed = input.sum(dim=0, keepdim=True)
+    batch_squared = input.square().sum(dim=0, keepdim=True)
+    prefix_sum = batch_summed.cumsum(dim=sequence_dim)
+    prefix_square_sum = batch_squared.cumsum(dim=sequence_dim)
+
+    length_shape = [1] * input.dim()
+    length_shape[sequence_dim] = input.shape[sequence_dim]
+    lengths = torch.arange(1, input.shape[sequence_dim] + 1, device=input.device, dtype=input.dtype).view(*length_shape)
+    counts = lengths * input.shape[0]
+    mean = prefix_sum / counts
+    square_mean = prefix_square_sum / counts
+    var = (square_mean - mean.square()).clamp_min(0.0)
+    if eps is not None:
+        var = var + eps
+    return mean, var
+
+
+class ChannelFeatureBatchNormCentering(nn.Module):
+    _version = 1
+
+    def __init__(
+        self,
+        num_features,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        track_running_stats: bool = True,
+        layout: str = "last",
+        causal: bool = False,
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.normalized_shape, self.num_features = _canonical_feature_shape(num_features)
+        self.momentum = momentum
+        self.affine = affine
+        self.track_running_stats = bool(track_running_stats and not causal)
+        self.layout = layout
+        self.causal = causal
+        if self.affine:
+            self.bias = Parameter(torch.empty(self.num_features, **factory_kwargs))
+        else:
+            self.register_parameter("bias", None)
+        if self.track_running_stats:
+            self.register_buffer("running_mean", torch.zeros(self.num_features, **factory_kwargs))
+            self.register_buffer(
+                "num_batches_tracked",
+                torch.tensor(0, dtype=torch.long, **{k: v for k, v in factory_kwargs.items() if k != "dtype"}),
+            )
+        else:
+            self.register_buffer("running_mean", None)
+            self.register_buffer("num_batches_tracked", None)
+        self.reset_parameters()
+
+    def reset_running_stats(self) -> None:
+        if self.track_running_stats:
+            self.running_mean.zero_()
+            self.num_batches_tracked.zero_()
+
+    def reset_parameters(self) -> None:
+        self.reset_running_stats()
+        if self.affine:
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, reduce_dims, shape, _ = _resolve_channel_feature_dims(input, self.layout, self.normalized_shape)
+        if self.causal:
+            mean, _ = _batch_prefix_stats(input, sequence_dim)
+        else:
+            exponential_average_factor = 0.0 if self.momentum is None else self.momentum
+            if self.training and self.track_running_stats and self.num_batches_tracked is not None:
+                self.num_batches_tracked.add_(1)
+                if self.momentum is None:
+                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+
+            bn_training = self.training or self.running_mean is None
+            if bn_training:
+                mean = torch.mean(input, dim=reduce_dims, keepdim=True)
+                if self.track_running_stats:
+                    self.running_mean.mul_(1 - exponential_average_factor).add_(
+                        mean.reshape(self.num_features), alpha=exponential_average_factor
+                    )
+            else:
+                mean = self.running_mean.view(*shape)
+
+        output = input - mean
+        if self.affine:
+            output = output + self.bias.view(*shape)
+        return output
+
+
+class ChannelFeatureBatchNormScaling(nn.Module):
+    _version = 1
+
+    def __init__(
+        self,
+        num_features,
+        eps: float = 1e-5,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        bias: bool = False,
+        track_running_stats: bool = True,
+        layout: str = "last",
+        causal: bool = False,
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.normalized_shape, self.num_features = _canonical_feature_shape(num_features)
+        self.eps = eps
+        self.momentum = momentum
+        self.affine = affine
+        self.affine_bias = bias
+        self.track_running_stats = bool(track_running_stats and not causal)
+        self.layout = layout
+        self.causal = causal
+        if self.affine:
+            self.weight = Parameter(torch.empty(self.num_features, **factory_kwargs))
+            if self.affine_bias:
+                self.bias = Parameter(torch.empty(self.num_features, **factory_kwargs))
+            else:
+                self.register_parameter("bias", None)
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+        if self.track_running_stats:
+            self.register_buffer("running_var", torch.ones(self.num_features, **factory_kwargs))
+            self.register_buffer(
+                "num_batches_tracked",
+                torch.tensor(0, dtype=torch.long, **{k: v for k, v in factory_kwargs.items() if k != "dtype"}),
+            )
+        else:
+            self.register_buffer("running_var", None)
+            self.register_buffer("num_batches_tracked", None)
+        self.reset_parameters()
+
+    def reset_running_stats(self) -> None:
+        if self.track_running_stats:
+            self.running_var.fill_(1)
+            self.num_batches_tracked.zero_()
+
+    def reset_parameters(self) -> None:
+        self.reset_running_stats()
+        if self.affine:
+            init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, reduce_dims, shape, _ = _resolve_channel_feature_dims(input, self.layout, self.normalized_shape)
+        if self.causal:
+            _, var = _batch_prefix_stats(input, sequence_dim)
+        else:
+            exponential_average_factor = 0.0 if self.momentum is None else self.momentum
+            if self.training and self.track_running_stats and self.num_batches_tracked is not None:
+                self.num_batches_tracked.add_(1)
+                if self.momentum is None:
+                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+
+            bn_training = self.training or self.running_var is None
+            if bn_training:
+                var = torch.var(input, dim=reduce_dims, unbiased=False, keepdim=True)
+                if self.track_running_stats:
+                    self.running_var.mul_(1 - exponential_average_factor).add_(
+                        var.reshape(self.num_features), alpha=exponential_average_factor
+                    )
+            else:
+                var = self.running_var.view(*shape)
+
+        output = input / torch.sqrt(var + self.eps)
+        if self.affine:
+            output = output * self.weight.view(*shape)
+            if self.affine_bias:
+                output = output + self.bias.view(*shape)
+        return output
+
+
+class ChannelFeatureBatchNorm(nn.Module):
+    _version = 1
+
+    def __init__(
+        self,
+        num_features,
+        eps: float = 1e-5,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        track_running_stats: bool = True,
+        layout: str = "last",
+        causal: bool = False,
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.normalized_shape, self.num_features = _canonical_feature_shape(num_features)
+        self.eps = eps
+        self.momentum = momentum
+        self.affine = affine
+        self.track_running_stats = bool(track_running_stats and not causal)
+        self.layout = layout
+        self.causal = causal
+        if self.affine:
+            self.weight = Parameter(torch.empty(self.num_features, **factory_kwargs))
+            self.bias = Parameter(torch.empty(self.num_features, **factory_kwargs))
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+        if self.track_running_stats:
+            self.register_buffer("running_mean", torch.zeros(self.num_features, **factory_kwargs))
+            self.register_buffer("running_var", torch.ones(self.num_features, **factory_kwargs))
+            self.register_buffer(
+                "num_batches_tracked",
+                torch.tensor(0, dtype=torch.long, **{k: v for k, v in factory_kwargs.items() if k != "dtype"}),
+            )
+        else:
+            self.register_buffer("running_mean", None)
+            self.register_buffer("running_var", None)
+            self.register_buffer("num_batches_tracked", None)
+        self.reset_parameters()
+
+    def reset_running_stats(self) -> None:
+        if self.track_running_stats:
+            self.running_mean.zero_()
+            self.running_var.fill_(1)
+            self.num_batches_tracked.zero_()
+
+    def reset_parameters(self) -> None:
+        self.reset_running_stats()
+        if self.affine:
+            init.ones_(self.weight)
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, reduce_dims, shape, _ = _resolve_channel_feature_dims(input, self.layout, self.normalized_shape)
+        if self.causal:
+            mean, var = _batch_prefix_stats(input, sequence_dim)
+        else:
+            exponential_average_factor = 0.0 if self.momentum is None else self.momentum
+            if self.training and self.track_running_stats and self.num_batches_tracked is not None:
+                self.num_batches_tracked.add_(1)
+                if self.momentum is None:
+                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+
+            bn_training = self.training or self.running_mean is None or self.running_var is None
+            if bn_training:
+                mean = torch.mean(input, dim=reduce_dims, keepdim=True)
+                var = torch.var(input, dim=reduce_dims, unbiased=False, keepdim=True)
+                if self.track_running_stats:
+                    self.running_mean.mul_(1 - exponential_average_factor).add_(
+                        mean.reshape(self.num_features), alpha=exponential_average_factor
+                    )
+                    self.running_var.mul_(1 - exponential_average_factor).add_(
+                        var.reshape(self.num_features), alpha=exponential_average_factor
+                    )
+            else:
+                mean = self.running_mean.view(*shape)
+                var = self.running_var.view(*shape)
+
+        output = (input - mean) / torch.sqrt(var + self.eps)
+        if self.affine:
+            output = output * self.weight.view(*shape) + self.bias.view(*shape)
+        return output
 
 
 class SequenceBatchNorm1dCentering(nn.Module):

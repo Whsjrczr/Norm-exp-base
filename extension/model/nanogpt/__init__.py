@@ -27,6 +27,9 @@ _CAUSAL_SEQUENCE_NORMS = {
     "CDSeqBN",
     "CDSeqBNc",
     "CDSeqBNs",
+    "CCFBN",
+    "CCFBNc",
+    "CCFBNs",
 }
 
 

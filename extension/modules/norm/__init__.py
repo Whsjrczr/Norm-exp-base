@@ -5,6 +5,9 @@ from .ln_modules import LayerNormCentering, LayerNormScaling, LayerNormScalingRM
 from .pln import ParallelLN
 from .pq_norm import PQNorm
 from .seq_bn import (
+    ChannelFeatureBatchNorm,
+    ChannelFeatureBatchNormCentering,
+    ChannelFeatureBatchNormScaling,
     CausalDynamicSequenceBatchNorm1d,
     CausalDynamicSequenceBatchNorm1dCentering,
     CausalDynamicSequenceBatchNorm1dScaling,

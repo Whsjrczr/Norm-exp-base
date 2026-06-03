@@ -320,6 +320,45 @@ def _CausalDynamicSequenceBatchNorm(num_features=None, dim=3, layout=None, eps=1
     layout = _normalize_sequence_layout(dim, layout)
     return CausalDynamicSequenceBatchNorm1d(eps=eps, affine=affine, layout=layout)
 
+
+def _ChannelFeatureBatchNormCentering(num_features, dim=3, layout=None, momentum=0.1, affine=True, track_running_stats=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return ChannelFeatureBatchNormCentering(
+        num_features,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+        causal=causal,
+    )
+
+
+def _ChannelFeatureBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return ChannelFeatureBatchNormScaling(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        bias=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+        causal=causal,
+    )
+
+
+def _ChannelFeatureBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return ChannelFeatureBatchNorm(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+        causal=causal,
+    )
+
 # IN
 def _InstanceNorm(num_features, dim=4, layout=None, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False, *args,
                   **kwargs):
@@ -404,6 +443,12 @@ class _config:
                     'CDSeqBN': _CausalDynamicSequenceBatchNorm,
                     'CDSeqBNc': _CausalDynamicSequenceBatchNormCentering,
                     'CDSeqBNs': _CausalDynamicSequenceBatchNormScaling,
+                    'CFBN': _ChannelFeatureBatchNorm,
+                    'CFBNc': _ChannelFeatureBatchNormCentering,
+                    'CFBNs': _ChannelFeatureBatchNormScaling,
+                    'CCFBN': partial(_ChannelFeatureBatchNorm, causal=True),
+                    'CCFBNc': partial(_ChannelFeatureBatchNormCentering, causal=True),
+                    'CCFBNs': partial(_ChannelFeatureBatchNormScaling, causal=True),
                     'DSeqBLS': _DynamicSequenceCenterLayerScaling,
                     'DSeqBCLN': _DynamicSequenceCenterLayerNorm,
                     'DSeqBCRMS': _DynamicSequenceCenterRMSNorm,
