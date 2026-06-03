@@ -20,7 +20,7 @@ dropout=0.0
 lr_method=cos
 activation=relu
 seed=0
-subjectname="ViT-CFBN-hparam-sensitivity"
+subjectname="ViT-CFBN-focused"
 dataset_root="/home/dlth/norm-exp-code/dataset"
 output_root="/home/dlth/norm-exp-code/Norm-exp-base/ViT/results/${dir_name}"
 python_bin="/home/dlth/miniconda3/envs/norm-base/bin/python"
@@ -29,9 +29,9 @@ CUDA_VISIBLE_DEVICES=0
 num_once=1
 launch_cnt=0
 
-norms=(LN RMS BN BNs SBN SBNs bCRMS SeqBN SeqBNs DSeqBN DSeqBNs DSeqBCRMS CFBN CFBNc CFBNs)
-weightdecays=(0.01 0.05 0.1)
-droppaths=(0.0 0.1 0.2)
+norms=(CFBN CFBNc CFBNs)
+weightdecays=(0.1)
+droppaths=(0.1)
 
 : > "${gen_dir}/z_bash_execute.sh"
 
@@ -88,6 +88,7 @@ for norm in "${norms[@]}"; do
   for weightdecay in "${weightdecays[@]}"; do
     for droppath in "${droppaths[@]}"; do
       add_job 4 1e-4 "${norm}" "${weightdecay}" "${droppath}" patch4_lr1e4
+      add_job 8 1e-4 "${norm}" "${weightdecay}" "${droppath}" patch8_lr1e4
       add_job 16 1e-3 "${norm}" "${weightdecay}" "${droppath}" patch16_lr1e3
     done
   done

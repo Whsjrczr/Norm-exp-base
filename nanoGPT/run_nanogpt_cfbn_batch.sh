@@ -30,7 +30,7 @@ dtype=bfloat16
 seed=0
 sample_tokens=0
 sample_every=0
-subjectname="nanoGPT-CFBN"
+subjectname="nanoGPT-CFBN-focused"
 dataset_root="/home/dlth/norm-exp-code/dataset/tinyshakespeare"
 output_root="/home/dlth/norm-exp-code/Norm-exp-base/nanoGPT/results/${dir_name}"
 python_bin="/home/dlth/miniconda3/envs/norm-base/bin/python"
@@ -39,8 +39,8 @@ CUDA_VISIBLE_DEVICES=0
 num_once=1
 launch_cnt=0
 
-control_norms=(LN RMS)
-norms=(CCFBN CCFBNc CCFBNs CSBN CSBNs CSeqBN CDSeqBN CDSeqBNs)
+control_norms=()
+norms=(CCFBN CCFBNc CCFBNs)
 slots=(attn mlp final all)
 
 : > "${gen_dir}/z_bash_execute.sh"
@@ -117,10 +117,6 @@ EOF
     echo "wait" >> "${gen_dir}/z_bash_execute.sh"
   fi
 }
-
-for norm in "${control_norms[@]}"; do
-  add_job "${norm}" all control
-done
 
 for norm in "${norms[@]}"; do
   for slot in "${slots[@]}"; do
