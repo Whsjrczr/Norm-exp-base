@@ -159,3 +159,20 @@ CSBNs CSeqBNs CDSeqBNs
 It first generates `LN` and `BN` control jobs, then runs each causal SeqBN norm
 on `attn`, `mlp`, `final`, and `all` slots. The BN control is generated with
 `--allow-noncausal-norm` because it is not a strict autoregressive setting.
+
+Batch generation for non-causal SBN/SeqBN/BN/CFBN controls across learning
+rates:
+
+```bash
+DATASET_ROOT=/path/to/dataset/tinyshakespeare \
+OUTPUT_ROOT=/path/to/results/exp-nanogpt-sbn-seqbn-bn-cfbn-lr \
+PYTHON_BIN=/path/to/python \
+NUM_ONCE=1 \
+bash nanoGPT/run_nanogpt_sbn_seqbn_bn_cfbn_lr_batch.sh
+```
+
+This generates one job per `LN`, `BN/BNc/BNs`, `SBN/SBNc/SBNs`,
+`SeqBN/SeqBNc/SeqBNs`, and `CFBN/CFBNc/CFBNs` setting across the configured
+learning rates. For `SBN`, `SeqBN`, `BN`, and `CFBN`, the jobs include
+`--allow-noncausal-norm`; treat them as explicit controls because they can mix
+future tokens in a causal language-model setup.

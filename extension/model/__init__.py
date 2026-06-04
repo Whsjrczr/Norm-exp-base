@@ -1,5 +1,6 @@
 import argparse
 
+from .bert import BERT_MODEL_NAMES, add_bert_arguments, get_bert_model
 from .kan import KAN_MODEL_NAMES, add_kan_arguments, get_kan_model
 from .initialization import (
     add_initialization_arguments,
@@ -11,7 +12,7 @@ from .nanogpt import NANOGPT_MODEL_NAMES, add_nanogpt_arguments, get_nanogpt_mod
 from .vit import VIT_MODEL_NAMES, add_vit_arguments, build_vit_norm_layer, get_vit_model
 
 
-MODEL_FAMILIES = ("mlp", "kan", "vit", "nanogpt")
+MODEL_FAMILIES = ("mlp", "kan", "vit", "nanogpt", "bert")
 
 
 def _all_model_names():
@@ -21,6 +22,7 @@ def _all_model_names():
         | set(KAN_MODEL_NAMES)
         | set(VIT_MODEL_NAMES)
         | set(NANOGPT_MODEL_NAMES)
+        | set(BERT_MODEL_NAMES)
     )
 
 
@@ -29,6 +31,8 @@ def _infer_family_from_arch(arch: str):
         return "vit"
     if arch in NANOGPT_MODEL_NAMES:
         return "nanogpt"
+    if arch in BERT_MODEL_NAMES:
+        return "bert"
     if arch in KAN_MODEL_NAMES:
         return "kan"
     if arch in MLP_CLASSIFICATION_MODEL_NAMES or arch in MLP_PDE_MODEL_NAMES:
@@ -57,6 +61,7 @@ def add_model_arguments(
         "kan": "KAN",
         "vit": "vit_small",
         "nanogpt": "nanoGPT",
+        "bert": "BERTTranslation",
     }[default_family]
     group = parser.add_argument_group("Model Options")
     group.add_argument(
@@ -79,6 +84,7 @@ def add_model_arguments(
     add_kan_arguments(parser)
     add_vit_arguments(parser)
     add_nanogpt_arguments(parser)
+    add_bert_arguments(parser)
     return group
 
 
@@ -94,6 +100,8 @@ def get_model(cfg):
         model = get_vit_model(cfg)
     elif family == "nanogpt":
         model = get_nanogpt_model(cfg)
+    elif family == "bert":
+        model = get_bert_model(cfg)
     else:
         raise ValueError(f"Unknown model family: {family}")
 
