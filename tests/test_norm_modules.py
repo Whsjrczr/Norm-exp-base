@@ -548,6 +548,24 @@ def test_vit_build_vit_norm_layer_uses_dynamic_sequence_norm_without_fixed_lengt
     assert isinstance(module, DynamicSequenceBatchNorm1d)
 
 
+def test_vit_build_vit_norm_layer_uses_ema_sbn_norms():
+    cfg = SimpleNamespace(norm="EMASBN", norm_cfg={"momentum": 0.2}, im_size=(32, 32), patch_size=4)
+    normalization._config.norm = "EMASBN"
+    normalization._config.norm_cfg = {"momentum": 0.2}
+    module = build_vit_norm_layer(cfg)(384)
+    assert isinstance(module, EMASequenceDimBatchNorm1d)
+    assert module[0].momentum == 0.2
+
+
+def test_vit_build_vit_norm_layer_uses_ema_cfbn_norms():
+    cfg = SimpleNamespace(norm="EMACFBN", norm_cfg={"momentum": 0.2}, im_size=(32, 32), patch_size=4)
+    normalization._config.norm = "EMACFBN"
+    normalization._config.norm_cfg = {"momentum": 0.2}
+    module = build_vit_norm_layer(cfg)(384)
+    assert isinstance(module, EMAChannelFeatureBatchNorm)
+    assert module.momentum == 0.2
+
+
 def test_nanogpt_allows_causal_cfbn_norms():
     cfg = SimpleNamespace(norm="CCFBN", norm_cfg={}, block_size=8, allow_noncausal_norm=False)
     module = build_nanogpt_norm_layer(cfg)(16)
