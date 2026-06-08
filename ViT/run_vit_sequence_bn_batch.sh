@@ -19,7 +19,7 @@ dropout="${DROPOUT:-0.0}"
 drop_path_rate="${DROP_PATH_RATE:-0.1}"
 activation="${ACTIVATION:-gelu}"
 seed="${SEED:-0}"
-cuda_visible_devices="${CUDA_VISIBLE_DEVICES:-0}"
+cuda_visible_devices="${CUDA_VISIBLE_DEVICES:-1}"
 
 patch_sizes=(4 16)
 norms=(
