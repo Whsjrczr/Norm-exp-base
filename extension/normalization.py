@@ -276,6 +276,28 @@ def _SequenceDimBatchNorm(num_features, dim=3, layout=None, eps=1e-5, affine=Tru
     return SequenceDimBatchNorm1d(num_features, eps=eps, affine=affine, layout=layout, causal=causal)
 
 
+def _EMASequenceDimBatchNormCentering(num_features, dim=3, layout=None, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMASequenceDimBatchNorm1dCentering(num_features, momentum=momentum, affine=affine, layout=layout)
+
+
+def _EMASequenceDimBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMASequenceDimBatchNorm1dScaling(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        bias=affine,
+        layout=layout,
+    )
+
+
+def _EMASequenceDimBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMASequenceDimBatchNorm1d(num_features, eps=eps, momentum=momentum, affine=affine, layout=layout)
+
+
 def _CausalSequenceBatchNormCentering(num_features, dim=3, layout=None, affine=True, *args, **kwargs):
     layout = _normalize_sequence_layout(dim, layout)
     return CausalSequenceBatchNorm1dCentering(num_features, affine=affine, layout=layout)
@@ -359,6 +381,39 @@ def _ChannelFeatureBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentu
         causal=causal,
     )
 
+
+def _EMAChannelFeatureBatchNormCentering(num_features, dim=3, layout=None, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMAChannelFeatureBatchNormCentering(
+        num_features,
+        momentum=momentum,
+        affine=affine,
+        layout=layout,
+    )
+
+
+def _EMAChannelFeatureBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMAChannelFeatureBatchNormScaling(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        bias=affine,
+        layout=layout,
+    )
+
+
+def _EMAChannelFeatureBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMAChannelFeatureBatchNorm(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        layout=layout,
+    )
+
 # IN
 def _InstanceNorm(num_features, dim=4, layout=None, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False, *args,
                   **kwargs):
@@ -437,6 +492,9 @@ class _config:
                     'CSBN': partial(_SequenceDimBatchNorm, causal=True),
                     'CSBNc': partial(_SequenceDimBatchNormCentering, causal=True),
                     'CSBNs': partial(_SequenceDimBatchNormScaling, causal=True),
+                    'EMASBN': _EMASequenceDimBatchNorm,
+                    'EMASBNc': _EMASequenceDimBatchNormCentering,
+                    'EMASBNs': _EMASequenceDimBatchNormScaling,
                     'DSeqBN': _DynamicSequenceBatchNorm,
                     'DSeqBNc': _DynamicSequenceBatchNormCentering,
                     'DSeqBNs': _DynamicSequenceBatchNormScaling,
@@ -449,6 +507,9 @@ class _config:
                     'CCFBN': partial(_ChannelFeatureBatchNorm, causal=True),
                     'CCFBNc': partial(_ChannelFeatureBatchNormCentering, causal=True),
                     'CCFBNs': partial(_ChannelFeatureBatchNormScaling, causal=True),
+                    'EMACFBN': _EMAChannelFeatureBatchNorm,
+                    'EMACFBNc': _EMAChannelFeatureBatchNormCentering,
+                    'EMACFBNs': _EMAChannelFeatureBatchNormScaling,
                     'DSeqBLS': _DynamicSequenceCenterLayerScaling,
                     'DSeqBCLN': _DynamicSequenceCenterLayerNorm,
                     'DSeqBCRMS': _DynamicSequenceCenterRMSNorm,

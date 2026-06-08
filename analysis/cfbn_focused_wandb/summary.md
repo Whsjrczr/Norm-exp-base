@@ -1,6 +1,6 @@
 # CFBN Focused W&B Summary
 
-- generated: 2026-06-04 07:52 UTC
+- generated: 2026-06-05 06:48 UTC
 - nanoGPT project: `whsjrc-buaa/nanoGPT-CFBN-focused` (12 runs)
 - ViT project: `whsjrc-buaa/ViT-CFBN-focused` (9 runs)
 - all runs are seed 0 and finished unless noted in the tables.

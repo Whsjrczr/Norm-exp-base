@@ -16,6 +16,8 @@ translation task instead of changing the TinyShakespeare entry point.
 - `prepare_translation.py`: explicit dataset preparation command.
 - `download_opus_books.py`: download OPUS Books English-French Moses files and convert them to TSV.
 - `run_bert_translation_norm_lr_batch.sh`: generate OPUS Books norm/LR sweep jobs.
+- `summarize_translation_results.py`: parse result logs into a CSV summary.
+- `EXPERIMENTS.md`: experiment design, sweep variables, and analysis plan.
 - `extension/model/bert/`: BERT-style translation model and model factory.
 
 ## Dataset
@@ -121,6 +123,14 @@ Then run the generated launcher:
 ```bash
 cd BERT/exp-bert-opus-books-norm-lr
 bash z_bash_execute.sh
+```
+
+Summarize finished runs:
+
+```bash
+python BERT/summarize_translation_results.py \
+  --results-root ./results/exp-bert-opus-books-norm-lr \
+  --output ./results/exp-bert-opus-books-norm-lr/summary.csv
 ```
 
 Outputs follow the repository result convention:

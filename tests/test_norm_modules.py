@@ -16,6 +16,12 @@ from extension.modules.norm.seq_bn import (
     DynamicSequenceBatchNorm1d,
     DynamicSequenceBatchNorm1dCentering,
     DynamicSequenceBatchNorm1dScaling,
+    EMAChannelFeatureBatchNorm,
+    EMAChannelFeatureBatchNormCentering,
+    EMAChannelFeatureBatchNormScaling,
+    EMASequenceDimBatchNorm1d,
+    EMASequenceDimBatchNorm1dCentering,
+    EMASequenceDimBatchNorm1dScaling,
     SequenceBatchNorm1d,
     SequenceBatchNorm1dCentering,
     SequenceBatchNorm1dScaling,
@@ -139,6 +145,30 @@ def test_causal_sbn_uses_only_prefix_tokens():
     assert torch.allclose(centered[:, 2:3], x[:, 2:3] - prefix_mean, atol=1e-6, rtol=1e-6)
 
 
+def test_ema_sbn_uses_exponential_prefix_statistics():
+    x = torch.randn(2, 5, 4)
+    momentum = 0.25
+    centered = EMASequenceDimBatchNorm1dCentering(4, momentum=momentum, affine=False, layout="last")(x)
+
+    mean0 = x[:, 0:1]
+    mean1 = mean0 * (1.0 - momentum) + x[:, 1:2] * momentum
+    mean2 = mean1 * (1.0 - momentum) + x[:, 2:3] * momentum
+
+    assert torch.allclose(centered[:, 0:1], torch.zeros_like(centered[:, 0:1]), atol=1e-6, rtol=1e-6)
+    assert torch.allclose(centered[:, 2:3], x[:, 2:3] - mean2, atol=1e-6, rtol=1e-6)
+
+
+def test_ema_sbn_combined_module_matches_center_then_scale():
+    x = torch.randn(3, 6, 8)
+    momentum = 0.2
+    module = EMASequenceDimBatchNorm1d(8, momentum=momentum, affine=False, layout="last")
+    manual = EMASequenceDimBatchNorm1dScaling(8, momentum=momentum, affine=False, layout="last")(
+        EMASequenceDimBatchNorm1dCentering(8, momentum=momentum, affine=False, layout="last")(x)
+    )
+    y = module(x)
+    assert torch.allclose(y, manual, atol=1e-6, rtol=1e-6)
+
+
 def test_causal_seqbn_variants_keep_shapes():
     x = torch.randn(2, 5, 8)
     y_fixed = CausalSequenceBatchNorm1d(5, affine=False, layout="last")(x)
@@ -187,6 +217,44 @@ def test_causal_cfbn_uses_batch_prefix_statistics():
     prefix_var = prefix.var(dim=(0, 1), unbiased=False, keepdim=True)
     expected = (x[:, 2:3] - prefix_mean) / torch.sqrt(prefix_var + full_module.eps)
     assert torch.allclose(full[:, 2:3], expected, atol=1e-6, rtol=1e-6)
+
+
+def test_ema_cfbn_uses_batch_exponential_prefix_statistics():
+    x = torch.randn(3, 5, 2)
+    momentum = 0.25
+    centered = EMAChannelFeatureBatchNormCentering(2, momentum=momentum, affine=False, layout="last")(x)
+
+    batch_mean0 = x[:, 0:1].mean(dim=0, keepdim=True)
+    batch_mean1 = x[:, 1:2].mean(dim=0, keepdim=True)
+    batch_mean2 = x[:, 2:3].mean(dim=0, keepdim=True)
+    mean1 = batch_mean0 * (1.0 - momentum) + batch_mean1 * momentum
+    mean2 = mean1 * (1.0 - momentum) + batch_mean2 * momentum
+
+    assert torch.allclose(centered[:, 0:1], x[:, 0:1] - batch_mean0, atol=1e-6, rtol=1e-6)
+    assert torch.allclose(centered[:, 2:3], x[:, 2:3] - mean2, atol=1e-6, rtol=1e-6)
+
+
+def test_ema_cfbn_full_uses_matching_batch_ema_mean_and_variance():
+    x = torch.randn(3, 5, 2)
+    momentum = 0.2
+    module = EMAChannelFeatureBatchNorm(2, momentum=momentum, affine=False, layout="last")
+    y = module(x)
+
+    batch_mean0 = x[:, 0:1].mean(dim=0, keepdim=True)
+    batch_mean1 = x[:, 1:2].mean(dim=0, keepdim=True)
+    batch_mean2 = x[:, 2:3].mean(dim=0, keepdim=True)
+    mean1 = batch_mean0 * (1.0 - momentum) + batch_mean1 * momentum
+    mean2 = mean1 * (1.0 - momentum) + batch_mean2 * momentum
+
+    batch_square_mean0 = x[:, 0:1].square().mean(dim=0, keepdim=True)
+    batch_square_mean1 = x[:, 1:2].square().mean(dim=0, keepdim=True)
+    batch_square_mean2 = x[:, 2:3].square().mean(dim=0, keepdim=True)
+    square_mean1 = batch_square_mean0 * (1.0 - momentum) + batch_square_mean1 * momentum
+    square_mean2 = square_mean1 * (1.0 - momentum) + batch_square_mean2 * momentum
+    var2 = (square_mean2 - mean2.square()).clamp_min(0.0)
+
+    expected = (x[:, 2:3] - mean2) / torch.sqrt(var2 + module.eps)
+    assert torch.allclose(y[:, 2:3], expected, atol=1e-6, rtol=1e-6)
 
 
 def test_bn2d_variants_keep_running_stats_flat_after_training():
@@ -382,6 +450,9 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
         ("CSBN", {"dim": 3, "layout": "last"}),
         ("CSBNc", {"dim": 3, "layout": "last"}),
         ("CSBNs", {"dim": 3, "layout": "last"}),
+        ("EMASBN", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("EMASBNc", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("EMASBNs", {"dim": 3, "layout": "last", "momentum": 0.2}),
         ("DSeqBN", {"dim": 3, "layout": "last"}),
         ("DSeqBNc", {"dim": 3, "layout": "last"}),
         ("DSeqBNs", {"dim": 3, "layout": "last"}),
@@ -394,6 +465,9 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
         ("CCFBN", {"dim": 3, "layout": "last"}),
         ("CCFBNc", {"dim": 3, "layout": "last"}),
         ("CCFBNs", {"dim": 3, "layout": "last"}),
+        ("EMACFBN", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("EMACFBNc", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("EMACFBNs", {"dim": 3, "layout": "last", "momentum": 0.2}),
         ("IN", {"dim": 3, "layout": "last"}),
         ("GN", {"dim": 3, "layout": "last", "num_groups": 4}),
         ("GNc", {"dim": 3, "layout": "last", "num_groups": 4}),
@@ -446,11 +520,11 @@ def test_norm_factory_supports_cfbn_for_dim_4():
         (torch.randn(2, 5, 7, 3), "last", (7, 3), (0, 1)),
         (torch.randn(2, 7, 3, 5), "first", (7, 3), (0, 3)),
     ]
-    for norm_name in ("CFBN", "CFBNc", "CFBNs", "CCFBN", "CCFBNc", "CCFBNs"):
+    for norm_name in ("CFBN", "CFBNc", "CFBNs", "CCFBN", "CCFBNc", "CCFBNs", "EMACFBN", "EMACFBNc", "EMACFBNs"):
         normalization._config.norm = norm_name
         normalization._config.norm_cfg = {}
         for x, layout, num_features, reduce_dims in cases:
-            y = normalization.Norm(num_features, dim=4, layout=layout, track_running_stats=False)(x)
+            y = normalization.Norm(num_features, dim=4, layout=layout, track_running_stats=False, momentum=0.2)(x)
             assert y.shape == x.shape
             if norm_name == "CFBN":
                 assert torch.allclose(y.mean(dim=reduce_dims), torch.zeros(num_features), atol=1e-6, rtol=1e-6)
@@ -479,4 +553,18 @@ def test_nanogpt_allows_causal_cfbn_norms():
     module = build_nanogpt_norm_layer(cfg)(16)
     assert isinstance(module, ChannelFeatureBatchNorm)
     assert module.causal
+
+
+def test_nanogpt_allows_ema_sbn_norms():
+    cfg = SimpleNamespace(norm="EMASBN", norm_cfg={"momentum": 0.2}, block_size=8, allow_noncausal_norm=False)
+    module = build_nanogpt_norm_layer(cfg)(16)
+    assert isinstance(module, EMASequenceDimBatchNorm1d)
+    assert module[0].momentum == 0.2
+
+
+def test_nanogpt_allows_ema_cfbn_norms():
+    cfg = SimpleNamespace(norm="EMACFBN", norm_cfg={"momentum": 0.2}, block_size=8, allow_noncausal_norm=False)
+    module = build_nanogpt_norm_layer(cfg)(16)
+    assert isinstance(module, EMAChannelFeatureBatchNorm)
+    assert module.momentum == 0.2
 

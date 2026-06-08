@@ -7,8 +7,8 @@ set -euo pipefail
 #   3. stat_variants: causal sample-wise statistics and current runnable
 #      LN-hybrid proxy CSBNc+LN.
 #
-# True EMA/running-average sequence norms are not implemented yet. Once they
-# are registered, add names such as CEMASBN or CSBNEMA to stat_variant_specs.
+# EMA/running-average SBN and CFBN variants are covered separately by
+# run_nanogpt_ema_norm_experiments.sh.
 
 dir_name="${DIR_NAME:-exp-nanogpt-sbn-seqbn-lr-optimizer}"
 

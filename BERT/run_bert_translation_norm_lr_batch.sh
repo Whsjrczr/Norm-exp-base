@@ -58,6 +58,7 @@ output_root="${OUTPUT_ROOT:-${repo_root}/results/${dir_name}}"
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 num_once="${NUM_ONCE:-1}"
 launch_cnt=0
+manifest="${gen_dir}/manifest.csv"
 
 norms=(
   LN
@@ -68,6 +69,7 @@ norms=(
 )
 
 : > "${gen_dir}/z_bash_execute.sh"
+echo "job_file,norm,optimizer,lr,dropout,seed,output_root" > "${manifest}"
 
 sanitize() {
   local value="$1"
@@ -166,6 +168,7 @@ generate_job() {
   } > "${gen_dir}/${fileName}"
   chmod +x "${gen_dir}/${fileName}"
 
+  echo "${fileName},${norm},${optimizer},${lr},${dropout},${seed},${output_root}" >> "${manifest}"
   echo "nohup bash ${fileName} > output_${baseString}.out 2>&1 &" >> "${gen_dir}/z_bash_execute.sh"
   launch_cnt=$((launch_cnt + 1))
   if (( launch_cnt % num_once == 0 )); then

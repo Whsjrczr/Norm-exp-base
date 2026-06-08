@@ -172,6 +172,74 @@ def _batch_prefix_stats(input: Tensor, sequence_dim: int, eps: float | None = No
     return mean, var
 
 
+def _validate_ema_momentum(momentum: float | None) -> float:
+    if momentum is None:
+        return 0.1
+    momentum = float(momentum)
+    if momentum <= 0.0 or momentum > 1.0:
+        raise ValueError(f"EMA momentum must be in (0, 1], but got {momentum}.")
+    return momentum
+
+
+def _ema_prefix_stats(input: Tensor, sequence_dim: int, momentum: float | None, eps: float | None = None):
+    momentum = _validate_ema_momentum(momentum)
+    mean = None
+    square_mean = None
+    means = []
+    square_means = []
+
+    for token in input.unbind(dim=sequence_dim):
+        token = token.unsqueeze(sequence_dim)
+        token_square = token.square()
+        if mean is None:
+            mean = token
+            square_mean = token_square
+        else:
+            mean = mean.mul(1.0 - momentum).add(token, alpha=momentum)
+            square_mean = square_mean.mul(1.0 - momentum).add(token_square, alpha=momentum)
+        means.append(mean)
+        square_means.append(square_mean)
+
+    mean = torch.cat(means, dim=sequence_dim)
+    square_mean = torch.cat(square_means, dim=sequence_dim)
+    var = (square_mean - mean.square()).clamp_min(0.0)
+    if eps is not None:
+        var = var + eps
+    return mean, var
+
+
+def _batch_ema_prefix_stats(input: Tensor, sequence_dim: int, momentum: float | None, eps: float | None = None):
+    momentum = _validate_ema_momentum(momentum)
+    mean = None
+    square_mean = None
+    means = []
+    square_means = []
+
+    batch_mean = input.mean(dim=0, keepdim=True)
+    batch_square_mean = input.square().mean(dim=0, keepdim=True)
+    for token_mean, token_square_mean in zip(
+        batch_mean.unbind(dim=sequence_dim),
+        batch_square_mean.unbind(dim=sequence_dim),
+    ):
+        token_mean = token_mean.unsqueeze(sequence_dim)
+        token_square_mean = token_square_mean.unsqueeze(sequence_dim)
+        if mean is None:
+            mean = token_mean
+            square_mean = token_square_mean
+        else:
+            mean = mean.mul(1.0 - momentum).add(token_mean, alpha=momentum)
+            square_mean = square_mean.mul(1.0 - momentum).add(token_square_mean, alpha=momentum)
+        means.append(mean)
+        square_means.append(square_mean)
+
+    mean = torch.cat(means, dim=sequence_dim)
+    square_mean = torch.cat(square_means, dim=sequence_dim)
+    var = (square_mean - mean.square()).clamp_min(0.0)
+    if eps is not None:
+        var = var + eps
+    return mean, var
+
+
 class ChannelFeatureBatchNormCentering(nn.Module):
     _version = 1
 
@@ -418,6 +486,150 @@ class ChannelFeatureBatchNorm(nn.Module):
         if self.affine:
             output = output * self.weight.view(*shape) + self.bias.view(*shape)
         return output
+
+
+class EMAChannelFeatureBatchNormCentering(nn.Module):
+    _version = 1
+
+    def __init__(
+        self,
+        num_features,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        layout: str = "last",
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.normalized_shape, self.num_features = _canonical_feature_shape(num_features)
+        self.momentum = _validate_ema_momentum(momentum)
+        self.affine = affine
+        self.layout = layout
+        if self.affine:
+            self.bias = Parameter(torch.empty(self.num_features, **factory_kwargs))
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, shape, _ = _resolve_channel_feature_dims(input, self.layout, self.normalized_shape)
+        mean, _ = _batch_ema_prefix_stats(input, sequence_dim, self.momentum)
+        output = input - mean
+        if self.affine:
+            output = output + self.bias.view(*shape)
+        return output
+
+    def extra_repr(self):
+        return "{normalized_shape}, momentum={momentum}, affine={affine}, layout={layout}".format(**self.__dict__)
+
+
+class EMAChannelFeatureBatchNormScaling(nn.Module):
+    _version = 1
+
+    def __init__(
+        self,
+        num_features,
+        eps: float = 1e-5,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        bias: bool = False,
+        layout: str = "last",
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.normalized_shape, self.num_features = _canonical_feature_shape(num_features)
+        self.eps = eps
+        self.momentum = _validate_ema_momentum(momentum)
+        self.affine = affine
+        self.affine_bias = bias
+        self.layout = layout
+        if self.affine:
+            self.weight = Parameter(torch.empty(self.num_features, **factory_kwargs))
+            if self.affine_bias:
+                self.bias = Parameter(torch.empty(self.num_features, **factory_kwargs))
+            else:
+                self.register_parameter("bias", None)
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, shape, _ = _resolve_channel_feature_dims(input, self.layout, self.normalized_shape)
+        _, var = _batch_ema_prefix_stats(input, sequence_dim, self.momentum)
+        output = input / torch.sqrt(var + self.eps)
+        if self.affine:
+            output = output * self.weight.view(*shape)
+            if self.affine_bias:
+                output = output + self.bias.view(*shape)
+        return output
+
+    def extra_repr(self):
+        return (
+            "{normalized_shape}, eps={eps}, momentum={momentum}, affine={affine}, "
+            "layout={layout}".format(**self.__dict__)
+        )
+
+
+class EMAChannelFeatureBatchNorm(nn.Module):
+    _version = 1
+
+    def __init__(
+        self,
+        num_features,
+        eps: float = 1e-5,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        layout: str = "last",
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.normalized_shape, self.num_features = _canonical_feature_shape(num_features)
+        self.eps = eps
+        self.momentum = _validate_ema_momentum(momentum)
+        self.affine = affine
+        self.layout = layout
+        if self.affine:
+            self.weight = Parameter(torch.empty(self.num_features, **factory_kwargs))
+            self.bias = Parameter(torch.empty(self.num_features, **factory_kwargs))
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.ones_(self.weight)
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, shape, _ = _resolve_channel_feature_dims(input, self.layout, self.normalized_shape)
+        mean, var = _batch_ema_prefix_stats(input, sequence_dim, self.momentum)
+        output = (input - mean) / torch.sqrt(var + self.eps)
+        if self.affine:
+            output = output * self.weight.view(*shape) + self.bias.view(*shape)
+        return output
+
+    def extra_repr(self):
+        return (
+            "{normalized_shape}, eps={eps}, momentum={momentum}, affine={affine}, "
+            "layout={layout}".format(**self.__dict__)
+        )
 
 
 class SequenceBatchNorm1dCentering(nn.Module):
@@ -733,6 +945,133 @@ class SequenceDimBatchNorm1d(nn.Sequential):
                 bias=affine,
                 layout=layout,
                 causal=causal,
+                device=device,
+                dtype=dtype,
+            ),
+        )
+
+
+class EMASequenceDimBatchNorm1dCentering(nn.Module):
+    def __init__(
+        self,
+        num_features: int,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        layout: str = "last",
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.num_features = num_features
+        self.momentum = _validate_ema_momentum(momentum)
+        self.affine = affine
+        self.layout = layout
+        if self.affine:
+            self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, _ = _resolve_sequence_dim(input, self.layout)
+        _, feature_shape = _resolve_feature_dim(input, self.layout, self.num_features)
+        mean, _ = _ema_prefix_stats(input, sequence_dim, self.momentum)
+        output = input - mean
+        if self.affine:
+            output = output + self.bias.view(*feature_shape)
+        return output
+
+    def extra_repr(self):
+        return "{num_features}, momentum={momentum}, affine={affine}, layout={layout}".format(**self.__dict__)
+
+
+class EMASequenceDimBatchNorm1dScaling(nn.Module):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-5,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        bias: bool = False,
+        layout: str = "last",
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.num_features = num_features
+        self.eps = eps
+        self.momentum = _validate_ema_momentum(momentum)
+        self.affine = affine
+        self.affine_bias = bias
+        self.layout = layout
+        if self.affine:
+            self.weight = Parameter(torch.empty(num_features, **factory_kwargs))
+            if self.affine_bias:
+                self.bias = Parameter(torch.empty(num_features, **factory_kwargs))
+            else:
+                self.register_parameter("bias", None)
+        else:
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        if self.affine:
+            init.ones_(self.weight)
+            if self.affine_bias:
+                init.zeros_(self.bias)
+
+    def forward(self, input: Tensor) -> Tensor:
+        sequence_dim, _, _ = _resolve_sequence_dim(input, self.layout)
+        _, feature_shape = _resolve_feature_dim(input, self.layout, self.num_features)
+        _, var = _ema_prefix_stats(input, sequence_dim, self.momentum)
+        output = input / torch.sqrt(var + self.eps)
+        if self.affine:
+            output = output * self.weight.view(*feature_shape)
+            if self.affine_bias:
+                output = output + self.bias.view(*feature_shape)
+        return output
+
+    def extra_repr(self):
+        return (
+            "{num_features}, eps={eps}, momentum={momentum}, affine={affine}, "
+            "layout={layout}".format(**self.__dict__)
+        )
+
+
+class EMASequenceDimBatchNorm1d(nn.Sequential):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-5,
+        momentum: float | None = 0.1,
+        affine: bool = True,
+        layout: str = "last",
+        device=None,
+        dtype=None,
+    ) -> None:
+        super().__init__(
+            EMASequenceDimBatchNorm1dCentering(
+                num_features,
+                momentum=momentum,
+                affine=False,
+                layout=layout,
+                device=device,
+                dtype=dtype,
+            ),
+            EMASequenceDimBatchNorm1dScaling(
+                num_features,
+                eps=eps,
+                momentum=momentum,
+                affine=affine,
+                bias=affine,
+                layout=layout,
                 device=device,
                 dtype=dtype,
             ),
