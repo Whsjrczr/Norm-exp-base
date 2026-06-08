@@ -38,6 +38,8 @@ KAN/*.sh
 KAN/results/
 KAN/test/
 nanoGPT/test/
+BERT/test/
+BERT/results/
 
 # wandb related
 wandb/
