@@ -6,6 +6,8 @@ __pycache__/
 
 # dataset
 dataset/
+cifar10/
+
 
 # Taiyi tool
 Taiyi/
@@ -20,6 +22,9 @@ extension/.ipynb_checkpoints/
 extension/modules/__pycache__/
 extension/modules/.ipynb_checkpoints/
 extension/my_modules/__pycache__/
+
+# DS store
+extension/my_modules/.DS_Store
 
 # result
 MLP/results/
@@ -42,5 +47,3 @@ tmp-kan-results*/
 pytest*
 
 test.py
-
-cifar10/
