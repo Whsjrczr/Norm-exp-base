@@ -1,0 +1,253 @@
+
+Epoch: 0, lr: 0.0006, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s773ms  Loss: nanoss: nan
+Train on epoch 0: average loss=nan, time: 15s774ms
+Validate on epoch 0: loss=nan, perplexity=nan
+Checkpoint saving disabled by --no-save-checkpoint
+
+Epoch: 1, lr: 0.0006, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s472ms  Loss: nanoss: nan
+Train on epoch 1: average loss=nan, time: 15s472ms
+Validate on epoch 1: loss=nan, perplexity=nan
+
+Epoch: 2, lr: 0.0006, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s783ms  Loss: nanoss: nan
+Train on epoch 2: average loss=nan, time: 15s783ms
+Validate on epoch 2: loss=nan, perplexity=nan
+
+Epoch: 3, lr: 0.0006, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s505ms  Loss: nanoss: nan
+Train on epoch 3: average loss=nan, time: 15s506ms
+Validate on epoch 3: loss=nan, perplexity=nan
+
+Epoch: 4, lr: 0.00059, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s520ms  Loss: nanoss: nan
+Train on epoch 4: average loss=nan, time: 15s520ms
+Validate on epoch 4: loss=nan, perplexity=nan
+
+Epoch: 5, lr: 0.00059, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s782ms  Loss: nanoss: nan
+Train on epoch 5: average loss=nan, time: 15s783ms
+Validate on epoch 5: loss=nan, perplexity=nan
+
+Epoch: 6, lr: 0.00058, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s631ms  Loss: nanss: nann
+Train on epoch 6: average loss=nan, time: 15s632ms
+Validate on epoch 6: loss=nan, perplexity=nan
+
+Epoch: 7, lr: 0.00057, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s480ms  Loss: nanoss: nan
+Train on epoch 7: average loss=nan, time: 15s480ms
+Validate on epoch 7: loss=nan, perplexity=nan
+
+Epoch: 8, lr: 0.00057, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s783ms  Loss: nanoss: nan
+Train on epoch 8: average loss=nan, time: 15s783ms
+Validate on epoch 8: loss=nan, perplexity=nan
+
+Epoch: 9, lr: 0.00056, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s780ms  Loss: nanoss: nan
+Train on epoch 9: average loss=nan, time: 15s780ms
+Validate on epoch 9: loss=nan, perplexity=nan
+
+Epoch: 10, lr: 0.00055, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s488ms  Loss: nanoss: nan
+Train on epoch 10: average loss=nan, time: 15s489ms
+Validate on epoch 10: loss=nan, perplexity=nan
+
+Epoch: 11, lr: 0.00054, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s644ms  Loss: nanoss: nan
+Train on epoch 11: average loss=nan, time: 15s645ms
+Validate on epoch 11: loss=nan, perplexity=nan
+
+Epoch: 12, lr: 0.00053, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s776ms  Loss: nanoss: nan
+Train on epoch 12: average loss=nan, time: 15s776ms
+Validate on epoch 12: loss=nan, perplexity=nan
+
+Epoch: 13, lr: 0.00051, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s493ms  Loss: nanoss: nan
+Train on epoch 13: average loss=nan, time: 15s494ms
+Validate on epoch 13: loss=nan, perplexity=nan
+
+Epoch: 14, lr: 0.0005, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s615ms  Loss: nanoss: nan
+Train on epoch 14: average loss=nan, time: 15s616ms
+Validate on epoch 14: loss=nan, perplexity=nan
+
+Epoch: 15, lr: 0.00049, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s764ms  Loss: nanoss: nan
+Train on epoch 15: average loss=nan, time: 15s764ms
+Validate on epoch 15: loss=nan, perplexity=nan
+
+Epoch: 16, lr: 0.00047, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s468ms  Loss: nanoss: nan
+Train on epoch 16: average loss=nan, time: 15s469ms
+Validate on epoch 16: loss=nan, perplexity=nan
+
+Epoch: 17, lr: 0.00046, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s494ms  Loss: nanss: nann
+Train on epoch 17: average loss=nan, time: 15s494ms
+Validate on epoch 17: loss=nan, perplexity=nan
+
+Epoch: 18, lr: 0.00044, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s757ms  Loss: nanoss: nan
+Train on epoch 18: average loss=nan, time: 15s757ms
+Validate on epoch 18: loss=nan, perplexity=nan
+
+Epoch: 19, lr: 0.00043, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s507ms  Loss: nanoss: nan
+Train on epoch 19: average loss=nan, time: 15s508ms
+Validate on epoch 19: loss=nan, perplexity=nan
+
+Epoch: 20, lr: 0.00041, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s480ms  Loss: nanoss: nan
+Train on epoch 20: average loss=nan, time: 15s481ms
+Validate on epoch 20: loss=nan, perplexity=nan
+
+Epoch: 21, lr: 0.0004, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s731ms  Loss: nanoss: nan
+Train on epoch 21: average loss=nan, time: 15s731ms
+Validate on epoch 21: loss=nan, perplexity=nan
+
+Epoch: 22, lr: 0.00038, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s450ms  Loss: nanoss: nan
+Train on epoch 22: average loss=nan, time: 15s451ms
+Validate on epoch 22: loss=nan, perplexity=nan
+
+Epoch: 23, lr: 0.00036, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s421ms  Loss: nanoss: nan
+Train on epoch 23: average loss=nan, time: 15s422ms
+Validate on epoch 23: loss=nan, perplexity=nan
+
+Epoch: 24, lr: 0.00035, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s675ms  Loss: nanoss: nan
+Train on epoch 24: average loss=nan, time: 15s675ms
+Validate on epoch 24: loss=nan, perplexity=nan
+
+Epoch: 25, lr: 0.00033, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s424ms  Loss: nanoss: nan
+Train on epoch 25: average loss=nan, time: 15s425ms
+Validate on epoch 25: loss=nan, perplexity=nan
+
+Epoch: 26, lr: 0.00031, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s372ms  Loss: nanoss: nan
+Train on epoch 26: average loss=nan, time: 15s372ms
+Validate on epoch 26: loss=nan, perplexity=nan
+
+Epoch: 27, lr: 0.0003, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s667ms  Loss: nanoss: nan
+Train on epoch 27: average loss=nan, time: 15s668ms
+Validate on epoch 27: loss=nan, perplexity=nan
+
+Epoch: 28, lr: 0.00028, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s397ms  Loss: nanoss: nan
+Train on epoch 28: average loss=nan, time: 15s397ms
+Validate on epoch 28: loss=nan, perplexity=nan
+
+Epoch: 29, lr: 0.00026, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s399ms  Loss: nanoss: nan
+Train on epoch 29: average loss=nan, time: 15s400ms
+Validate on epoch 29: loss=nan, perplexity=nan
+
+Epoch: 30, lr: 0.00025, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s665ms  Loss: nanss: nann
+Train on epoch 30: average loss=nan, time: 15s665ms
+Validate on epoch 30: loss=nan, perplexity=nan
+
+Epoch: 31, lr: 0.00023, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s540ms  Loss: nanoss: nan
+Train on epoch 31: average loss=nan, time: 15s541ms
+Validate on epoch 31: loss=nan, perplexity=nan
+
+Epoch: 32, lr: 0.00022, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s403ms  Loss: nanoss: nan
+Train on epoch 32: average loss=nan, time: 15s404ms
+Validate on epoch 32: loss=nan, perplexity=nan
+
+Epoch: 33, lr: 0.0002, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s626ms  Loss: nanss: nann
+Train on epoch 33: average loss=nan, time: 15s626ms
+Validate on epoch 33: loss=nan, perplexity=nan
+
+Epoch: 34, lr: 0.00019, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s614ms  Loss: nanss: nann
+Train on epoch 34: average loss=nan, time: 15s614ms
+Validate on epoch 34: loss=nan, perplexity=nan
+
+Epoch: 35, lr: 0.00017, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s369ms  Loss: nanoss: nan
+Train on epoch 35: average loss=nan, time: 15s369ms
+Validate on epoch 35: loss=nan, perplexity=nan
+
+Epoch: 36, lr: 0.00016, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s514ms  Loss: nanss: nann
+Train on epoch 36: average loss=nan, time: 15s515ms
+Validate on epoch 36: loss=nan, perplexity=nan
+
+Epoch: 37, lr: 0.00015, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s631ms  Loss: nanss: nann
+Train on epoch 37: average loss=nan, time: 15s632ms
+Validate on epoch 37: loss=nan, perplexity=nan
+
+Epoch: 38, lr: 0.00013, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s368ms  Loss: nanoss: nan
+Train on epoch 38: average loss=nan, time: 15s368ms
+Validate on epoch 38: loss=nan, perplexity=nan
+
+Epoch: 39, lr: 0.00012, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s500ms  Loss: nans: nanan
+Train on epoch 39: average loss=nan, time: 15s500ms
+Validate on epoch 39: loss=nan, perplexity=nan
+
+Epoch: 40, lr: 0.00011, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s702ms  Loss: nanoss: nan
+Train on epoch 40: average loss=nan, time: 15s702ms
+Validate on epoch 40: loss=nan, perplexity=nan
+
+Epoch: 41, lr: 0.0001, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s414ms  Loss: nanoss: nan
+Train on epoch 41: average loss=nan, time: 15s415ms
+Validate on epoch 41: loss=nan, perplexity=nan
+
+Epoch: 42, lr: 9.3e-05, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s426ms  Loss: nanoss: nan
+Train on epoch 42: average loss=nan, time: 15s426ms
+Validate on epoch 42: loss=nan, perplexity=nan
+
+Epoch: 43, lr: 8.6e-05, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s721ms  Loss: nanoss: nan
+Train on epoch 43: average loss=nan, time: 15s721ms
+Validate on epoch 43: loss=nan, perplexity=nan
+
+Epoch: 44, lr: 7.9e-05, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s455ms  Loss: nanoss: nan
+Train on epoch 44: average loss=nan, time: 15s455ms
+Validate on epoch 44: loss=nan, perplexity=nan
+
+Epoch: 45, lr: 7.3e-05, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s462ms  Loss: nanoss: nan
+Train on epoch 45: average loss=nan, time: 15s463ms
+Validate on epoch 45: loss=nan, perplexity=nan
+
+Epoch: 46, lr: 6.8e-05, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s732ms  Loss: nanoss: nan
+Train on epoch 46: average loss=nan, time: 15s732ms
+Validate on epoch 46: loss=nan, perplexity=nan
+
+Epoch: 47, lr: 6.5e-05, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s448ms  Loss: nanoss: nan
+Train on epoch 47: average loss=nan, time: 15s449ms
+Validate on epoch 47: loss=nan, perplexity=nan
+
+Epoch: 48, lr: 6.2e-05, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s456ms  Loss: nanoss: nan
+Train on epoch 48: average loss=nan, time: 15s457ms
+Validate on epoch 48: loss=nan, perplexity=nan
+
+Epoch: 49, lr: 6.1e-05, weight decay: 0.1 on model nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0
+|>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>|   100/100 15s739ms  Loss: nanoss: nan
+Train on epoch 49: average loss=nan, time: 15s739ms
+Validate on epoch 49: loss=nan, perplexity=nan
+==> generated sample: /home/dlth/norm-exp-code/Norm-exp-base/ViT/results/exp-seqbn/nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0/sample_final.txt
+==> end time: 26-05-29_20-15-02

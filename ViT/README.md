@@ -5,8 +5,8 @@
 ## 目录
 
 - `vit.py`: ViT 训练入口
-- `model_vit/select_vit.py`: 模型选择
-- `model_vit/vision_transformer.py`: ViT 结构定义
+- `extension/model/vit/__init__.py`: 模型选择
+- `extension/model/vit/vision_transformer.py`: ViT 结构定义
 
 ## 支持模型
 
@@ -213,3 +213,46 @@ python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-siz
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --norm bCRMS
 python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 16 --activation pqact --activation-cfg "p=4,q=2"
 ```
+
+### Sequence BatchNorm on ViT
+
+ViT now supports sequence-axis BatchNorm families directly through `extension/model/vit/__init__.py`.
+
+For ViT token tensors `(B, N, C)`:
+
+- `SeqBN`, `SeqBNc`, `SeqBNs` automatically bind `num_features` to `N = num_patches + 1`
+- `DSeqBN`, `DSeqBNc`, `DSeqBNs` work without a fixed token count
+
+Minimal examples:
+
+```bash
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SeqBN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SeqBNc
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SeqBNs
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm SBN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm CSBN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm CSeqBN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm CDSeqBN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBLS
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBCLN
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBCRMS
+python ViT/vit.py --arch vit_small --dataset cifar10 --im-size 32,32 --patch-size 4 --norm DSeqBCDS
+```
+
+Notes:
+
+- You do not need to pass `num_features` manually for ViT.
+- You do not need `--norm-cfg "dim=3,layout=last"` for the ViT path.
+- Fixed-length `SeqBN*` is the better match when image size and patch size are fixed.
+- Dynamic `DSeqBN*` is safer if token length may vary across calls.
+- `SBN*` normalizes only along the sequence dimension, treating sequence positions as the batch axis.
+- Prefix/causal variants are `CSBN*`, `CSeqBN*`, and `CDSeqBN*`; each token only uses current and previous positions for statistics.
+- `DSeqBLS` means `DSeqBNc + LayerScaling`.
+- `DSeqBCLN` means `DSeqBNc + LayerNorm`.
+- `DSeqBCRMS` means `DSeqBNc + RMSNorm`.
+- `DSeqBCDS` means `DSeqBNc + Dropout + LayerScaling`.
+
+Batch script:
+
+- [`run_vit_sequence_bn_batch.sh`](/e:/norm-exp/ViT/run_vit_sequence_bn_batch.sh)

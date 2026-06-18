@@ -18,7 +18,6 @@ CUDA_VISIBLE_DEVICES=0 /home/dlth/miniconda3/envs/norm-base/bin/python /home/dlt
  --weight-decay=0.0 \
  --seed=1 \
  --log-suffix=base \
- --no_save_best \
  --display_every=10 \
  --metrics "l2 relative error,MSE" \
  --subject_name="PDE Solving Updated 2" \

@@ -71,7 +71,6 @@ python PDE/pde.py \
 - `-o, --output`：输出目录，默认 `./results`
 - `-t, --test`：仅验证
 - `--offline`：WandB 离线模式
-- `--no_save_best`：不保存最佳模型
 - `--subject_name`：WandB project 名
 
 ### 优化器参数

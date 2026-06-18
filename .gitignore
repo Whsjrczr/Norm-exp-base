@@ -2,7 +2,9 @@
 .conda/
 .codex/
 .vscode/
+tmp_pytest_checkpoint/
 __pycache__/
+analysis/
 
 # dataset
 dataset/
@@ -26,7 +28,7 @@ extension/my_modules/__pycache__/
 # DS store
 extension/my_modules/.DS_Store
 
-# result
+# experiments and results
 MLP/results/
 results/
 PDE/results/
@@ -35,6 +37,14 @@ PDE/exp*
 PDE/*generate.sh
 ViT/test/
 ViT/exp*
+ViT/analysis/
+ViT/analyze_failure_diagnostics_wandb.py
+KAN/*.sh
+KAN/results/
+KAN/test/
+nanoGPT/test/
+BERT/test/
+BERT/results/
 
 # wandb related
 wandb/
@@ -47,3 +57,9 @@ tmp-kan-results*/
 pytest*
 
 test.py
+*.csv
+
+#dataset
+cifar10/
+
+wandb_logs_latest/

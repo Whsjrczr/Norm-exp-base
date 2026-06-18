@@ -2,12 +2,13 @@ import argparse
 from functools import partial
 import torch.nn as nn
 
-from .my_modules.norm.ln_modules import *
-from .my_modules.norm.bn1d_modules import *
-from .my_modules.norm.bn2d_modules import *
-from .my_modules.norm.gn_modules import *
-from .my_modules.norm.pln import ParallelLN
-from .my_modules.norm.pq_norm import PQNorm
+from .modules.norm.ln_modules import *
+from .modules.norm.bn1d_modules import *
+from .modules.norm.bn2d_modules import *
+from .modules.norm.gn_modules import *
+from .modules.norm.pln import ParallelLN
+from .modules.norm.pq_norm import PQNorm
+from .modules.norm.seq_bn import *
 
 from .utils import str2dict
 
@@ -54,8 +55,45 @@ def _wrap_layout(module, dim, layout):
     return module
 
 
+def _normalize_sequence_layout(dim, layout):
+    if dim < 3:
+        raise ValueError(f"Sequence BatchNorm requires dim >= 3, but got dim={dim}.")
+
+    if layout is None:
+        return "first"
+
+    if layout not in ("first", "last"):
+        raise ValueError(f"Unsupported norm layout: {layout}. Expected 'first' or 'last'.")
+    return layout
+
+
 def make_norm_factory(**bound_kwargs):
     return partial(Norm, **bound_kwargs)
+
+
+def _split_norm_names(norm_name):
+    return [name.strip() for name in str(norm_name).split("+") if name.strip()]
+
+
+def _make_single_norm(norm_name, *args, **kwargs):
+    if norm_name == "None":
+        return None
+    if norm_name not in _config.norm_methods:
+        raise KeyError(
+            f"Unknown normalization '{norm_name}'. "
+            f"Expected one of {_config.norm_methods.keys()} or a '+' combination."
+        )
+    return _config.norm_methods[norm_name](*args, **kwargs)
+
+
+def _make_composite_norm(norm_names, *args, **kwargs):
+    modules = [_make_single_norm(norm_name, *args, **kwargs) for norm_name in norm_names]
+    modules = [module for module in modules if module is not None]
+    if not modules:
+        return None
+    if len(modules) == 1:
+        return modules[0]
+    return nn.Sequential(*modules)
 
 
 
@@ -124,6 +162,47 @@ def _bCRMSNorm(num_features, eps=1e-5, affine=True, *args, **kwargs):
     )
 
 
+def _DynamicSequenceCenterLayerScaling(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("DSeqBLS only supports layout='last' because LayerScaling is applied on the last feature axis.")
+    return nn.Sequential(
+        DynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        LayerNormScaling(num_features, eps=eps, elementwise_affine=affine, bias=affine),
+    )
+
+
+def _DynamicSequenceCenterLayerNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("DSeqBCLN only supports layout='last' because LayerNorm is applied on the last feature axis.")
+    return nn.Sequential(
+        DynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        nn.LayerNorm(num_features, eps=eps, elementwise_affine=affine),
+    )
+
+
+def _DynamicSequenceCenterRMSNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("DSeqBCRMS only supports layout='last' because RMSNorm is applied on the last feature axis.")
+    return nn.Sequential(
+        DynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        LayerNormScalingRMS(num_features, eps=eps, elementwise_affine=affine),
+    )
+
+
+def _DynamicSequenceCenterDropoutScaling(num_features, dim=3, layout=None, dropout_prob=0.0, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("DSeqBCDS only supports layout='last' because LayerScaling is applied on the last feature axis.")
+    return nn.Sequential(
+        DynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        nn.Dropout(p=dropout_prob),
+        LayerNormScaling(num_features, eps=eps, elementwise_affine=affine, bias=affine),
+    )
+
+
 # BN
 def _BatchNorm(num_features, dim=4, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
     layout = _normalize_layout(dim, layout)
@@ -142,6 +221,198 @@ def _BatchNormScaling(num_features, dim=4, layout=None, eps=1e-5, momentum=0.1, 
     module_cls = BatchNorm2dScaling if dim == 4 else BatchNorm1dScaling
     module = module_cls(num_features, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
     return _wrap_layout(module, dim=dim, layout=layout)
+
+
+def _SequenceBatchNormCentering(num_features, dim=3, layout=None, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    module = SequenceBatchNorm1dCentering(
+        num_features,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+    )
+    return module
+
+
+def _SequenceBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    module = SequenceBatchNorm1dScaling(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+    )
+    return module
+
+
+def _SequenceBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    module = SequenceBatchNorm1d(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+    )
+    return module
+
+
+def _SequenceDimBatchNormCentering(num_features, dim=3, layout=None, affine=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return SequenceDimBatchNorm1dCentering(num_features, affine=affine, layout=layout, causal=causal)
+
+
+def _SequenceDimBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, affine=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return SequenceDimBatchNorm1dScaling(num_features, eps=eps, affine=affine, bias=affine, layout=layout, causal=causal)
+
+
+def _SequenceDimBatchNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return SequenceDimBatchNorm1d(num_features, eps=eps, affine=affine, layout=layout, causal=causal)
+
+
+def _EMASequenceDimBatchNormCentering(num_features, dim=3, layout=None, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMASequenceDimBatchNorm1dCentering(num_features, momentum=momentum, affine=affine, layout=layout)
+
+
+def _EMASequenceDimBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMASequenceDimBatchNorm1dScaling(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        bias=affine,
+        layout=layout,
+    )
+
+
+def _EMASequenceDimBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMASequenceDimBatchNorm1d(num_features, eps=eps, momentum=momentum, affine=affine, layout=layout)
+
+
+def _CausalSequenceBatchNormCentering(num_features, dim=3, layout=None, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalSequenceBatchNorm1dCentering(num_features, affine=affine, layout=layout)
+
+
+def _CausalSequenceBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalSequenceBatchNorm1dScaling(num_features, eps=eps, affine=affine, bias=affine, layout=layout)
+
+
+def _CausalSequenceBatchNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalSequenceBatchNorm1d(num_features, eps=eps, affine=affine, layout=layout)
+
+
+def _DynamicSequenceBatchNormCentering(num_features=None, dim=3, layout=None, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return DynamicSequenceBatchNorm1dCentering(affine=affine, layout=layout)
+
+
+def _DynamicSequenceBatchNormScaling(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return DynamicSequenceBatchNorm1dScaling(eps=eps, affine=affine, bias=affine, layout=layout)
+
+
+def _DynamicSequenceBatchNorm(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return DynamicSequenceBatchNorm1d(eps=eps, affine=affine, layout=layout)
+
+
+def _CausalDynamicSequenceBatchNormCentering(num_features=None, dim=3, layout=None, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalDynamicSequenceBatchNorm1dCentering(affine=affine, layout=layout)
+
+
+def _CausalDynamicSequenceBatchNormScaling(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalDynamicSequenceBatchNorm1dScaling(eps=eps, affine=affine, bias=affine, layout=layout)
+
+
+def _CausalDynamicSequenceBatchNorm(num_features=None, dim=3, layout=None, eps=1e-5, affine=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return CausalDynamicSequenceBatchNorm1d(eps=eps, affine=affine, layout=layout)
+
+
+def _ChannelFeatureBatchNormCentering(num_features, dim=3, layout=None, momentum=0.1, affine=True, track_running_stats=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return ChannelFeatureBatchNormCentering(
+        num_features,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+        causal=causal,
+    )
+
+
+def _ChannelFeatureBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return ChannelFeatureBatchNormScaling(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        bias=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+        causal=causal,
+    )
+
+
+def _ChannelFeatureBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, causal=False, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return ChannelFeatureBatchNorm(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        track_running_stats=track_running_stats,
+        layout=layout,
+        causal=causal,
+    )
+
+
+def _EMAChannelFeatureBatchNormCentering(num_features, dim=3, layout=None, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMAChannelFeatureBatchNormCentering(
+        num_features,
+        momentum=momentum,
+        affine=affine,
+        layout=layout,
+    )
+
+
+def _EMAChannelFeatureBatchNormScaling(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMAChannelFeatureBatchNormScaling(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        bias=affine,
+        layout=layout,
+    )
+
+
+def _EMAChannelFeatureBatchNorm(num_features, dim=3, layout=None, eps=1e-5, momentum=0.1, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    return EMAChannelFeatureBatchNorm(
+        num_features,
+        eps=eps,
+        momentum=momentum,
+        affine=affine,
+        layout=layout,
+    )
 
 # IN
 def _InstanceNorm(num_features, dim=4, layout=None, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False, *args,
@@ -209,6 +480,40 @@ class _config:
                     'CDS': _CenteringDropoutScaling,
                     'BNc': _BatchNormCentering,
                     'BNs': _BatchNormScaling,
+                    'SeqBN': _SequenceBatchNorm,
+                    'SeqBNc': _SequenceBatchNormCentering,
+                    'SeqBNs': _SequenceBatchNormScaling,
+                    'CSeqBN': _CausalSequenceBatchNorm,
+                    'CSeqBNc': _CausalSequenceBatchNormCentering,
+                    'CSeqBNs': _CausalSequenceBatchNormScaling,
+                    'SBN': _SequenceDimBatchNorm,
+                    'SBNc': _SequenceDimBatchNormCentering,
+                    'SBNs': _SequenceDimBatchNormScaling,
+                    'CSBN': partial(_SequenceDimBatchNorm, causal=True),
+                    'CSBNc': partial(_SequenceDimBatchNormCentering, causal=True),
+                    'CSBNs': partial(_SequenceDimBatchNormScaling, causal=True),
+                    'EMASBN': _EMASequenceDimBatchNorm,
+                    'EMASBNc': _EMASequenceDimBatchNormCentering,
+                    'EMASBNs': _EMASequenceDimBatchNormScaling,
+                    'DSeqBN': _DynamicSequenceBatchNorm,
+                    'DSeqBNc': _DynamicSequenceBatchNormCentering,
+                    'DSeqBNs': _DynamicSequenceBatchNormScaling,
+                    'CDSeqBN': _CausalDynamicSequenceBatchNorm,
+                    'CDSeqBNc': _CausalDynamicSequenceBatchNormCentering,
+                    'CDSeqBNs': _CausalDynamicSequenceBatchNormScaling,
+                    'CFBN': _ChannelFeatureBatchNorm,
+                    'CFBNc': _ChannelFeatureBatchNormCentering,
+                    'CFBNs': _ChannelFeatureBatchNormScaling,
+                    'CCFBN': partial(_ChannelFeatureBatchNorm, causal=True),
+                    'CCFBNc': partial(_ChannelFeatureBatchNormCentering, causal=True),
+                    'CCFBNs': partial(_ChannelFeatureBatchNormScaling, causal=True),
+                    'EMACFBN': _EMAChannelFeatureBatchNorm,
+                    'EMACFBNc': _EMAChannelFeatureBatchNormCentering,
+                    'EMACFBNs': _EMAChannelFeatureBatchNormScaling,
+                    'DSeqBLS': _DynamicSequenceCenterLayerScaling,
+                    'DSeqBCLN': _DynamicSequenceCenterLayerNorm,
+                    'DSeqBCRMS': _DynamicSequenceCenterRMSNorm,
+                    'DSeqBCDS': _DynamicSequenceCenterDropoutScaling,
                     'bCDS':_bCenteringDropoutScaling,
                     'bClCDS':_bCenlCenDropScaling,
                     'bCLN': _bCLayerNorm,
@@ -225,7 +530,7 @@ class _config:
 def add_arguments(parser: argparse.ArgumentParser):
     group = parser.add_argument_group('Normalization Options')
     group.add_argument('--norm', default='No', help='Use which normalization layers? {' + ', '.join(
-        _config.norm_methods.keys()) + '}' + ' (defalut: {})'.format(_config.norm))
+        _config.norm_methods.keys()) + '}; use + for sequential combinations, e.g. BNc+LNc+LNs' + ' (defalut: {})'.format(_config.norm))
     group.add_argument('--norm-cfg', type=str2dict, default={}, metavar='DICT', help='layers config.')
     return group
 
@@ -286,6 +591,7 @@ def setting(cfg: argparse.Namespace):
 
 def Norm(*args, **kwargs):
     kwargs.update(_config.norm_cfg)
-    if _config.norm == 'None':
+    norm_names = _split_norm_names(_config.norm)
+    if not norm_names:
         return None
-    return _config.norm_methods[_config.norm](*args, **kwargs)
+    return _make_composite_norm(norm_names, *args, **kwargs)

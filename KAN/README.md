@@ -6,10 +6,10 @@
 
 - `KAN.py`: KAN 回归任务训练入口
 - `kan_dataset.py`: 合成回归数据构造器 `KANDatasetBuilder`
-- `model/select_kan.py`: 模型选择入口，统一为 `get_model(cfg)`
-- `model/KAN.py`: KAN 网络封装 `KANNetwork` / `KAN_norm`
-- `model/KAN_layer.py`: KAN 核心层 `KANLinear`
-- `model/MLP.py`: 对照用 MLP 实现
+- `extension/model/kan/__init__.py`: KAN 模型选择入口，统一为 `get_model(cfg)`
+- `extension/model/kan/KAN.py`: KAN 网络封装 `KANNetwork` / `KAN_norm`
+- `extension/model/kan/KAN_layer.py`: KAN 核心层 `KANLinear`
+- `extension/model/kan/MLP.py`: 对照用 MLP 实现
 
 ## 当前整理结果
 
@@ -29,9 +29,9 @@
 - `regularization_loss`
 - 权重归一化接口 `normalize_weights`
 
-### 2. `select_kan` 风格统一
+### 2. 统一模型入口
 
-`model/select_kan.py` 已改成和其他目录一致的风格：
+`extension/model/kan/__init__.py` 已改成和其他目录一致的风格：
 
 ```python
 def get_model(cfg):
@@ -255,7 +255,7 @@ results/
 
 - 仓库根目录中的包名实际为 `KAN`，因此 README 和命令统一使用大写目录名。
 - 当前任务是合成回归任务，不直接复用 `extension.dataset` 中的图像数据加载流程。
-- 如果后续需要把 `KAN` 接入 `PDE` 或其他任务，只需要在对应 `selection_tool` 中接入 `KAN/model/select_kan.py` 的 `get_model(cfg)` 即可。
+- 如果后续需要把 `KAN` 接入 `PDE` 或其他任务，只需要通过 `extension.model.get_model(cfg)` 接入即可。
 
 ## 2026-04 Normalization Update
 

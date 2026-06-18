@@ -1,28 +1,54 @@
 import torch
+from types import SimpleNamespace
 
 import extension.normalization as normalization
-from extension.my_modules.norm.bn1d_modules import (
+from extension.modules.norm.bn1d_modules import (
     BatchNorm1dCentering,
     BatchNorm1dScaling,
     BatchNorm1dScalingRMS,
 )
-from extension.my_modules.norm.bn2d_modules import (
+from extension.modules.norm.seq_bn import (
+    ChannelFeatureBatchNorm,
+    ChannelFeatureBatchNormCentering,
+    ChannelFeatureBatchNormScaling,
+    CausalDynamicSequenceBatchNorm1d,
+    CausalSequenceBatchNorm1d,
+    DynamicSequenceBatchNorm1d,
+    DynamicSequenceBatchNorm1dCentering,
+    DynamicSequenceBatchNorm1dScaling,
+    EMAChannelFeatureBatchNorm,
+    EMAChannelFeatureBatchNormCentering,
+    EMAChannelFeatureBatchNormScaling,
+    EMASequenceDimBatchNorm1d,
+    EMASequenceDimBatchNorm1dCentering,
+    EMASequenceDimBatchNorm1dScaling,
+    SequenceBatchNorm1d,
+    SequenceBatchNorm1dCentering,
+    SequenceBatchNorm1dScaling,
+    SequenceDimBatchNorm1dCentering,
+    SequenceDimBatchNorm1dScaling,
+)
+from extension.modules.norm.bn2d_modules import (
     BatchNorm2dCentering,
     BatchNorm2dScaling,
     BatchNorm2dScalingRMS,
 )
-from extension.my_modules.norm.gn_modules import GroupNormScaling
-from extension.my_modules.activation.pgn_modules import (
+from extension.modules.norm.gn_modules import GroupNormScaling
+from extension.modules.activation.pgn_modules import (
     PointwiseGroupNorm,
     PointwiseGroupNormCentering,
     PointwiseGroupNormScaling,
     PointwiseGroupNormScalingRMS,
 )
-from extension.my_modules.norm.pln import ParallelLN
-from extension.my_modules.activation.pq_activation import PQActivation
-from extension.my_modules.norm.pq_norm import PQNorm
-from extension.my_modules.activation.sinarctan import SinArctan
+from extension.modules.activation.mlp_activation import MLPActivation
+from extension.modules.norm.pln import ParallelLN
+from extension.modules.activation.pq_activation import PQActivation
+from extension.modules.norm.pq_norm import PQNorm
+from extension.modules.activation.sinarctan import SinArctan
+import extension.activation as activation
 from extension.normalization import _ParallelLayerNorm, _ParallelLayerScaling
+from extension.model import build_vit_norm_layer
+from extension.model.nanogpt import build_nanogpt_norm_layer
 
 
 def test_bn1d_variants_support_channel_first_and_channel_last():
@@ -33,6 +59,202 @@ def test_bn1d_variants_support_channel_first_and_channel_last():
         for module in modules:
             y = module(x)
             assert y.shape == x.shape
+
+
+def test_sequence_bn1d_variants_support_token_first_and_token_last():
+    inputs = [torch.randn(2, 5, 384), torch.randn(2, 384, 5)]
+    modules = [SequenceBatchNorm1dCentering(5), SequenceBatchNorm1dScaling(5)]
+
+    for x in inputs:
+        for module in modules:
+            y = module(x)
+            assert y.shape == x.shape
+
+
+def test_sequence_bn1d_centering_and_scaling_normalize_sequence_axis():
+    x = torch.randn(4, 6, 8)
+
+    centered = SequenceBatchNorm1dCentering(6, affine=False, track_running_stats=False)(x)
+    center_mean = centered.mean(dim=(0, 2))
+    assert torch.allclose(center_mean, torch.zeros_like(center_mean), atol=1e-6, rtol=1e-6)
+
+    scaled = SequenceBatchNorm1dScaling(6, affine=False, track_running_stats=False)(x)
+    scale_var = scaled.var(dim=(0, 2), unbiased=False)
+    assert torch.allclose(scale_var, torch.ones_like(scale_var), atol=1e-4, rtol=1e-4)
+
+
+def test_sequence_bn1d_supports_higher_dimensional_inputs():
+    x_last = torch.randn(2, 5, 3, 7)
+    y_last = SequenceBatchNorm1dCentering(5, affine=False, track_running_stats=False, layout="last")(x_last)
+    mean_last = y_last.mean(dim=(0, 2, 3))
+    assert torch.allclose(mean_last, torch.zeros_like(mean_last), atol=1e-6, rtol=1e-6)
+
+    x_first = torch.randn(2, 3, 7, 5)
+    y_first = SequenceBatchNorm1dScaling(5, affine=False, track_running_stats=False, layout="first")(x_first)
+    var_first = y_first.var(dim=(0, 1, 2), unbiased=False)
+    assert torch.allclose(var_first, torch.ones_like(var_first), atol=1e-4, rtol=1e-4)
+
+
+def test_sequence_bn_combined_module_matches_center_then_scale():
+    x = torch.randn(3, 6, 8)
+    module = SequenceBatchNorm1d(6, affine=False, track_running_stats=False)
+    manual = SequenceBatchNorm1dScaling(6, affine=False, track_running_stats=False)(
+        SequenceBatchNorm1dCentering(6, affine=False, track_running_stats=False)(x)
+    )
+    y = module(x)
+    assert torch.allclose(y, manual, atol=1e-6, rtol=1e-6)
+
+
+def test_dynamic_sequence_bn_reuses_same_module_for_different_lengths():
+    module = DynamicSequenceBatchNorm1d(layout="last")
+    x1 = torch.randn(2, 5, 8)
+    x2 = torch.randn(2, 9, 8)
+    y1 = module(x1)
+    y2 = module(x2)
+    assert y1.shape == x1.shape
+    assert y2.shape == x2.shape
+
+
+def test_dynamic_sequence_bn_centering_and_scaling_normalize_sequence_axis():
+    x = torch.randn(4, 6, 8)
+    centered = DynamicSequenceBatchNorm1dCentering(layout="last")(x)
+    center_mean = centered.mean(dim=(0, 2))
+    assert torch.allclose(center_mean, torch.zeros_like(center_mean), atol=1e-6, rtol=1e-6)
+
+    scaled = DynamicSequenceBatchNorm1dScaling(layout="last")(x)
+    scale_var = scaled.var(dim=(0, 2), unbiased=False)
+    assert torch.allclose(scale_var, torch.ones_like(scale_var), atol=1e-4, rtol=1e-4)
+
+
+def test_sbn_normalizes_only_over_sequence_axis():
+    x = torch.randn(3, 6, 8)
+    centered = SequenceDimBatchNorm1dCentering(8, affine=False, layout="last")(x)
+    center_mean = centered.mean(dim=1)
+    assert torch.allclose(center_mean, torch.zeros_like(center_mean), atol=1e-6, rtol=1e-6)
+
+    scaled = SequenceDimBatchNorm1dScaling(8, affine=False, layout="last")(x)
+    scale_var = scaled.var(dim=1, unbiased=False)
+    assert torch.allclose(scale_var, torch.ones_like(scale_var), atol=1e-4, rtol=1e-4)
+
+
+def test_causal_sbn_uses_only_prefix_tokens():
+    x = torch.randn(2, 5, 4)
+    centered = SequenceDimBatchNorm1dCentering(4, affine=False, layout="last", causal=True)(x)
+    assert torch.allclose(centered[:, 0], torch.zeros_like(centered[:, 0]), atol=1e-6, rtol=1e-6)
+    prefix_mean = x[:, :3].mean(dim=1, keepdim=True)
+    assert torch.allclose(centered[:, 2:3], x[:, 2:3] - prefix_mean, atol=1e-6, rtol=1e-6)
+
+
+def test_ema_sbn_uses_exponential_prefix_statistics():
+    x = torch.randn(2, 5, 4)
+    momentum = 0.25
+    centered = EMASequenceDimBatchNorm1dCentering(4, momentum=momentum, affine=False, layout="last")(x)
+
+    mean0 = x[:, 0:1]
+    mean1 = mean0 * (1.0 - momentum) + x[:, 1:2] * momentum
+    mean2 = mean1 * (1.0 - momentum) + x[:, 2:3] * momentum
+
+    assert torch.allclose(centered[:, 0:1], torch.zeros_like(centered[:, 0:1]), atol=1e-6, rtol=1e-6)
+    assert torch.allclose(centered[:, 2:3], x[:, 2:3] - mean2, atol=1e-6, rtol=1e-6)
+
+
+def test_ema_sbn_combined_module_matches_center_then_scale():
+    x = torch.randn(3, 6, 8)
+    momentum = 0.2
+    module = EMASequenceDimBatchNorm1d(8, momentum=momentum, affine=False, layout="last")
+    manual = EMASequenceDimBatchNorm1dScaling(8, momentum=momentum, affine=False, layout="last")(
+        EMASequenceDimBatchNorm1dCentering(8, momentum=momentum, affine=False, layout="last")(x)
+    )
+    y = module(x)
+    assert torch.allclose(y, manual, atol=1e-6, rtol=1e-6)
+
+
+def test_causal_seqbn_variants_keep_shapes():
+    x = torch.randn(2, 5, 8)
+    y_fixed = CausalSequenceBatchNorm1d(5, affine=False, layout="last")(x)
+    y_dynamic = CausalDynamicSequenceBatchNorm1d(layout="last")(x)
+    assert y_fixed.shape == x.shape
+    assert y_dynamic.shape == x.shape
+
+
+def test_cfbn_normalizes_fixed_channel_feature_sites_over_batch_and_sequence():
+    x = torch.randn(3, 6, 2, 5)
+    centered = ChannelFeatureBatchNormCentering((2, 5), affine=False, track_running_stats=False, layout="last")(x)
+    center_mean = centered.mean(dim=(0, 1))
+    assert torch.allclose(center_mean, torch.zeros_like(center_mean), atol=1e-6, rtol=1e-6)
+
+    scaled = ChannelFeatureBatchNormScaling((2, 5), affine=False, track_running_stats=False, layout="last")(x)
+    scale_var = scaled.var(dim=(0, 1), unbiased=False)
+    assert torch.allclose(scale_var, torch.ones_like(scale_var), atol=1e-4, rtol=1e-4)
+
+    full = ChannelFeatureBatchNorm((2, 5), affine=False, track_running_stats=False, layout="last")(x)
+    full_mean = full.mean(dim=(0, 1))
+    full_var = full.var(dim=(0, 1), unbiased=False)
+    assert torch.allclose(full_mean, torch.zeros_like(full_mean), atol=1e-6, rtol=1e-6)
+    assert torch.allclose(full_var, torch.ones_like(full_var), atol=1e-4, rtol=1e-4)
+
+
+def test_cfbn_supports_channel_feature_first_layout():
+    x = torch.randn(3, 2, 5, 6)
+    y = ChannelFeatureBatchNorm((2, 5), affine=False, track_running_stats=False, layout="first")(x)
+    assert y.shape == x.shape
+    assert torch.allclose(y.mean(dim=(0, 3)), torch.zeros(2, 5), atol=1e-6, rtol=1e-6)
+    assert torch.allclose(y.var(dim=(0, 3), unbiased=False), torch.ones(2, 5), atol=1e-4, rtol=1e-4)
+
+
+def test_causal_cfbn_uses_batch_prefix_statistics():
+    x = torch.randn(3, 5, 2)
+    centered = ChannelFeatureBatchNormCentering(2, affine=False, track_running_stats=False, layout="last", causal=True)(x)
+    expected_t0 = x[:, 0:1] - x[:, 0:1].mean(dim=(0, 1), keepdim=True)
+    expected_t2 = x[:, 2:3] - x[:, :3].mean(dim=(0, 1), keepdim=True)
+    assert torch.allclose(centered[:, 0:1], expected_t0, atol=1e-6, rtol=1e-6)
+    assert torch.allclose(centered[:, 2:3], expected_t2, atol=1e-6, rtol=1e-6)
+
+    full_module = ChannelFeatureBatchNorm(2, affine=False, track_running_stats=False, layout="last", causal=True)
+    full = full_module(x)
+    prefix = x[:, :3]
+    prefix_mean = prefix.mean(dim=(0, 1), keepdim=True)
+    prefix_var = prefix.var(dim=(0, 1), unbiased=False, keepdim=True)
+    expected = (x[:, 2:3] - prefix_mean) / torch.sqrt(prefix_var + full_module.eps)
+    assert torch.allclose(full[:, 2:3], expected, atol=1e-6, rtol=1e-6)
+
+
+def test_ema_cfbn_uses_batch_exponential_prefix_statistics():
+    x = torch.randn(3, 5, 2)
+    momentum = 0.25
+    centered = EMAChannelFeatureBatchNormCentering(2, momentum=momentum, affine=False, layout="last")(x)
+
+    batch_mean0 = x[:, 0:1].mean(dim=0, keepdim=True)
+    batch_mean1 = x[:, 1:2].mean(dim=0, keepdim=True)
+    batch_mean2 = x[:, 2:3].mean(dim=0, keepdim=True)
+    mean1 = batch_mean0 * (1.0 - momentum) + batch_mean1 * momentum
+    mean2 = mean1 * (1.0 - momentum) + batch_mean2 * momentum
+
+    assert torch.allclose(centered[:, 0:1], x[:, 0:1] - batch_mean0, atol=1e-6, rtol=1e-6)
+    assert torch.allclose(centered[:, 2:3], x[:, 2:3] - mean2, atol=1e-6, rtol=1e-6)
+
+
+def test_ema_cfbn_full_uses_matching_batch_ema_mean_and_variance():
+    x = torch.randn(3, 5, 2)
+    momentum = 0.2
+    module = EMAChannelFeatureBatchNorm(2, momentum=momentum, affine=False, layout="last")
+    y = module(x)
+
+    batch_mean0 = x[:, 0:1].mean(dim=0, keepdim=True)
+    batch_mean1 = x[:, 1:2].mean(dim=0, keepdim=True)
+    batch_mean2 = x[:, 2:3].mean(dim=0, keepdim=True)
+    mean1 = batch_mean0 * (1.0 - momentum) + batch_mean1 * momentum
+    mean2 = mean1 * (1.0 - momentum) + batch_mean2 * momentum
+
+    batch_square_mean0 = x[:, 0:1].square().mean(dim=0, keepdim=True)
+    batch_square_mean1 = x[:, 1:2].square().mean(dim=0, keepdim=True)
+    batch_square_mean2 = x[:, 2:3].square().mean(dim=0, keepdim=True)
+    square_mean1 = batch_square_mean0 * (1.0 - momentum) + batch_square_mean1 * momentum
+    square_mean2 = square_mean1 * (1.0 - momentum) + batch_square_mean2 * momentum
+    var2 = (square_mean2 - mean2.square()).clamp_min(0.0)
+
+    expected = (x[:, 2:3] - mean2) / torch.sqrt(var2 + module.eps)
+    assert torch.allclose(y[:, 2:3], expected, atol=1e-6, rtol=1e-6)
 
 
 def test_bn2d_variants_keep_running_stats_flat_after_training():
@@ -138,6 +360,33 @@ def test_pq_activation_matches_sinarctan_when_p_equals_q_equals_2():
     assert torch.allclose(y_pq, y_sat, atol=1e-6, rtol=1e-6)
 
 
+def test_mlp_activation_supports_common_shapes_and_has_trainable_parameters():
+    module = MLPActivation(hidden_dim=8, act="tanh")
+    x2 = torch.randn(4, 7, requires_grad=True)
+    x3 = torch.randn(2, 5, 8, requires_grad=True)
+
+    y2 = module(x2)
+    y3 = module(x3)
+
+    assert y2.shape == x2.shape
+    assert y3.shape == x3.shape
+
+    (y2.sum() + y3.sum()).backward()
+    assert module.fc1.weight.grad is not None
+    assert module.fc2.weight.grad is not None
+
+
+def test_activation_factory_builds_mlpact_and_formats_flag():
+    activation._config.activation = "mlpact"
+    activation._config.activation_cfg = {"n": 11, "act": "gelu"}
+
+    module = activation.Activation(32)
+    assert isinstance(module, MLPActivation)
+    assert module.hidden_dim == 11
+    assert module.act_name == "gelu"
+    assert activation.getActivationConfigFlag() == "mlpact_H11_Agelu"
+
+
 def test_norm_factory_supports_mlp_2d_for_bn_and_gn():
     x = torch.randn(2, 8)
     cases = [
@@ -159,6 +408,19 @@ def test_norm_factory_supports_mlp_2d_for_bn_and_gn():
         assert y.shape == x.shape
 
 
+def test_norm_factory_supports_plus_composite_norms():
+    x = torch.randn(2, 8)
+    normalization._config.norm = "BNc+LNc+LNs"
+    normalization._config.norm_cfg = {"dim": 2}
+
+    module = normalization.Norm(8)
+    y = module(x)
+
+    assert isinstance(module, torch.nn.Sequential)
+    assert len(module) == 3
+    assert y.shape == x.shape
+
+
 def test_instance_norm_rejects_dim_2_inputs():
     normalization._config.norm = "IN"
     normalization._config.norm_cfg = {}
@@ -176,6 +438,36 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
         ("BN", {"dim": 3, "layout": "last"}),
         ("BNc", {"dim": 3, "layout": "last"}),
         ("BNs", {"dim": 3, "layout": "last"}),
+        ("SeqBN", {"dim": 3, "layout": "last"}),
+        ("SeqBNc", {"dim": 3, "layout": "last"}),
+        ("SeqBNs", {"dim": 3, "layout": "last"}),
+        ("CSeqBN", {"dim": 3, "layout": "last"}),
+        ("CSeqBNc", {"dim": 3, "layout": "last"}),
+        ("CSeqBNs", {"dim": 3, "layout": "last"}),
+        ("SBN", {"dim": 3, "layout": "last"}),
+        ("SBNc", {"dim": 3, "layout": "last"}),
+        ("SBNs", {"dim": 3, "layout": "last"}),
+        ("CSBN", {"dim": 3, "layout": "last"}),
+        ("CSBNc", {"dim": 3, "layout": "last"}),
+        ("CSBNs", {"dim": 3, "layout": "last"}),
+        ("EMASBN", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("EMASBNc", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("EMASBNs", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("DSeqBN", {"dim": 3, "layout": "last"}),
+        ("DSeqBNc", {"dim": 3, "layout": "last"}),
+        ("DSeqBNs", {"dim": 3, "layout": "last"}),
+        ("CDSeqBN", {"dim": 3, "layout": "last"}),
+        ("CDSeqBNc", {"dim": 3, "layout": "last"}),
+        ("CDSeqBNs", {"dim": 3, "layout": "last"}),
+        ("CFBN", {"dim": 3, "layout": "last"}),
+        ("CFBNc", {"dim": 3, "layout": "last"}),
+        ("CFBNs", {"dim": 3, "layout": "last"}),
+        ("CCFBN", {"dim": 3, "layout": "last"}),
+        ("CCFBNc", {"dim": 3, "layout": "last"}),
+        ("CCFBNs", {"dim": 3, "layout": "last"}),
+        ("EMACFBN", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("EMACFBNc", {"dim": 3, "layout": "last", "momentum": 0.2}),
+        ("EMACFBNs", {"dim": 3, "layout": "last", "momentum": 0.2}),
         ("IN", {"dim": 3, "layout": "last"}),
         ("GN", {"dim": 3, "layout": "last", "num_groups": 4}),
         ("GNc", {"dim": 3, "layout": "last", "num_groups": 4}),
@@ -188,5 +480,109 @@ def test_norm_factory_supports_vit_token_last_for_bn_in_gn():
     for norm_name, kwargs in cases:
         normalization._config.norm = norm_name
         normalization._config.norm_cfg = {}
-        y = normalization.Norm(8, **kwargs)(x)
+        if norm_name.startswith("SeqBN") or norm_name.startswith("CSeqBN"):
+            y = normalization.Norm(x.shape[1], **kwargs)(x)
+        elif norm_name.startswith("DSeqBN") or norm_name.startswith("CDSeqBN"):
+            y = normalization.Norm(**kwargs)(x)
+        else:
+            y = normalization.Norm(x.shape[2], **kwargs)(x)
         assert y.shape == x.shape
+
+
+def test_norm_factory_supports_sequence_bn_for_dim_4():
+    cases = [
+        (torch.randn(2, 5, 7, 3), "last", 5),
+        (torch.randn(2, 3, 7, 5), "first", 5),
+    ]
+    for norm_name in ("SeqBN", "SeqBNc", "SeqBNs"):
+        normalization._config.norm = norm_name
+        normalization._config.norm_cfg = {}
+        for x, layout, num_features in cases:
+            y = normalization.Norm(num_features, dim=4, layout=layout)(x)
+            assert y.shape == x.shape
+
+
+def test_norm_factory_supports_dynamic_sequence_bn_for_dim_4():
+    cases = [
+        (torch.randn(2, 5, 7, 3), "last"),
+        (torch.randn(2, 3, 7, 5), "first"),
+    ]
+    for norm_name in ("DSeqBN", "DSeqBNc", "DSeqBNs"):
+        normalization._config.norm = norm_name
+        normalization._config.norm_cfg = {}
+        for x, layout in cases:
+            y = normalization.Norm(dim=4, layout=layout)(x)
+            assert y.shape == x.shape
+
+
+def test_norm_factory_supports_cfbn_for_dim_4():
+    cases = [
+        (torch.randn(2, 5, 7, 3), "last", (7, 3), (0, 1)),
+        (torch.randn(2, 7, 3, 5), "first", (7, 3), (0, 3)),
+    ]
+    for norm_name in ("CFBN", "CFBNc", "CFBNs", "CCFBN", "CCFBNc", "CCFBNs", "EMACFBN", "EMACFBNc", "EMACFBNs"):
+        normalization._config.norm = norm_name
+        normalization._config.norm_cfg = {}
+        for x, layout, num_features, reduce_dims in cases:
+            y = normalization.Norm(num_features, dim=4, layout=layout, track_running_stats=False, momentum=0.2)(x)
+            assert y.shape == x.shape
+            if norm_name == "CFBN":
+                assert torch.allclose(y.mean(dim=reduce_dims), torch.zeros(num_features), atol=1e-6, rtol=1e-6)
+                assert torch.allclose(y.var(dim=reduce_dims, unbiased=False), torch.ones(num_features), atol=1e-4, rtol=1e-4)
+
+
+def test_vit_build_vit_norm_layer_binds_sequence_length_for_seqbn():
+    cfg = SimpleNamespace(norm="SeqBN", im_size=(32, 32), patch_size=4)
+    normalization._config.norm = "SeqBN"
+    normalization._config.norm_cfg = {}
+    module = build_vit_norm_layer(cfg)(384)
+    assert isinstance(module, SequenceBatchNorm1d)
+    assert module[0].num_features == 65
+
+
+def test_vit_build_vit_norm_layer_uses_dynamic_sequence_norm_without_fixed_length():
+    cfg = SimpleNamespace(norm="DSeqBN", im_size=(32, 32), patch_size=4)
+    normalization._config.norm = "DSeqBN"
+    normalization._config.norm_cfg = {}
+    module = build_vit_norm_layer(cfg)(384)
+    assert isinstance(module, DynamicSequenceBatchNorm1d)
+
+
+def test_vit_build_vit_norm_layer_uses_ema_sbn_norms():
+    cfg = SimpleNamespace(norm="EMASBN", norm_cfg={"momentum": 0.2}, im_size=(32, 32), patch_size=4)
+    normalization._config.norm = "EMASBN"
+    normalization._config.norm_cfg = {"momentum": 0.2}
+    module = build_vit_norm_layer(cfg)(384)
+    assert isinstance(module, EMASequenceDimBatchNorm1d)
+    assert module[0].momentum == 0.2
+
+
+def test_vit_build_vit_norm_layer_uses_ema_cfbn_norms():
+    cfg = SimpleNamespace(norm="EMACFBN", norm_cfg={"momentum": 0.2}, im_size=(32, 32), patch_size=4)
+    normalization._config.norm = "EMACFBN"
+    normalization._config.norm_cfg = {"momentum": 0.2}
+    module = build_vit_norm_layer(cfg)(384)
+    assert isinstance(module, EMAChannelFeatureBatchNorm)
+    assert module.momentum == 0.2
+
+
+def test_nanogpt_allows_causal_cfbn_norms():
+    cfg = SimpleNamespace(norm="CCFBN", norm_cfg={}, block_size=8, allow_noncausal_norm=False)
+    module = build_nanogpt_norm_layer(cfg)(16)
+    assert isinstance(module, ChannelFeatureBatchNorm)
+    assert module.causal
+
+
+def test_nanogpt_allows_ema_sbn_norms():
+    cfg = SimpleNamespace(norm="EMASBN", norm_cfg={"momentum": 0.2}, block_size=8, allow_noncausal_norm=False)
+    module = build_nanogpt_norm_layer(cfg)(16)
+    assert isinstance(module, EMASequenceDimBatchNorm1d)
+    assert module[0].momentum == 0.2
+
+
+def test_nanogpt_allows_ema_cfbn_norms():
+    cfg = SimpleNamespace(norm="EMACFBN", norm_cfg={"momentum": 0.2}, block_size=8, allow_noncausal_norm=False)
+    module = build_nanogpt_norm_layer(cfg)(16)
+    assert isinstance(module, EMAChannelFeatureBatchNorm)
+    assert module.momentum == 0.2
+

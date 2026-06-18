@@ -20,7 +20,7 @@ import extension as ext
 from extension.utils import str2list
 
 from kan_dataset import KANDatasetBuilder, add_dataset_arguments
-from model.select_kan import add_model_arguments, get_model
+from extension.model.kan.KAN_layer import KANLinear
 
 
 class KANTrainer:
@@ -56,7 +56,7 @@ class KANTrainer:
         self.y_true_val = dataset["y_true_val"]
         self.y_true_test = dataset["y_true_test"]
 
-        self.model = get_model(self.cfg)
+        self.model = ext.model.get_model(self.cfg)
         self.logger("==> model [{}]: {}".format(self.model_name, self.model))
 
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -77,6 +77,7 @@ class KANTrainer:
         self.model.to(self.device)
 
         self.best_r2 = float("-inf")
+        self.step = 0
         if self.cfg.resume:
             saved = self.saver.resume(self.cfg.resume)
             self.cfg.start_epoch = saved["epoch"]
@@ -134,13 +135,42 @@ class KANTrainer:
             },
             wandb_kwargs=wandb_kwargs,
         )
+        self.metrics = ext.measurement.setting(
+            result_path=self.result_path,
+            visualizer=self.visualizer,
+            logger=self.logger,
+        )
+        self.taiyi_config = self._build_taiyi_config()
+        if self.visualizer.wandb_enabled and self.taiyi_config:
+            self.visualizer.update_wandb_config(
+                {
+                    "taiyi_track_every": self.cfg.taiyi_track_every,
+                    "taiyi_config": self._serialize_taiyi_config(self.taiyi_config),
+                }
+            )
+        self.taiyi = ext.taiyi.setting(
+            self.cfg,
+            model=self._unwrap_model(self.model),
+            monitor_config=self.taiyi_config,
+            wandb=self.visualizer.wandb,
+            output_dir=self.result_path,
+        )
+        if self.taiyi.enabled:
+            self.logger("==> taiyi config: {}".format(self.taiyi_config))
 
     def add_arguments(self):
         parser = argparse.ArgumentParser("KAN Regression")
-        add_model_arguments(parser)
+        ext.model.add_model_arguments(parser, task="classification", default_family="kan")
+        parser.set_defaults(width=32, depth=3, arch="KAN")
         add_dataset_arguments(parser)
         parser.add_argument("--batch-size", dest="batch_size", type=str2list, default="256,1024")
         parser.add_argument("--offline", "-offline", action="store_true")
+        parser.add_argument(
+            "--taiyi-track-every",
+            type=int,
+            default=100,
+            help="track Taiyi residual statistics every N iterations",
+        )
 
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=500)
@@ -188,6 +218,35 @@ class KANTrainer:
             f"_lr{self.cfg.lr}_bs{self.cfg.batch_size[0]}"
             f"_wd{self.cfg.weight_decay}_noise{self.cfg.error}_seed{self.cfg.seed}"
         )
+
+    def _unwrap_model(self, model):
+        return model.module if isinstance(model, nn.DataParallel) else model
+
+    def _build_taiyi_config(self):
+        if not getattr(self.cfg, "taiyi", False):
+            return {}
+        if self.cfg.arch != "KAN":
+            return {}
+        schedule = f"linear({max(int(self.cfg.taiyi_track_every), 1)},0)"
+        return {
+            KANLinear: [
+                ["ResidualEnergyRatio", schedule],
+                ["ResidualInputAngleMean", schedule],
+                ["ResidualInputAngleStd", schedule],
+                ["ResidualStreamOutputAngleMean", schedule],
+                ["ResidualStreamOutputAngleStd", schedule],
+            ]
+        }
+
+    def _serialize_taiyi_config(self, taiyi_config):
+        serializable = {}
+        for module_key, quantities in taiyi_config.items():
+            if isinstance(module_key, type):
+                key = module_key.__name__
+            else:
+                key = str(module_key)
+            serializable[key] = quantities
+        return serializable
 
     def _rebuild_optim_sched_and_sync_saver(self):
         self.optimizer = ext.optimizer.setting(self.model, self.cfg)
@@ -278,11 +337,9 @@ class KANTrainer:
                 train_loss, train_r2 = self.train_epoch(epoch)
                 val_loss, val_r2, true_val_loss, true_val_r2 = self.validate(epoch)
 
-                self.visualizer.log(
+                self.metrics.log_scalars(
                     {
                         "learning_rate": self.scheduler.get_last_lr()[0],
-                        "epochs": epoch,
-                        "steps": self.step,
                         "stage": stage_idx,
                         "train_loss": train_loss,
                         "train_r2": train_r2,
@@ -290,7 +347,9 @@ class KANTrainer:
                         "val_r2": val_r2,
                         "true_val_loss": true_val_loss,
                         "true_val_r2": true_val_r2,
-                    }
+                    },
+                    step=self.step,
+                    epoch=epoch,
                 )
 
                 if self.visualizer.wandb_enabled:
@@ -317,6 +376,9 @@ class KANTrainer:
 
         new_log_filename = f"{self.model_name}_{now_date}.txt"
         self.logger("==> Network training completed. Copy log file to {}".format(new_log_filename))
+        taiyi_info = self.taiyi.finish()
+        if taiyi_info["taiyi_output"]:
+            self.logger("==> Taiyi monitor collected output.")
         self.visualizer.finish(sync_offline=self.cfg.offline)
         shutil.copy(self.logger.filename, os.path.join(self.result_path, new_log_filename))
 
@@ -347,6 +409,7 @@ class KANTrainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            self.taiyi.track(self.step)
             self.step += 1
 
             total_loss += loss.item() * targets.size(0)
@@ -357,8 +420,12 @@ class KANTrainer:
         avg_loss = total_loss / max(total_count, 1)
         train_r2 = self._compute_r2(torch.cat(outputs_list), torch.cat(targets_list))
 
-        self.visualizer.add_value("train loss", avg_loss)
-        self.visualizer.add_value("train r2", train_r2)
+        self.metrics.log_scalars(
+            {"train_loss": avg_loss, "train_r2": train_r2},
+            step=self.step,
+            epoch=epoch,
+            vis_scalars={"train loss": avg_loss, "train r2": train_r2},
+        )
         self.logger(
             "Train on epoch {}: average loss={:.5g}, r2={:.4f}".format(epoch, avg_loss, train_r2)
         )
@@ -368,8 +435,17 @@ class KANTrainer:
         val_loss, val_r2 = self._evaluate_loader(self.val_loader)
         true_loss, true_r2 = self._evaluate_true_targets(self.val_loader, split="val")
 
-        self.visualizer.add_value("val loss", val_loss)
-        self.visualizer.add_value("val r2", val_r2)
+        self.metrics.log_scalars(
+            {
+                "val_loss": val_loss,
+                "val_r2": val_r2,
+                "true_val_loss": true_loss,
+                "true_val_r2": true_r2,
+            },
+            step=self.step,
+            epoch=epoch,
+            vis_scalars={"val loss": val_loss, "val r2": val_r2},
+        )
         self.logger(
             "Validate on epoch {}: loss={:.5g}, r2={:.4f}, true_loss={:.5g}, true_r2={:.4f}".format(
                 epoch, val_loss, val_r2, true_loss, true_r2
@@ -385,17 +461,20 @@ class KANTrainer:
     def test(self):
         test_loss, test_r2 = self._evaluate_loader(self.test_loader)
         true_loss, true_r2 = self._evaluate_true_targets(self.test_loader, split="test")
-        self.visualizer.add_value("test loss", test_loss)
-        self.visualizer.add_value("test r2", test_r2)
-        self.visualizer.add_value("true test loss", true_loss)
-        self.visualizer.add_value("true test r2", true_r2)
-        self.visualizer.log(
+        self.metrics.log_scalars(
             {
                 "test_loss": test_loss,
                 "test_r2": test_r2,
                 "true_test_loss": true_loss,
                 "true_test_r2": true_r2,
-            }
+            },
+            step=self.step,
+            vis_scalars={
+                "test loss": test_loss,
+                "test r2": test_r2,
+                "true test loss": true_loss,
+                "true test r2": true_r2,
+            },
         )
         self.logger(
             "Test: loss={:.5g}, r2={:.4f}, true_loss={:.5g}, true_r2={:.4f}".format(

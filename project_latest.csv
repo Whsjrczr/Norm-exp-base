@@ -1,0 +1,17 @@
+id,name,state,created_at,norm,nanogpt_norm,attn_norm,mlp_norm,final_norm,n_layer,n_head,n_embd,block_size,optimizer,lr,seed,steps,epochs,runtime,train_loss,val_loss,val_perplexity
+773a59g6,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnCSBNs_mlpLN_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T11:29:42Z,,,,,,,,,,,,,5000,49,657,,,
+g2zrprnw,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpCSBNs_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T11:40:45Z,,,,,,,,,,,,,5000,49,658,2.596656150817871,2.603433995246887,13.510051922742049
+10mm593u,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpLN_finalCSBNs_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T11:51:49Z,,,,,,,,,,,,,5000,49,489,21.219329376220703,17.0414093208313,25176191.416497126
+ch7ao1wb,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSBNs_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T12:00:05Z,,,,,,,,,,,,,5000,49,896,,,
+9rs398t5,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnCSeqBNs_mlpLN_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T12:15:08Z,,,,,,,,,,,,,5000,49,536,0.9180068129301072,1.5820490050315856,4.864913838662935
+6n0o0ygd,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpCSeqBNs_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T12:24:11Z,,,,,,,,,,,,,5000,49,537,0.9501950585842132,1.5768381094932555,4.8396292158245195
+gg8f8pyc,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpLN_finalCSeqBNs_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T12:33:14Z,,,,,,,,,,,,,5000,49,466,0.9268529903888704,1.5760820245742797,4.835971428134307
+8l6ug9ag,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CSeqBNs_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T12:41:07Z,,,,,,,,,,,,,5000,49,610,0.9305692368745804,1.5971033549308775,4.938706006736535
+dlqyi2zs,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnCDSeqBNs_mlpLN_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T12:51:23Z,,,,,,,,,,,,,5000,49,508,0.925024435520172,1.5719481921195984,4.816021595537004
+84m19bx2,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpCDSeqBNs_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T12:59:58Z,,,,,,,,,,,,,5000,49,507,0.9527927440404892,1.571688210964203,4.814769683422018
+48xs44by,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpLN_finalCDSeqBNs_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T13:08:33Z,,,,,,,,,,,,,5000,49,467,0.9276308131217956,1.5732488465309142,4.8222896506733735
+osn3y5yw,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_CDSeqBNs_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-05-29T13:16:27Z,,,,,,,,,,,,,5000,49,566,0.9470548141002656,1.5648512363433835,4.781963500602568
+d2gn90lz,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpLN_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-06-01T11:51:00Z,,,,,,,,,,,,,5000,49,461,0.9278505164384842,1.5855188298225402,4.88182355722088
+1d04ho8h,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpLN_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-06-01T11:58:46Z,,,,,,,,,,,,,5000,49,461,0.9278505164384842,1.5855188298225402,4.88182355722088
+8ermn4ge,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_attnLN_mlpLN_finalLN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-06-01T12:06:33Z,,,,,,,,,,,,,5000,49,461,0.9278505164384842,1.5855188298225402,4.88182355722088
+0xe8dit8,nanoGPT_tinyshakespeare_L6_H6_D384_ctx256_LN_gelu_lr0.0006_bs64_wd0.1_seed0,finished,2026-06-01T12:14:22Z,,,,,,,,,,,,,5000,49,461,0.9278505164384842,1.5855188298225402,4.88182355722088

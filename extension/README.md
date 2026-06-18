@@ -18,13 +18,12 @@
 - `scheduler.py`：学习率调度器
 - `checkpoint.py`：模型保存、加载、恢复
 - `logger.py`：日志输出
-- `visualization.py`：Visdom 可视化
-- `vis_taiyi.py`：WandB / Taiyi 参数
+- `visdom.py`：Visdom 可视化入口
+- `tracking.py` / `taiyi.py`：WandB、Visdom、Taiyi 参数与运行时接入
 - `normalization.py`：归一化层工厂
 - `activation.py`：激活函数工厂
 - `utils.py`：命令行字符串解析工具
-- `modules/`：基础层
-- `my_modules/`：自定义归一化和激活层
+- `modules/`：基础层、自定义归一化和激活层
 
 ## 参数格式总规则
 
@@ -707,7 +706,7 @@ checkpoint 参数注册函数：`ext.checkpoint.add_arguments(parser)`
 - 说明：
   该参数已注册，但并不是所有训练脚本都实际使用它控制输出频率
 
-## `visualization.py`
+## `visdom.py`
 
 Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
@@ -733,7 +732,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 - 实际行为：
   上层脚本通常会在 `setting(cfg, env_name, names)` 时传入模型名作为环境名
 
-## `vis_taiyi.py`
+## `tracking.py` + `taiyi.py`
 
 ### `--visualize`
 
@@ -810,6 +809,57 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 `BNs`
 
 - BatchNormScaling
+
+`SeqBN`
+
+- SequenceBatchNorm = SequenceBatchNormCentering -> SequenceBatchNormScaling
+- Supports sequence-axis normalization for inputs with `dim >= 3`
+
+`CSeqBN`
+
+- Causal SequenceBatchNorm
+- Prefix-only variant of `SeqBN`; each sequence position only uses current and previous positions
+
+`SeqBNc`
+
+- SequenceBatchNormCentering
+- For inputs with `dim >= 3`, normalize along the sequence axis instead of the channel axis
+
+`SeqBNs`
+
+- SequenceBatchNormScaling
+- For inputs with `dim >= 3`, normalize along the sequence axis instead of the channel axis
+
+`SBN`
+
+- Sequence-only BatchNorm = SBNCentering -> SBNScaling
+- Normalizes only across the sequence dimension, treating sequence positions as the batch axis
+
+`CSBN`
+
+- Causal sequence-only BatchNorm
+- Prefix-only variant of `SBN`
+
+`DSeqBN`
+
+- DynamicSequenceBatchNorm = DynamicSequenceBatchNormCentering -> DynamicSequenceBatchNormScaling
+- Supports variable-length sequence inputs with `dim >= 3`
+- Does not keep per-position running statistics
+
+`CDSeqBN`
+
+- Causal DynamicSequenceBatchNorm
+- Prefix-only variant of `DSeqBN`
+
+`DSeqBNc`
+
+- DynamicSequenceBatchNormCentering
+- Variable-length sequence centering without fixed `seq_len`
+
+`DSeqBNs`
+
+- DynamicSequenceBatchNormScaling
+- Variable-length sequence scaling without fixed `seq_len`
 
 `bCDS`
 
@@ -1022,7 +1072,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 --resume ./results/exp1/checkpoint.pth
 ```
 
-## `modules/` 和 `my_modules/`
+## `modules/`
 
 ### `modules/`
 
@@ -1038,7 +1088,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - 作用：顺序容器扩展
 
-### `my_modules/`
+### 自定义层
 
 ????????????? `normalization.py` ? `activation.py` ?????
 ???????
@@ -1063,7 +1113,7 @@ Visdom 参数注册函数：`ext.visualization.add_arguments(parser)`
 
 - `copy.py`
 
-## `my_modules/`
+## `modules/`
 
 这里是自定义层实现，主要被 `normalization.py` 和 `activation.py` 注册调用：
 
@@ -1132,9 +1182,6 @@ python ViT/vit.py \
 - 新的统一入口是 `tracking.py`
 - 新的 Visdom 专用入口是 `visdom.py`
 - 新的 Taiyi 专用入口是 `taiyi.py`
-- `visualize.py` 现在只是 `tracking.py` 的兼容别名
-- `visualization.py` 现在只是 `visdom.py` 的兼容别名
-- `vis_taiyi.py` 暂时保留为旧参数兼容入口
 
 ### Recommended Usage
 
@@ -1217,6 +1264,15 @@ Meaning:
 
 For channel-first norm families such as `BN`, `BNc`, `BNs`, `GN`, `GNc`, `GNs`, and `IN`, the factory now automatically adapts token-last inputs when `layout="last"` is given.
 
+For sequence-axis BatchNorm families `SeqBN`, `SeqBNc`, and `SeqBNs`, `num_features` means sequence length rather than hidden size.
+
+Layout convention:
+
+- `layout="last"`: `(B, N, ..., C)`
+- `layout="first"`: `(B, C, ..., N)`
+
+For dynamic sequence-axis BatchNorm families `DSeqBN`, `DSeqBNc`, and `DSeqBNs`, no fixed `num_features` is required. They are intended for variable-length sequence inputs and use current-batch statistics only.
+
 ### `make_norm_factory`
 
 Preferred wiring pattern:
@@ -1232,6 +1288,10 @@ norm_4d = ext.make_norm_factory(dim=4)
 - `InstanceNorm` is intentionally rejected for `dim=2` because pure `(N, C)` tensors have no spatial axis for instance statistics.
 - `bCLN`, `bCRMS`, `PLN`, `PLS`, and `PQN` now work on both 2D MLP inputs and 3D ViT token inputs.
 - `BN/GN/IN` can now be used on ViT through `dim=3, layout="last"`.
+- `SeqBN/SeqBNc/SeqBNs` support sequence inputs with `dim >= 3` and compute statistics per sequence position, not per channel.
+- `DSeqBN/DSeqBNc/DSeqBNs` support variable-length sequence inputs, but they do not maintain per-position running statistics and their affine parameters are shared scalars rather than per-position vectors.
+- `SBN/SBNc/SBNs` compute statistics only over the sequence dimension; affine parameters are feature-wise.
+- Causal variants `CSBN*`, `CSeqBN*`, and `CDSeqBN*` only use prefix positions, matching autoregressive normalization behavior.
 
 ### CLI examples
 
@@ -1243,6 +1303,26 @@ norm_4d = ext.make_norm_factory(dim=4)
 # ViT
 --norm GN
 --norm-cfg "num_groups=6,dim=3,layout=last"
+
+# ViT with sequence-axis BN centering
+--norm SeqBNc
+--norm-cfg "dim=3,layout=last"
+
+# ViT with sequence-axis BN scaling
+--norm SeqBNs
+--norm-cfg "dim=3,layout=last"
+
+# ViT with sequence-axis BN (centering -> scaling)
+--norm SeqBN
+--norm-cfg "dim=3,layout=last"
+
+# Higher-dimensional sequence input with sequence axis at the end
+--norm SeqBN
+--norm-cfg "dim=4,layout=first"
+
+# Variable-length sequence BN
+--norm DSeqBN
+--norm-cfg "dim=3,layout=last"
 
 # CNN
 --norm BN
@@ -1256,3 +1336,183 @@ norm_4d = ext.make_norm_factory(dim=4)
 --norm PQN
 --norm-cfg "p=4,q=2,dim=3,layout=last"
 ```
+
+## 2026-04 MultiChannel Tool
+
+`extension.multichannel` is a small utility layer for grouped fully-connected models where the whole operator still looks like one large linear map, but different channel groups do not interact.
+
+Files:
+
+- `extension/multichannel.py`
+- `extension/modules/multichannel.py`
+
+### Components
+
+`MultiChannelLinear`
+
+- Implements a block-diagonal linear operator.
+- Input/output stay as one flat feature vector.
+- Internally the feature dimension is split into `num_channels` groups.
+- Each group has its own weight block and optional bias.
+- No cross-channel mixing happens inside this layer.
+
+`MultiChannelMLP`
+
+- Stacks `MultiChannelLinear` layers into a grouped MLP.
+- Hidden layers stay channel-independent.
+- The final layer can be:
+  - `merge`: one dense `Linear(width -> output_size)`
+  - `grouped`: one more `MultiChannelLinear(width -> output_size)`
+
+### CLI arguments
+
+These options are registered through `ext.multichannel.add_arguments(parser)` and are wired into the unified model entry under `extension/model/`.
+
+`--multi-channels`
+
+- Number of independent channel groups.
+
+`--multi-final-layer`
+
+- `merge` or `grouped`.
+
+`--multi-norm`
+
+- apply one independent normalization module per channel after each grouped linear.
+- each channel gets its own normalization instance.
+- the normalization type still comes from `--norm` and `--norm-cfg`.
+
+`--freeze-patterns`
+
+- Comma-separated regex patterns for parameter names to freeze completely.
+
+`--train-patterns`
+
+- Comma-separated regex patterns for parameters to re-enable after freezing.
+
+`--freeze-channels`
+
+- Comma-separated channel indices to freeze inside every `MultiChannelLinear`.
+
+`--trainable-channels`
+
+- Comma-separated channel indices to keep trainable inside every `MultiChannelLinear`.
+
+### Constraints
+
+- `input_size % multi_channels == 0`
+- `width % multi_channels == 0`
+- if `--multi-final-layer grouped`, then `output_size % multi_channels == 0`
+
+### Freezing behavior
+
+There are two different freeze modes.
+
+1. Whole-parameter freezing
+
+- Implemented by changing `requires_grad`.
+- Best for freezing complete modules such as `trunk.*` or `head.*`.
+
+2. Partial channel freezing inside `MultiChannelLinear`
+
+- Implemented with a train mask plus a frozen-value buffer.
+- Frozen channels use a fixed cached parameter value in forward.
+- Trainable channels still use live parameters and receive gradients.
+
+This is stronger than only zeroing gradients, because the frozen part is also fixed in the forward path.
+
+### Logging and WandB
+
+At model construction time the training scripts now record a freeze summary:
+
+- local logger text
+- WandB config fields
+- WandB run summary fields
+
+Recorded items include:
+
+- number of trainable parameters
+- number of frozen parameters
+- number of trainable/frozen tensors
+- frozen parameter names
+- per-module trainable/frozen channel indices for `MultiChannelLinear`
+
+### Examples
+
+Grouped MLP with six independent channels:
+
+```bash
+python MLP/cifar10.py \
+  -a MultiChannelMLP \
+  --width 120 \
+  --depth 4 \
+  --multi-channels 6 \
+  --multi-norm \
+  --multi-final-layer merge
+```
+
+Freeze channel `0` and `1`:
+
+```bash
+python MLP/cifar10.py \
+  -a MultiChannelMLP \
+  --width 120 \
+  --depth 4 \
+  --multi-channels 6 \
+  --freeze-channels "0,1"
+```
+
+Freeze the grouped trunk and only train the head:
+
+```bash
+python MLP/cifar10.py \
+  -a MultiChannelMLP \
+  --width 120 \
+  --depth 4 \
+  --multi-channels 6 \
+  --freeze-patterns "trunk.*" \
+  --train-patterns "head.*"
+```
+
+## 2026-04 Landscape Tool
+
+`extension.landscape` is the shared post-hoc loss-landscape helper used by `MLP-fitting`, `MLP`, and `PDE`.
+
+It is intentionally outside `taiyi.py`.
+
+- `Taiyi` is reserved for hook-based internal layer statistics.
+- `landscape` is a parameter-space analysis tool that runs after training from saved checkpoints.
+
+### Provided utilities
+
+- flatten / restore model parameters
+- sample an isosceles-right 2D slice from `theta0 -> theta_v`
+- evaluate scalar objectives on a parameter grid
+- save landscape arrays as `.npz`
+- render 2D contour plots and optional 3D surface plots
+- track geometry scalars such as:
+  - `distance_from_init`
+  - `update_rate`
+  - `curve_rate`
+  - `cosine_similarity`
+
+### Current task entry points
+
+- `MLP-fitting/landscape.py`
+- `MLP/landscape.py`
+- `PDE/landscape.py`
+
+### Output convention
+
+Most landscape tools save:
+
+- `*.npz`
+- `*_2d.png`
+- optional `*_3d.png`
+
+Examples:
+
+- `loss_landscape.npz`
+- `loss_landscape_2d.png`
+- `landscape_train_loss.npz`
+- `landscape_val_error_2d.png`
