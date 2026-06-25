@@ -91,13 +91,17 @@ class NanoGPTTrainer:
         self.metrics = ext.measurement.setting(
             result_path=self.result_path, visualizer=self.visualizer, logger=self.logger
         )
+        taiyi_config = self._nanogpt_diagnostics_config() if self.cfg.diagnostics else {}
         self.taiyi = ext.taiyi.setting(
             self.cfg,
             model=self.model,
-            monitor_config={},
+            monitor_config=taiyi_config,
             wandb=self.visualizer.wandb,
-            output_dir=self.result_path,
         )
+        if self.taiyi.enabled:
+            self.logger(f"==> taiyi config: {taiyi_config}")
+            if self.cfg.diagnostics:
+                self.logger("==> nanoGPT Taiyi diagnostics enabled; metrics are logged through wandb")
 
     def add_arguments(self):
         parser = argparse.ArgumentParser("nanoGPT TinyShakespeare Language Modeling")
@@ -118,7 +122,7 @@ class NanoGPTTrainer:
         group.add_argument("--top-k", type=int, default=200)
         group.add_argument("--sample-every", type=int, default=5)
         parser.add_argument("--offline", "-offline", action="store_true", help="offline mode")
-
+        parser.add_argument("--diagnostics", action="store_true", help="enable Taiyi norm/residual diagnostics through wandb")
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=50, seed=0)
         ext.scheduler.add_arguments(parser)
@@ -141,6 +145,10 @@ class NanoGPTTrainer:
             args.batch_size = [args.batch_size[0], args.batch_size[0]]
         if args.lr_method == "cos" and args.lr_step == 30:
             args.lr_step = args.epochs
+        if args.diagnostics:
+            args.taiyi = True
+            args.wandb = True
+            args.visualize = True
         if args.gradient_accumulation_steps < 1:
             parser.error("--gradient-accumulation-steps must be >= 1")
         return ext.tracking.normalize_config(args)
@@ -169,6 +177,25 @@ class NanoGPTTrainer:
             return nullcontext()
         dtype = torch.bfloat16 if self.cfg.dtype == "bfloat16" else torch.float16
         return torch.autocast(device_type="cuda", dtype=dtype)
+
+    def _nanogpt_diagnostics_config(self):
+        block_indices = sorted({0, max(0, self.cfg.n_layer // 2), max(0, self.cfg.n_layer - 1)})
+        norm_quantities = [
+            ["NormMechanismStats", "linear(1,0)"],
+            ["OutputGradSndNorm", "linear(5,0)"],
+        ]
+        block_quantities = [
+            ["ResidualMechanismStats", "linear(1,0)"],
+        ]
+        config = {}
+        for block_idx in block_indices:
+            block_prefix = f"transformer.h.{block_idx}"
+            config[block_prefix] = block_quantities
+            config[f"{block_prefix}.ln_1"] = norm_quantities
+            config[f"{block_prefix}.ln_2"] = norm_quantities
+        config["transformer.ln_f"] = norm_quantities
+        config["lm_head"] = [["ViTLogitsStats", "linear(1,0)"]]
+        return config
 
     def _wandb_kwargs(self):
         kwargs = dict(
@@ -246,7 +273,7 @@ class NanoGPTTrainer:
         taiyi_info = self.taiyi.finish()
         self.visualizer.finish(sync_offline=self.cfg.offline)
         if taiyi_info["taiyi_output"]:
-            self.logger("==> Taiyi monitor collected output.")
+            self.logger(f"==> Taiyi monitor uploaded artifact: {taiyi_info.get('taiyi_artifact')}")
         shutil.copy(self.logger.filename, os.path.join(self.result_path, f"{self.model_name}_{now_date}.txt"))
 
     def train_epoch(self, epoch):

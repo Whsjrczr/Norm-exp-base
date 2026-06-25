@@ -263,7 +263,7 @@ class ViTTrainer:
         taiyi_info = self.taiyi.finish()
         finish_info = self.visualizer.finish(sync_offline=self.cfg.offline)
         if taiyi_info["taiyi_output"]:
-            self.logger("==> Taiyi monitor collected output.")
+            self.logger(f"==> Taiyi monitor uploaded artifact: {taiyi_info.get('taiyi_artifact')}")
 
         new_log_filename = r"{}_{}_{:5.2f}%%.txt".format(self.model_name, now_date, self.best_acc1)
         self.logger("==> Network training completed. Copy log file to {}".format(new_log_filename))
@@ -344,6 +344,7 @@ class ViTTrainer:
         ]
         norm_quantities = [
             ["ViTNormStats", "linear(1,0)"],
+            ["NormMechanismStats", "linear(1,0)"],
             ["InputSndNorm", "linear(5,0)"],
             ["OutputGradSndNorm", "linear(5,0)"],
         ]

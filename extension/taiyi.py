@@ -1,5 +1,8 @@
 import argparse
 import os
+import re
+import sys
+import tempfile
 
 import torch
 
@@ -25,9 +28,15 @@ class TaiyiTracker:
         try:
             from Taiyi.taiyi.monitor import Monitor
         except ImportError:
-            print("You do not install Taiyi!!!!")
-            self.cfg.taiyi = False
-            return
+            local_taiyi = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Taiyi")
+            if os.path.isdir(local_taiyi) and local_taiyi not in sys.path:
+                sys.path.append(local_taiyi)
+            try:
+                from Taiyi.taiyi.monitor import Monitor
+            except ImportError:
+                print("You do not install Taiyi!!!!")
+                self.cfg.taiyi = False
+                return
 
         self.monitor = Monitor(self.model, self.monitor_config)
         if self.wandb is not None and getattr(self.wandb, "run", None) is not None:
@@ -61,19 +70,43 @@ class TaiyiTracker:
         if self.visualization is not None:
             self.visualization.close()
 
+    def _artifact_name(self):
+        run = getattr(self.wandb, "run", None) if self.wandb is not None else None
+        if run is not None and getattr(run, "id", None):
+            base = f"taiyi-output-{run.id}"
+        else:
+            base = "taiyi-output"
+        return re.sub(r"[^A-Za-z0-9_.-]+", "-", base)
+
+    def _upload_artifact(self, output):
+        if self.wandb is None or getattr(self.wandb, "run", None) is None:
+            return None
+        with tempfile.TemporaryDirectory(prefix="taiyi_wandb_") as tmp_dir:
+            output_path = os.path.join(tmp_dir, "taiyi_output.pt")
+            torch.save(output, output_path)
+            artifact = self.wandb.Artifact(
+                self._artifact_name(),
+                type="taiyi-output",
+                metadata={
+                    "monitor_config": str(self.monitor_config),
+                    "output_format": "torch.save",
+                },
+            )
+            artifact.add_file(output_path, name="taiyi_output.pt")
+            logged_artifact = self.wandb.run.log_artifact(artifact)
+            if hasattr(logged_artifact, "wait"):
+                logged_artifact.wait()
+            return getattr(logged_artifact, "name", artifact.name)
+
     def finish(self):
-        info = {"taiyi_output": False, "taiyi_output_path": None}
-        self.close()
+        info = {"taiyi_output": False, "taiyi_artifact": None}
         output = None
         if self.monitor is not None:
             output = self.monitor.get_output()
         if output is not None:
-            if self.output_dir:
-                os.makedirs(self.output_dir, exist_ok=True)
-                output_path = os.path.join(self.output_dir, "taiyi_output.pt")
-                torch.save(output, output_path)
-                info["taiyi_output_path"] = output_path
             info["taiyi_output"] = True
+            info["taiyi_artifact"] = self._upload_artifact(output)
+        self.close()
         return info
 
 

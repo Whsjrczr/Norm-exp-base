@@ -63,8 +63,25 @@ class Block(nn.Module):
         self.mlp = MLP(n_embd, dropout, bias, act_layer)
 
     def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
-        x = x + self.mlp(self.ln_2(x))
+        attn_stream = x
+        attn_branch = self.attn(self.ln_1(x))
+        x = attn_stream + attn_branch
+
+        mlp_stream = x
+        mlp_branch = self.mlp(self.ln_2(x))
+        x = mlp_stream + mlp_branch
+        self.residual_states = {
+            "attn": {
+                "stream": attn_stream,
+                "branch": attn_branch,
+                "output": attn_stream + attn_branch,
+            },
+            "mlp": {
+                "stream": mlp_stream,
+                "branch": mlp_branch,
+                "output": x,
+            },
+        }
         return x
 
 
