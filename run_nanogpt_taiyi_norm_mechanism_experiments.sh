@@ -20,13 +20,25 @@ else
   script_dir="$(pwd)"
 fi
 
-if [[ -d "${script_dir}/nanoGPT" ]]; then
-  repo_root="${script_dir}"
-else
-  repo_root="$(cd "${script_dir}/.." && pwd)"
+find_repo_root() {
+  local dir="$1"
+  while [[ "${dir}" != "/" && -n "${dir}" ]]; do
+    if [[ -f "${dir}/nanoGPT/nanogpt.py" && -d "${dir}/extension" ]]; then
+      printf '%s' "${dir}"
+      return 0
+    fi
+    dir="$(cd "${dir}/.." && pwd)"
+  done
+  return 1
+}
+
+repo_root="${REPO_ROOT:-$(find_repo_root "${script_dir}")}"
+if [[ -z "${repo_root}" ]]; then
+  echo "Could not locate repo root from ${script_dir}; set REPO_ROOT explicitly." >&2
+  exit 1
 fi
 
-gen_dir="${script_dir}/${dir_name}"
+gen_dir="${GEN_DIR:-${script_dir}/${dir_name}}"
 mkdir -p "${gen_dir}"
 cp "$0" "${gen_dir}/gen_script.sh"
 

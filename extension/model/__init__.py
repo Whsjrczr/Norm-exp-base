@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 
 from .bert import BERT_MODEL_NAMES, add_bert_arguments, get_bert_model
 from .kan import KAN_MODEL_NAMES, add_kan_arguments, get_kan_model
@@ -79,6 +79,32 @@ def add_model_arguments(
         help="model architecture, available names: " + " | ".join(_all_model_names()),
     )
     add_initialization_arguments(group)
+    group.add_argument(
+        "--norm-site",
+        dest="norm_site",
+        default=None,
+        choices=("all", "attn", "mlp", "final", "norm1", "norm2", "none"),
+        help="replace only one normalization site; unselected Transformer sites use LN",
+    )
+    group.add_argument(
+        "--norm-sites",
+        dest="norm_sites",
+        default=None,
+        help="comma-separated normalization sites to replace, e.g. attn,mlp or norm1,norm2,final",
+    )
+    group.add_argument("--mean-shift-alpha", dest="mean_shift_alpha", type=float, default=0.0)
+    group.add_argument(
+        "--mean-shift-target",
+        dest="mean_shift_target",
+        default="pre_norm",
+        choices=("input", "pre_norm", "post_norm", "residual_branch"),
+    )
+    group.add_argument(
+        "--centering-rescue",
+        dest="centering_rescue",
+        default="none",
+        choices=("none", "early", "middle", "late", "mlp", "attn", "norm1", "norm2", "final", "all"),
+    )
 
     add_mlp_arguments(parser, task=task)
     add_kan_arguments(parser)
@@ -118,3 +144,4 @@ __all__ = [
     "get_model",
     "resolve_model_family",
 ]
+

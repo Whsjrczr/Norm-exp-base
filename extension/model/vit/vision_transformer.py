@@ -8,6 +8,13 @@ import torch.nn as nn
 import extension as ext
 
 
+
+def _call_norm_factory(factory, num_features, block_idx=None, site=None):
+    try:
+        return factory(num_features, block_idx=block_idx, site=site)
+    except TypeError:
+        return factory(num_features)
+
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):
     # Cut & paste from PyTorch official master until it's in a few official releases - RW
     # Method based on https://people.sc.fsu.edu/~jburkardt/presentations/truncated_normal.pdf
@@ -118,13 +125,19 @@ class Attention(nn.Module):
 
 class Block(nn.Module):
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, norm1_layer=None, norm2_layer=None,
+                 block_idx=0, mean_shift_alpha=0.0, mean_shift_target="pre_norm"):
         super().__init__()
-        self.norm1 = norm_layer(dim)
+        norm1_layer = norm1_layer or norm_layer
+        norm2_layer = norm2_layer or norm_layer
+        self.block_idx = block_idx
+        self.mean_shift_alpha = float(mean_shift_alpha or 0.0)
+        self.mean_shift_target = mean_shift_target
+        self.norm1 = _call_norm_factory(norm1_layer, dim, block_idx=block_idx, site="norm1")
         self.attn = Attention(
             dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.norm2 = norm_layer(dim)
+        self.norm2 = _call_norm_factory(norm2_layer, dim, block_idx=block_idx, site="norm2")
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
@@ -134,10 +147,14 @@ class Block(nn.Module):
             return attn
         attn_stream = x
         attn_branch = self.drop_path(y)
+        if self.mean_shift_target == "residual_branch" and self.mean_shift_alpha != 0.0:
+            attn_branch = attn_branch + self.mean_shift_alpha
         x = attn_stream + attn_branch
 
         mlp_stream = x
         mlp_branch = self.drop_path(self.mlp(self.norm2(x)))
+        if self.mean_shift_target == "residual_branch" and self.mean_shift_alpha != 0.0:
+            mlp_branch = mlp_branch + self.mean_shift_alpha
         x = mlp_stream + mlp_branch
         self.residual_states = {
             "attn": {
@@ -181,9 +198,15 @@ class VisionTransformer(nn.Module):
     """ Vision Transformer """
     def __init__(self, img_size=[224], patch_size=16, in_chans=3, num_classes=1000, embed_dim=768, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 drop_path_rate=0., norm_layer=nn.LayerNorm, act_layer=nn.GELU, **kwargs):
+                 drop_path_rate=0., norm_layer=nn.LayerNorm, act_layer=nn.GELU, norm1_layer=None, norm2_layer=None,
+                 final_norm_layer=None, mean_shift_alpha=0.0, mean_shift_target="pre_norm", **kwargs):
         super().__init__()
         self.num_features = self.embed_dim = embed_dim
+        self.mean_shift_alpha = float(mean_shift_alpha or 0.0)
+        self.mean_shift_target = mean_shift_target
+        norm1_layer = norm1_layer or norm_layer
+        norm2_layer = norm2_layer or norm_layer
+        final_norm_layer = final_norm_layer or norm_layer
 
         if isinstance(img_size, (tuple, list)):
             img_size = int(img_size[-1])
@@ -202,9 +225,11 @@ class VisionTransformer(nn.Module):
         self.blocks = nn.ModuleList([
             Block(
                 dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer, act_layer=act_layer)
+                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer,
+                norm1_layer=norm1_layer, norm2_layer=norm2_layer, act_layer=act_layer, block_idx=i,
+                mean_shift_alpha=self.mean_shift_alpha, mean_shift_target=self.mean_shift_target)
             for i in range(depth)])
-        self.norm = norm_layer(embed_dim)
+        self.norm = _call_norm_factory(final_norm_layer, embed_dim, block_idx=None, site="final")
 
         # Classifier fc
         self.fc = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()

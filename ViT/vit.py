@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 import argparse
 import os
 import shutil
@@ -13,6 +13,7 @@ PROJECT_ROOT = os.path.dirname(THIS_DIR)
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 import extension as ext
+from extension.model.vit import intervention_suffix as vit_intervention_suffix
 
 
 class ViTTrainer:
@@ -24,7 +25,7 @@ class ViTTrainer:
         self.model_name = (
             f"ViT_{self.cfg.arch}_{ext.dataset.setting(self.cfg)}"
             f"_img{self.image_size}_patch{self.cfg.patch_size}"
-            f"_{ext.normalization.setting(self.cfg)}_{ext.activation.setting(self.cfg)}"
+            f"_{ext.normalization.setting(self.cfg)}{vit_intervention_suffix(self.cfg)}_{ext.activation.setting(self.cfg)}"
             f"_lr{self.cfg.lr}_bs{train_batch_size}_dropout{self.cfg.dropout}"
             f"_droppath{self.cfg.drop_path_rate}_wd{self.cfg.weight_decay}_seed{self.cfg.seed}"
         )
@@ -102,6 +103,12 @@ class ViTTrainer:
                 "seed": self.cfg.seed,
                 "scheduler": getattr(self.cfg, "lr_method", None),
                 "scheduler_cfg": f"step{getattr(self.cfg, 'lr_step', None)}_gamma{getattr(self.cfg, 'lr_gamma', None)}",
+                "norm_site": getattr(self.cfg, "norm_site", None),
+                "norm_sites": getattr(self.cfg, "norm_sites", None),
+                "mean_shift_alpha": getattr(self.cfg, "mean_shift_alpha", 0.0),
+                "mean_shift_target": getattr(self.cfg, "mean_shift_target", None),
+                "centering_rescue": getattr(self.cfg, "centering_rescue", None),
+                "norm_no_affine": getattr(self.cfg, "norm_no_affine", False),
             },
         )
 
@@ -538,3 +545,6 @@ if __name__ == "__main__":
     trainer = ViTTrainer()
     torch.set_num_threads(1)
     trainer.train()
+
+
+

@@ -1,10 +1,16 @@
-import math
+﻿import math
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
+
+def _call_norm_factory(factory, num_features, block_idx=None, site=None):
+    try:
+        return factory(num_features, block_idx=block_idx, site=site)
+    except TypeError:
+        return factory(num_features)
 class CausalSelfAttention(nn.Module):
     def __init__(self, n_embd, n_head, dropout, bias):
         super().__init__()
@@ -55,20 +61,39 @@ class MLP(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, n_embd, n_head, dropout, bias, attn_norm_layer, mlp_norm_layer, act_layer):
+    def __init__(
+        self,
+        n_embd,
+        n_head,
+        dropout,
+        bias,
+        attn_norm_layer,
+        mlp_norm_layer,
+        act_layer,
+        block_idx=0,
+        mean_shift_alpha=0.0,
+        mean_shift_target="pre_norm",
+    ):
         super().__init__()
-        self.ln_1 = attn_norm_layer(n_embd)
+        self.block_idx = block_idx
+        self.mean_shift_alpha = float(mean_shift_alpha or 0.0)
+        self.mean_shift_target = mean_shift_target
+        self.ln_1 = _call_norm_factory(attn_norm_layer, n_embd, block_idx=block_idx, site="attn")
         self.attn = CausalSelfAttention(n_embd, n_head, dropout, bias)
-        self.ln_2 = mlp_norm_layer(n_embd)
+        self.ln_2 = _call_norm_factory(mlp_norm_layer, n_embd, block_idx=block_idx, site="mlp")
         self.mlp = MLP(n_embd, dropout, bias, act_layer)
 
     def forward(self, x):
         attn_stream = x
         attn_branch = self.attn(self.ln_1(x))
+        if self.mean_shift_target == "residual_branch" and self.mean_shift_alpha != 0.0:
+            attn_branch = attn_branch + self.mean_shift_alpha
         x = attn_stream + attn_branch
 
         mlp_stream = x
         mlp_branch = self.mlp(self.ln_2(x))
+        if self.mean_shift_target == "residual_branch" and self.mean_shift_alpha != 0.0:
+            mlp_branch = mlp_branch + self.mean_shift_alpha
         x = mlp_stream + mlp_branch
         self.residual_states = {
             "attn": {
@@ -100,9 +125,13 @@ class GPT(nn.Module):
         mlp_norm_layer=None,
         final_norm_layer=None,
         act_layer=nn.GELU,
+        mean_shift_alpha=0.0,
+        mean_shift_target="pre_norm",
     ):
         super().__init__()
         self.block_size = block_size
+        self.mean_shift_alpha = float(mean_shift_alpha or 0.0)
+        self.mean_shift_target = mean_shift_target
         attn_norm_layer = attn_norm_layer or norm_layer
         mlp_norm_layer = mlp_norm_layer or norm_layer
         final_norm_layer = final_norm_layer or norm_layer
@@ -113,11 +142,22 @@ class GPT(nn.Module):
                 drop=nn.Dropout(dropout),
                 h=nn.ModuleList(
                     [
-                        Block(n_embd, n_head, dropout, bias, attn_norm_layer, mlp_norm_layer, act_layer)
-                        for _ in range(n_layer)
+                        Block(
+                            n_embd,
+                            n_head,
+                            dropout,
+                            bias,
+                            attn_norm_layer,
+                            mlp_norm_layer,
+                            act_layer,
+                            block_idx=i,
+                            mean_shift_alpha=self.mean_shift_alpha,
+                            mean_shift_target=self.mean_shift_target,
+                        )
+                        for i in range(n_layer)
                     ]
                 ),
-                ln_f=final_norm_layer(n_embd),
+                ln_f=_call_norm_factory(final_norm_layer, n_embd, block_idx=None, site="final"),
             )
         )
         self.lm_head = nn.Linear(n_embd, vocab_size, bias=False)
@@ -144,6 +184,8 @@ class GPT(nn.Module):
             raise ValueError(f"Input sequence length {seq_len} exceeds block_size {self.block_size}.")
         pos = torch.arange(0, seq_len, dtype=torch.long, device=idx.device)
         x = self.transformer.drop(self.transformer.wte(idx) + self.transformer.wpe(pos))
+        if self.mean_shift_target == "input" and self.mean_shift_alpha != 0.0:
+            x = x + self.mean_shift_alpha
         for block in self.transformer.h:
             x = block(x)
         logits = self.lm_head(self.transformer.ln_f(x))
@@ -165,3 +207,5 @@ class GPT(nn.Module):
             idx_next = torch.multinomial(probs, num_samples=1)
             idx = torch.cat((idx, idx_next), dim=1)
         return idx
+
+

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 import argparse
 import math
 import os
@@ -220,6 +220,12 @@ class NanoGPTTrainer:
                 "learning_rate": self.cfg.lr,
                 "batch_size": self.cfg.batch_size[0],
                 "gradient_accumulation_steps": self.cfg.gradient_accumulation_steps,
+                "norm_site": getattr(self.cfg, "norm_site", None),
+                "norm_sites": getattr(self.cfg, "norm_sites", None),
+                "mean_shift_alpha": getattr(self.cfg, "mean_shift_alpha", 0.0),
+                "mean_shift_target": getattr(self.cfg, "mean_shift_target", None),
+                "centering_rescue": getattr(self.cfg, "centering_rescue", None),
+                "norm_no_affine": getattr(self.cfg, "norm_no_affine", False),
                 "weight_decay": self.cfg.weight_decay,
                 "epochs": self.cfg.epochs,
                 "iters_per_epoch": self.cfg.iters_per_epoch,
@@ -363,3 +369,4 @@ class NanoGPTTrainer:
 if __name__ == "__main__":
     trainer = NanoGPTTrainer()
     trainer.train()
+

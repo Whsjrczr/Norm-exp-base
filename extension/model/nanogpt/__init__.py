@@ -1,4 +1,4 @@
-import torch.nn as nn
+﻿import torch.nn as nn
 
 import extension as ext
 
@@ -39,6 +39,89 @@ _CAUSAL_SEQUENCE_NORMS = {
 }
 
 
+class MeanShiftNormWrapper(nn.Module):
+    def __init__(self, module, alpha=0.0, target="pre_norm"):
+        super().__init__()
+        self.module = module
+        self.alpha = float(alpha or 0.0)
+        self.target = target
+
+    def forward(self, x):
+        if self.target == "pre_norm" and self.alpha != 0.0:
+            x = x + self.alpha
+        y = self.module(x)
+        if self.target == "post_norm" and self.alpha != 0.0:
+            y = y + self.alpha
+        return y
+
+
+def _split_csv(value):
+    if value is None or value == "":
+        return []
+    return [item.strip() for item in str(value).split(",") if item.strip()]
+
+
+def _selected_norm_sites(cfg, valid_sites):
+    site = getattr(cfg, "norm_site", None)
+    sites = _split_csv(getattr(cfg, "norm_sites", None))
+    if site in (None, "none") and not sites:
+        return None
+    if site == "all":
+        selected = set(valid_sites)
+    else:
+        selected = {site} if site not in (None, "none") else set()
+    selected.update(sites)
+    return {item for item in selected if item in valid_sites}
+
+
+def _full_norm_name(norm_name):
+    names = _norm_names(norm_name)
+    out = []
+    for name in names:
+        candidate = name[:-1] if name.endswith("s") else name
+        out.append(candidate if candidate in ext.normalization._config.norm_methods else name)
+    return "+".join(out)
+
+
+def _range_rescue_applies(cfg, block_idx, rescue):
+    if block_idx is None or rescue not in {"early", "middle", "late"}:
+        return False
+    n_layer = max(1, int(getattr(cfg, "n_layer", 1)))
+    third = max(1, n_layer // 3)
+    if rescue == "early":
+        return block_idx < third
+    if rescue == "middle":
+        return third <= block_idx < min(n_layer, 2 * third)
+    return block_idx >= min(n_layer, 2 * third)
+
+
+def _rescue_applies(cfg, slot, block_idx):
+    rescue = getattr(cfg, "centering_rescue", "none") or "none"
+    if rescue == "none":
+        return False
+    if rescue == "all":
+        return True
+    if rescue in {"attn", "mlp", "final"}:
+        return slot == rescue
+    return _range_rescue_applies(cfg, block_idx, rescue)
+
+
+def _intervention_suffix(cfg):
+    parts = []
+    selected = _selected_norm_sites(cfg, ("attn", "mlp", "final"))
+    if selected is not None:
+        parts.append("site" + "-".join(sorted(selected)) if selected else "sitenone")
+    alpha = float(getattr(cfg, "mean_shift_alpha", 0.0) or 0.0)
+    if alpha != 0.0:
+        parts.append(f"shift{getattr(cfg, 'mean_shift_target', 'pre_norm')}{alpha:g}")
+    rescue = getattr(cfg, "centering_rescue", "none") or "none"
+    if rescue != "none":
+        parts.append(f"rescue{rescue}")
+    if getattr(cfg, "norm_no_affine", False):
+        parts.append("noaffine")
+    return "_" + "_".join(parts) if parts else ""
+
+
 def add_nanogpt_arguments(parser):
     group = parser.add_argument_group("nanoGPT Model Options")
     group.add_argument("--n-layer", dest="n_layer", type=int, default=6)
@@ -69,6 +152,8 @@ def _norm_names(norm):
 
 def _merged_slot_cfg(cfg, slot):
     base = dict(getattr(cfg, "norm_cfg", {}) or {})
+    if getattr(cfg, "norm_no_affine", False):
+        base["affine"] = False
     override = getattr(cfg, f"{slot}_norm_cfg", None)
     if override:
         base.update(override)
@@ -76,7 +161,11 @@ def _merged_slot_cfg(cfg, slot):
 
 
 def _slot_norm_name(cfg, slot):
-    return getattr(cfg, f"{slot}_norm", None) or getattr(cfg, "norm", "LN")
+    selected = _selected_norm_sites(cfg, ("attn", "mlp", "final"))
+    explicit = getattr(cfg, f"{slot}_norm", None)
+    if selected is not None:
+        return explicit or (getattr(cfg, "norm", "LN") if slot in selected else "LN")
+    return explicit or getattr(cfg, "norm", "LN")
 
 
 def _validate_norm_names(names, allow_noncausal=False):
@@ -140,7 +229,7 @@ def format_nanogpt_norm_setting(cfg):
         for slot in slots
     )
     if uses_global:
-        return ext.normalization.setting(cfg)
+        return ext.normalization.setting(cfg) + _intervention_suffix(cfg)
 
     def slot_flag(slot):
         norm_name = _slot_norm_name(cfg, slot)
@@ -148,7 +237,7 @@ def format_nanogpt_norm_setting(cfg):
         extra = "".join(f"_{key}{norm_cfg[key]}" for key in sorted(norm_cfg) if norm_cfg[key] != global_cfg.get(key))
         return f"{slot}{norm_name}{extra}"
 
-    return "_".join(slot_flag(slot) for slot in slots)
+    return "_".join(slot_flag(slot) for slot in slots) + _intervention_suffix(cfg)
 
 
 def format_nanogpt_activation_setting(cfg):
@@ -164,6 +253,8 @@ def format_nanogpt_activation_setting(cfg):
 
 def build_nanogpt_norm_layer(cfg):
     norm_cfg = dict(getattr(cfg, "norm_cfg", {}) or {})
+    if getattr(cfg, "norm_no_affine", False):
+        norm_cfg["affine"] = False
     norm_cfg["allow_noncausal_norm"] = getattr(cfg, "allow_noncausal_norm", False)
     return _build_norm_layer(
         getattr(cfg, "norm", "LN"),
@@ -172,23 +263,32 @@ def build_nanogpt_norm_layer(cfg):
     )
 
 
+def _build_nanogpt_site_norm_layer(cfg, slot):
+    norm_name = _slot_norm_name(cfg, slot)
+    norm_cfg = {**_merged_slot_cfg(cfg, slot), "allow_noncausal_norm": getattr(cfg, "allow_noncausal_norm", False)}
+    base_factory = _build_norm_layer(norm_name, norm_cfg, block_size=getattr(cfg, "block_size", None))
+    rescue_name = _full_norm_name(norm_name)
+    rescue_factory = _build_norm_layer(rescue_name, norm_cfg, block_size=getattr(cfg, "block_size", None))
+    alpha = float(getattr(cfg, "mean_shift_alpha", 0.0) or 0.0)
+    shift_target = getattr(cfg, "mean_shift_target", "pre_norm")
+
+    def factory(num_features, block_idx=None, site=None):
+        use_rescue = _rescue_applies(cfg, slot, block_idx) and rescue_name != norm_name
+        module = (rescue_factory if use_rescue else base_factory)(num_features)
+        selected = _selected_norm_sites(cfg, ("attn", "mlp", "final"))
+        shift_site_selected = selected is None or slot in selected
+        if shift_site_selected and alpha != 0.0 and shift_target in {"pre_norm", "post_norm"}:
+            module = MeanShiftNormWrapper(module, alpha=alpha, target=shift_target)
+        return module
+
+    return factory
+
+
 def build_nanogpt_norm_layers(cfg):
     return {
-        "attn_norm_layer": _build_norm_layer(
-            _slot_norm_name(cfg, "attn"),
-            {**_merged_slot_cfg(cfg, "attn"), "allow_noncausal_norm": getattr(cfg, "allow_noncausal_norm", False)},
-            block_size=getattr(cfg, "block_size", None),
-        ),
-        "mlp_norm_layer": _build_norm_layer(
-            _slot_norm_name(cfg, "mlp"),
-            {**_merged_slot_cfg(cfg, "mlp"), "allow_noncausal_norm": getattr(cfg, "allow_noncausal_norm", False)},
-            block_size=getattr(cfg, "block_size", None),
-        ),
-        "final_norm_layer": _build_norm_layer(
-            _slot_norm_name(cfg, "final"),
-            {**_merged_slot_cfg(cfg, "final"), "allow_noncausal_norm": getattr(cfg, "allow_noncausal_norm", False)},
-            block_size=getattr(cfg, "block_size", None),
-        ),
+        "attn_norm_layer": _build_nanogpt_site_norm_layer(cfg, "attn"),
+        "mlp_norm_layer": _build_nanogpt_site_norm_layer(cfg, "mlp"),
+        "final_norm_layer": _build_nanogpt_site_norm_layer(cfg, "final"),
     }
 
 
@@ -226,6 +326,8 @@ def get_nanogpt_model(cfg):
         bias=bool(cfg.bias),
         norm_layer=build_nanogpt_norm_layer(cfg),
         act_layer=build_nanogpt_activation_layer(cfg),
+        mean_shift_alpha=getattr(cfg, "mean_shift_alpha", 0.0),
+        mean_shift_target=getattr(cfg, "mean_shift_target", "pre_norm"),
         **norm_layers,
     )
 
@@ -241,3 +343,13 @@ __all__ = [
     "format_nanogpt_norm_setting",
     "get_nanogpt_model",
 ]
+
+
+
+
+
+
+
+
+
+

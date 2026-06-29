@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 from functools import partial
 import torch.nn as nn
 
@@ -532,6 +532,7 @@ def add_arguments(parser: argparse.ArgumentParser):
     group.add_argument('--norm', default='No', help='Use which normalization layers? {' + ', '.join(
         _config.norm_methods.keys()) + '}; use + for sequential combinations, e.g. BNc+LNc+LNs' + ' (defalut: {})'.format(_config.norm))
     group.add_argument('--norm-cfg', type=str2dict, default={}, metavar='DICT', help='layers config.')
+    group.add_argument('--norm-no-affine', action='store_true', help='disable affine parameters for normalization layers')
     return group
 
 def getNormConfigFlag():
@@ -583,6 +584,9 @@ def setting(cfg: argparse.Namespace):
         #print(value)
         if key in _config.__dict__:
             setattr(_config, key, value)
+    if getattr(cfg, 'norm_no_affine', False):
+        _config.norm_cfg = dict(_config.norm_cfg or {})
+        _config.norm_cfg['affine'] = False
     # print(_config.__dict__)
     flagName = getNormConfigFlag()
     # print(flagName)
@@ -595,3 +599,5 @@ def Norm(*args, **kwargs):
     if not norm_names:
         return None
     return _make_composite_norm(norm_names, *args, **kwargs)
+
+
