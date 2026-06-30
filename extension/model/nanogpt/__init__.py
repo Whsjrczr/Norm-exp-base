@@ -110,9 +110,15 @@ def _intervention_suffix(cfg):
     parts = []
     selected = _selected_norm_sites(cfg, ("attn", "mlp", "final"))
     if selected is not None:
-        parts.append("site" + "-".join(sorted(selected)) if selected else "sitenone")
-    alpha = float(getattr(cfg, "mean_shift_alpha", 0.0) or 0.0)
-    if alpha != 0.0:
+        raw_site = getattr(cfg, "norm_site", None)
+        raw_sites = getattr(cfg, "norm_sites", None)
+        if raw_site == "all" and not raw_sites:
+            parts.append("siteall")
+        else:
+            parts.append("site" + "-".join(sorted(selected)) if selected else "sitenone")
+    alpha_value = getattr(cfg, "mean_shift_alpha", None)
+    alpha = float(alpha_value or 0.0)
+    if alpha_value is not None:
         parts.append(f"shift{getattr(cfg, 'mean_shift_target', 'pre_norm')}{alpha:g}")
     rescue = getattr(cfg, "centering_rescue", "none") or "none"
     if rescue != "none":

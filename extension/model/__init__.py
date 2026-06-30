@@ -92,7 +92,7 @@ def add_model_arguments(
         default=None,
         help="comma-separated normalization sites to replace, e.g. attn,mlp or norm1,norm2,final",
     )
-    group.add_argument("--mean-shift-alpha", dest="mean_shift_alpha", type=float, default=0.0)
+    group.add_argument("--mean-shift-alpha", dest="mean_shift_alpha", type=float, default=None)
     group.add_argument(
         "--mean-shift-target",
         dest="mean_shift_target",
