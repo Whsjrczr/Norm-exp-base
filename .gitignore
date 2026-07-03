@@ -45,6 +45,7 @@ KAN/test/
 nanoGPT/test/
 BERT/test/
 BERT/results/
+*no_ckpt/
 
 # wandb related
 wandb/
@@ -63,3 +64,4 @@ test.py
 cifar10/
 
 wandb_logs_latest/
+
