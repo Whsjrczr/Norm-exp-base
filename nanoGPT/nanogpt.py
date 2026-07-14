@@ -97,6 +97,7 @@ class NanoGPTTrainer:
             model=self.model,
             monitor_config=taiyi_config,
             wandb=self.visualizer.wandb,
+            output_dir=self.result_path,
         )
         if self.taiyi.enabled:
             self.logger(f"==> taiyi config: {taiyi_config}")
@@ -182,6 +183,9 @@ class NanoGPTTrainer:
         block_indices = sorted({0, max(0, self.cfg.n_layer // 2), max(0, self.cfg.n_layer - 1)})
         norm_quantities = [
             ["NormMechanismStats", "linear(1,0)"],
+            ["InputCovCondition", "linear(5,0)"],
+            ["InputCovStableRank", "linear(5,0)"],
+            ["InputCovMaxEig", "linear(5,0)"],
             ["OutputGradSndNorm", "linear(5,0)"],
         ]
         block_quantities = [
@@ -279,7 +283,15 @@ class NanoGPTTrainer:
         taiyi_info = self.taiyi.finish()
         self.visualizer.finish(sync_offline=self.cfg.offline)
         if taiyi_info["taiyi_output"]:
-            self.logger(f"==> Taiyi monitor uploaded artifact: {taiyi_info.get('taiyi_artifact')}")
+            if taiyi_info.get("taiyi_artifact"):
+                self.logger(f"==> Taiyi monitor uploaded artifact: {taiyi_info['taiyi_artifact']}")
+            elif taiyi_info.get("taiyi_artifact_error"):
+                self.logger(
+                    f"==> Taiyi monitor output saved to {taiyi_info.get('taiyi_output_path')}; "
+                    f"artifact upload failed: {taiyi_info['taiyi_artifact_error']}"
+                )
+            else:
+                self.logger(f"==> Taiyi monitor output saved to {taiyi_info.get('taiyi_output_path')}")
         shutil.copy(self.logger.filename, os.path.join(self.result_path, f"{self.model_name}_{now_date}.txt"))
 
     def train_epoch(self, epoch):

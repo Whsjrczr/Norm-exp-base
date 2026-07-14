@@ -192,6 +192,16 @@ def _DynamicSequenceCenterRMSNorm(num_features, dim=3, layout=None, eps=1e-5, af
     )
 
 
+def _CausalDynamicSequenceCenterRMSNorm(num_features, dim=3, layout=None, eps=1e-5, affine=True, *args, **kwargs):
+    layout = _normalize_sequence_layout(dim, layout)
+    if layout != "last":
+        raise ValueError("CDSeqBCRMS only supports layout='last' because RMSNorm is applied on the last feature axis.")
+    return nn.Sequential(
+        CausalDynamicSequenceBatchNorm1dCentering(affine=False, layout=layout),
+        LayerNormScalingRMS(num_features, eps=eps, elementwise_affine=affine),
+    )
+
+
 def _DynamicSequenceCenterDropoutScaling(num_features, dim=3, layout=None, dropout_prob=0.0, eps=1e-5, affine=True, *args, **kwargs):
     layout = _normalize_sequence_layout(dim, layout)
     if layout != "last":
@@ -513,6 +523,7 @@ class _config:
                     'DSeqBLS': _DynamicSequenceCenterLayerScaling,
                     'DSeqBCLN': _DynamicSequenceCenterLayerNorm,
                     'DSeqBCRMS': _DynamicSequenceCenterRMSNorm,
+                    'CDSeqBCRMS': _CausalDynamicSequenceCenterRMSNorm,
                     'DSeqBCDS': _DynamicSequenceCenterDropoutScaling,
                     'bCDS':_bCenteringDropoutScaling,
                     'bClCDS':_bCenlCenDropScaling,
@@ -524,7 +535,7 @@ class _config:
                     "PLS": _ParallelLayerScaling,#partial(ParallelLN, centering=False, norm_method="default"),
                     "PQN": _PQNorm,
                     'No': _IdentityModule,
-                    'no': _IdentityModule,}  # 'No': _LayerNorm, 
+                    'no': _IdentityModule,}  # 'No': _LayerNorm,
 
 
 def add_arguments(parser: argparse.ArgumentParser):

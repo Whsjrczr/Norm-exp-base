@@ -92,13 +92,18 @@ class BERTTranslationTrainer:
             visualizer=self.visualizer,
             logger=self.logger,
         )
+        taiyi_config = self._bert_diagnostics_config() if self.cfg.diagnostics else {}
         self.taiyi = ext.taiyi.setting(
             self.cfg,
             model=self.model,
-            monitor_config={},
+            monitor_config=taiyi_config,
             wandb=self.visualizer.wandb,
             output_dir=self.result_path,
         )
+        if self.taiyi.enabled:
+            self.logger(f"==> taiyi config: {taiyi_config}")
+            if self.cfg.diagnostics:
+                self.logger("==> BERT translation diagnostics enabled; metrics are logged through wandb")
 
     def add_arguments(self):
         parser = argparse.ArgumentParser("BERT-style Text Translation")
@@ -119,6 +124,7 @@ class BERTTranslationTrainer:
         group.add_argument("--sample-src", default="hello")
         group.add_argument("--sample-every", type=int, default=5)
         parser.add_argument("--offline", "-offline", action="store_true", help="offline mode")
+        parser.add_argument("--diagnostics", action="store_true", help="enable BERT norm conditioning diagnostics through Taiyi and wandb")
 
         ext.trainer.add_arguments(parser)
         parser.set_defaults(epochs=50, seed=0)
@@ -142,6 +148,10 @@ class BERTTranslationTrainer:
             args.batch_size = [args.batch_size[0], args.batch_size[0]]
         if args.lr_method == "cos" and args.lr_step == 30:
             args.lr_step = args.epochs
+        if args.diagnostics:
+            args.taiyi = True
+            args.wandb = True
+            args.visualize = True
         if args.gradient_accumulation_steps < 1:
             parser.error("--gradient-accumulation-steps must be >= 1")
         return ext.tracking.normalize_config(args)
@@ -177,6 +187,24 @@ class BERTTranslationTrainer:
         dtype = torch.bfloat16 if self.cfg.dtype == "bfloat16" else torch.float16
         return torch.autocast(device_type="cuda", dtype=dtype)
 
+    def _bert_diagnostics_config(self):
+        block_indices = sorted({0, max(0, self.cfg.bert_layers // 2), max(0, self.cfg.bert_layers - 1)})
+        norm_quantities = [
+            ["NormMechanismStats", "linear(1,0)"],
+            ["InputCovCondition", "linear(5,0)"],
+            ["InputCovStableRank", "linear(5,0)"],
+            ["InputCovMaxEig", "linear(5,0)"],
+            ["OutputGradSndNorm", "linear(5,0)"],
+        ]
+        config = {"final_norm": norm_quantities, "lm_head": [["ViTLogitsStats", "linear(1,0)"]]}
+        for block_idx in block_indices:
+            config[f"encoder.{block_idx}.norm_1"] = norm_quantities
+            config[f"encoder.{block_idx}.norm_2"] = norm_quantities
+            config[f"decoder.{block_idx}.norm_1"] = norm_quantities
+            config[f"decoder.{block_idx}.norm_2"] = norm_quantities
+            config[f"decoder.{block_idx}.norm_3"] = norm_quantities
+        return config
+
     def _wandb_kwargs(self):
         kwargs = dict(
             project=self.cfg.wandb_project,
@@ -198,6 +226,7 @@ class BERTTranslationTrainer:
                 "epochs": self.cfg.epochs,
                 "iters_per_epoch": self.cfg.iters_per_epoch,
                 "seed": self.cfg.seed,
+                "diagnostics": getattr(self.cfg, "diagnostics", False),
             },
         )
         if self.cfg.resume and getattr(self, "wandb_id", None):
@@ -241,7 +270,15 @@ class BERTTranslationTrainer:
         taiyi_info = self.taiyi.finish()
         self.visualizer.finish(sync_offline=self.cfg.offline)
         if taiyi_info["taiyi_output"]:
-            self.logger("==> Taiyi monitor collected output.")
+            if taiyi_info.get("taiyi_artifact"):
+                self.logger(f"==> Taiyi monitor uploaded artifact: {taiyi_info['taiyi_artifact']}")
+            elif taiyi_info.get("taiyi_artifact_error"):
+                self.logger(
+                    f"==> Taiyi monitor output saved to {taiyi_info.get('taiyi_output_path')}; "
+                    f"artifact upload failed: {taiyi_info['taiyi_artifact_error']}"
+                )
+            else:
+                self.logger(f"==> Taiyi monitor output saved to {taiyi_info.get('taiyi_output_path')}")
         shutil.copy(self.logger.filename, os.path.join(self.result_path, f"{self.model_name}_{now_date}.txt"))
         return train_loss
 

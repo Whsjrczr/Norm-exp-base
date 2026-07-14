@@ -35,7 +35,7 @@ def _cfg(norm="LN"):
     )
 
 
-@pytest.mark.parametrize("norm", ["LN", "RMS", "CSBN", "CSeqBN", "CDSeqBN"])
+@pytest.mark.parametrize("norm", ["LN", "RMS", "CSBN", "CSeqBN", "CDSeqBN", "CDSeqBCRMS"])
 def test_nanogpt_forward_backward_and_generate(norm):
     cfg = _cfg(norm)
     ext.normalization.setting(cfg)
@@ -53,7 +53,7 @@ def test_nanogpt_forward_backward_and_generate(norm):
     assert generated.shape[1] == prompt.shape[1] + 3
 
 
-@pytest.mark.parametrize("norm", ["BN", "SeqBN", "DSeqBN"])
+@pytest.mark.parametrize("norm", ["BN", "SeqBN", "DSeqBN", "DSeqBCRMS"])
 def test_nanogpt_rejects_noncausal_token_mixing_norms(norm):
     cfg = _cfg(norm)
     ext.normalization.setting(cfg)
@@ -62,8 +62,8 @@ def test_nanogpt_rejects_noncausal_token_mixing_norms(norm):
         ext.model.get_model(cfg)
 
 
-def test_nanogpt_allows_explicit_bn_control():
-    cfg = _cfg("BN")
+def test_nanogpt_allows_explicit_noncausal_control():
+    cfg = _cfg("DSeqBCRMS")
     cfg.allow_noncausal_norm = True
     ext.normalization.setting(cfg)
     ext.activation.setting(cfg)

@@ -83,7 +83,7 @@ def test_convert_opus_zip_to_pairs(tmp_path):
     assert output_tsv.read_text(encoding="utf-8").strip() == "hello\tbonjour"
 
 
-@pytest.mark.parametrize("norm", ["LN", "BN", "SBN", "SeqBN", "CFBN"])
+@pytest.mark.parametrize("norm", ["LN", "BN", "DSeqBCRMS", "SBN", "SeqBN", "CFBN"])
 def test_bert_translation_forward_backward_and_generate(norm):
     cfg = _cfg()
     cfg.norm = norm

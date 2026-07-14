@@ -515,6 +515,15 @@ def test_norm_factory_supports_dynamic_sequence_bn_for_dim_4():
             assert y.shape == x.shape
 
 
+def test_norm_factory_supports_sequence_center_rmsnorm_for_token_last():
+    x = torch.randn(2, 5, 8)
+    for norm_name in ("DSeqBCRMS", "CDSeqBCRMS"):
+        normalization._config.norm = norm_name
+        normalization._config.norm_cfg = {}
+        y = normalization.Norm(8, dim=3, layout="last")(x)
+        assert y.shape == x.shape
+
+
 def test_norm_factory_supports_cfbn_for_dim_4():
     cases = [
         (torch.randn(2, 5, 7, 3), "last", (7, 3), (0, 1)),

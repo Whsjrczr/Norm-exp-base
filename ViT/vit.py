@@ -139,6 +139,7 @@ class ViTTrainer:
             model=self.model,
             monitor_config=taiyi_config,
             wandb=self.visualizer.wandb,
+            output_dir=self.result_path,
         )
         if self.taiyi.enabled:
             self.logger("==> taiyi config: {}".format(taiyi_config))
@@ -270,7 +271,15 @@ class ViTTrainer:
         taiyi_info = self.taiyi.finish()
         finish_info = self.visualizer.finish(sync_offline=self.cfg.offline)
         if taiyi_info["taiyi_output"]:
-            self.logger(f"==> Taiyi monitor uploaded artifact: {taiyi_info.get('taiyi_artifact')}")
+            if taiyi_info.get("taiyi_artifact"):
+                self.logger(f"==> Taiyi monitor uploaded artifact: {taiyi_info['taiyi_artifact']}")
+            elif taiyi_info.get("taiyi_artifact_error"):
+                self.logger(
+                    f"==> Taiyi monitor output saved to {taiyi_info.get('taiyi_output_path')}; "
+                    f"artifact upload failed: {taiyi_info['taiyi_artifact_error']}"
+                )
+            else:
+                self.logger(f"==> Taiyi monitor output saved to {taiyi_info.get('taiyi_output_path')}")
 
         new_log_filename = r"{}_{}_{:5.2f}%%.txt".format(self.model_name, now_date, self.best_acc1)
         self.logger("==> Network training completed. Copy log file to {}".format(new_log_filename))
@@ -353,6 +362,9 @@ class ViTTrainer:
             ["ViTNormStats", "linear(1,0)"],
             ["NormMechanismStats", "linear(1,0)"],
             ["InputSndNorm", "linear(5,0)"],
+            ["InputCovCondition", "linear(5,0)"],
+            ["InputCovStableRank", "linear(5,0)"],
+            ["InputCovMaxEig", "linear(5,0)"],
             ["OutputGradSndNorm", "linear(5,0)"],
         ]
         for block_idx in (0, 6, 11):
